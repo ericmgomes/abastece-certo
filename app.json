@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Abastece Certo",
+    "slug": "abastece-certo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F7F2EA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.abastececerto.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para sugerir o posto onde você está abastecendo."
+      }
+    },
+    "android": {
+      "package": "com.abastececerto.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
