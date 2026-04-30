@@ -279,6 +279,18 @@ function getAuthUserName(metadata: Record<string, unknown> | null | undefined) {
   return trimmedName || null;
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function authErrorMessage(message: string) {
+  if (message === "Invalid login credentials") {
+    return "Senha errada ou usuário não existe.";
+  }
+
+  return message;
+}
+
 const starterState: AppState = {
   user: null,
   selectedCarId: null,
@@ -354,6 +366,7 @@ export default function App() {
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authName, setAuthName] = useState<string | null>(null);
+  const [authScreenOpen, setAuthScreenOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("Resumo");
   const [fuelFormMode, setFuelFormMode] = useState<"closed" | "new" | "edit">("closed");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
@@ -364,30 +377,39 @@ export default function App() {
   const theme = useMemo(() => buildTheme(themeMode), [themeMode]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  async function loadStateForOwner(loadedOwnerId: string) {
-    const localValue = await AsyncStorage.getItem(storageKey);
-    const localState = localValue
-      ? ({ ...starterState, ...JSON.parse(localValue) } as AppState)
-      : starterState;
+  function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
+    return {
+      ...starterState,
+      user: { name: name ?? email?.split("@")[0] ?? "Usuário" },
+      stations: [],
+      themeMode
+    };
+  }
+
+  function loadDemoState() {
+    setState(withDemoData(starterState));
+  }
+
+  async function loadStateForOwner(loadedOwnerId: string, name: string | null, email: string | null) {
+    const fallbackState = emptyAuthenticatedState(name, email);
 
     try {
       const remoteState = await appRepository.load(loadedOwnerId);
       if (remoteState) {
         const mergedRemoteState = { ...starterState, ...remoteState } as AppState;
-        setState(withDemoData({
+        setState({
           ...mergedRemoteState,
+          user: mergedRemoteState.user ?? fallbackState.user,
+          stations: mergedRemoteState.stations ?? [],
           logs: sortFuelLogs(withStableLogSequences(mergedRemoteState.logs))
-        }));
+        });
         return;
       }
     } catch {
-      // The SQL schema or RLS policies may still be pending. Local storage keeps the app usable.
+      // The SQL schema or RLS policies may still be pending. The logged account starts empty.
     }
 
-    setState(withDemoData({
-      ...localState,
-      logs: sortFuelLogs(withStableLogSequences(localState.logs))
-    }));
+    setState(fallbackState);
   }
 
   useEffect(() => {
@@ -402,13 +424,17 @@ export default function App() {
           setOwnerId(null);
           setAuthEmail(null);
           setAuthName(null);
+          loadDemoState();
           return;
         }
 
+        const sessionEmail = sessionUser.email ?? null;
+        const sessionName = getAuthUserName(sessionUser.user_metadata);
+        setAuthEmail(sessionEmail);
+        setAuthName(sessionName);
+        await loadStateForOwner(sessionUser.id, sessionName, sessionEmail);
         setOwnerId(sessionUser.id);
-        setAuthEmail(sessionUser.email ?? null);
-        setAuthName(getAuthUserName(sessionUser.user_metadata));
-        await loadStateForOwner(sessionUser.id);
+        setAuthScreenOpen(false);
       } catch {
         if (!cancelled) {
           Alert.alert("Ops", "Não foi possível carregar sua sessão.");
@@ -426,13 +452,20 @@ export default function App() {
         setOwnerId(null);
         setAuthEmail(null);
         setAuthName(null);
+        loadDemoState();
         return;
       }
 
-      setOwnerId(sessionUser.id);
-      setAuthEmail(sessionUser.email ?? null);
-      setAuthName(getAuthUserName(sessionUser.user_metadata));
-      loadStateForOwner(sessionUser.id).catch(() => undefined);
+      const sessionEmail = sessionUser.email ?? null;
+      const sessionName = getAuthUserName(sessionUser.user_metadata);
+      setAuthEmail(sessionEmail);
+      setAuthName(sessionName);
+      loadStateForOwner(sessionUser.id, sessionName, sessionEmail)
+        .then(() => {
+          setOwnerId(sessionUser.id);
+          setAuthScreenOpen(false);
+        })
+        .catch(() => undefined);
     });
 
     loadSession();
@@ -492,7 +525,7 @@ export default function App() {
     setOwnerId(null);
     setAuthEmail(null);
     setAuthName(null);
-    setState(starterState);
+    loadDemoState();
   }
 
   function toggleFilterCar(carId: string) {
@@ -539,13 +572,13 @@ export default function App() {
     );
   }
 
-  if (!ownerId) {
+  if (authScreenOpen) {
     return (
       <SafeAreaProvider>
         <ThemeContext.Provider value={{ mode: themeMode, theme, styles }}>
           <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
           <SafeAreaView style={styles.shell}>
-            <AuthScreen onToggleTheme={toggleTheme} />
+            <AuthScreen onToggleTheme={toggleTheme} onCancel={() => setAuthScreenOpen(false)} />
           </SafeAreaView>
         </ThemeContext.Provider>
       </SafeAreaProvider>
@@ -566,10 +599,14 @@ export default function App() {
               onSave={(user) => updateState({ user })}
               onToggleTheme={toggleTheme}
               onNewFuel={openNewFuelForm}
+              onOpenAuth={() => setAuthScreenOpen(true)}
               onSignOut={signOut}
               authEmail={authEmail}
               authName={authName}
             />
+            {!ownerId ? (
+              <DemoBanner onOpenAuth={() => setAuthScreenOpen(true)} />
+            ) : null}
             {state.user && state.cars.length > 1 && tab !== "Carros" && fuelFormMode !== "new" ? (
               <CarFilter
                 cars={state.cars}
@@ -725,11 +762,15 @@ export default function App() {
   );
 }
 
-function AuthScreen({ onToggleTheme }: { onToggleTheme: () => void }) {
+function AuthScreen({ onToggleTheme, onCancel }: { onToggleTheme: () => void; onCancel: () => void }) {
   const { mode, styles, theme } = useThemeStyles();
+  const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const isSignIn = authMode === "signIn";
 
   function authRedirectUrl() {
     const location = (globalThis as unknown as { location?: { origin?: string } }).location;
@@ -737,25 +778,42 @@ function AuthScreen({ onToggleTheme }: { onToggleTheme: () => void }) {
   }
 
   async function submit(mode: "signIn" | "signUp") {
-    if (!email.trim() || password.length < 6) {
-      Alert.alert("Quase lá", "Informe email e uma senha com pelo menos 6 caracteres.");
+    setFormError(null);
+    const trimmedEmail = email.trim();
+    if (!isValidEmail(trimmedEmail)) {
+      setFormError("Informe um email válido para continuar.");
+      return;
+    }
+
+    if (!password) {
+      setFormError("Informe sua senha para continuar.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setFormError("Use uma senha com pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (mode === "signUp" && password !== passwordConfirmation) {
+      setFormError("A confirmação de senha precisa ser igual à senha.");
       return;
     }
 
     setLoading(true);
-    const credentials = { email: email.trim(), password };
+    const credentials = { email: trimmedEmail, password };
     const result = mode === "signIn"
       ? await supabase.auth.signInWithPassword(credentials)
       : await supabase.auth.signUp(credentials);
     setLoading(false);
 
     if (result.error) {
-      Alert.alert("Ops", result.error.message);
+      setFormError(authErrorMessage(result.error.message));
       return;
     }
 
     if (mode === "signUp" && !result.data.session) {
-      Alert.alert("Conta criada", "Confira seu email para confirmar a conta antes de entrar.");
+      Alert.alert("Conta criada", "Confira seu email para confirmar a conta antes de fazer login.");
     }
   }
 
@@ -781,12 +839,32 @@ function AuthScreen({ onToggleTheme }: { onToggleTheme: () => void }) {
     >
       <View style={styles.authTop}>
         <Text style={styles.brand}>Litro Certo</Text>
-        <Pressable style={styles.themeButton} onPress={onToggleTheme}>
-          <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
-        </Pressable>
+        <View style={styles.headerSecondaryActions}>
+          <Pressable style={styles.headerSecondaryButton} onPress={onCancel}>
+            <Text style={styles.headerSecondaryButtonText}>Agora não</Text>
+          </Pressable>
+          <Pressable style={styles.themeButton} onPress={onToggleTheme}>
+            <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
+          </Pressable>
+        </View>
       </View>
       <View style={styles.authCard}>
-        <Text style={styles.title}>Entre para sincronizar seus dados</Text>
+        <Text style={styles.title}>Entre para manter seus abastecimentos salvos</Text>
+        <Text style={styles.muted}>Use email e senha ou continue com Google.</Text>
+        <View style={styles.authTabs}>
+          <Pressable
+            style={[styles.authTab, isSignIn && styles.authTabActive]}
+            onPress={() => setAuthMode("signIn")}
+          >
+            <Text style={[styles.authTabText, isSignIn && styles.authTabTextActive]}>Login</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.authTab, !isSignIn && styles.authTabActive]}
+            onPress={() => setAuthMode("signUp")}
+          >
+            <Text style={[styles.authTabText, !isSignIn && styles.authTabTextActive]}>Criar conta</Text>
+          </Pressable>
+        </View>
         <TextInput
           value={email}
           onChangeText={setEmail}
@@ -804,14 +882,35 @@ function AuthScreen({ onToggleTheme }: { onToggleTheme: () => void }) {
           placeholderTextColor={theme.muted}
           style={styles.input}
         />
-        <Pressable style={[styles.primaryButton, styles.authButton]} onPress={() => submit("signIn")} disabled={loading}>
-          <Text style={styles.primaryButtonText}>{loading ? "Aguarde..." : "Entrar"}</Text>
+        {!isSignIn ? (
+          <TextInput
+            value={passwordConfirmation}
+            onChangeText={setPasswordConfirmation}
+            placeholder="Confirmar senha"
+            secureTextEntry
+            placeholderTextColor={theme.muted}
+            style={styles.input}
+          />
+        ) : null}
+        {formError ? (
+          <View style={styles.formErrorBox}>
+            <Text style={styles.formErrorText}>{formError}</Text>
+          </View>
+        ) : null}
+        <Pressable style={[styles.primaryButton, styles.authButton]} onPress={() => submit(authMode)} disabled={loading}>
+          <Text style={styles.primaryButtonText}>
+            {loading ? "Aguarde..." : isSignIn ? "Login" : "Criar conta"}
+          </Text>
         </Pressable>
+        <View style={styles.authDivider}>
+          <View style={styles.authDividerLine} />
+          <Text style={styles.authDividerText}>ou</Text>
+          <View style={styles.authDividerLine} />
+        </View>
         <Pressable style={[styles.googleButton, styles.authButton]} onPress={signInWithGoogle} disabled={loading}>
-          <Text style={styles.googleButtonText}>Entrar com Google</Text>
-        </Pressable>
-        <Pressable style={[styles.secondaryButton, styles.authButton]} onPress={() => submit("signUp")} disabled={loading}>
-          <Text style={styles.secondaryButtonText}>Criar conta</Text>
+          <Text style={styles.googleButtonText}>
+            {isSignIn ? "Login com Google" : "Criar conta com Google"}
+          </Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -823,6 +922,7 @@ function Header({
   onSave,
   onToggleTheme,
   onNewFuel,
+  onOpenAuth,
   onSignOut,
   authEmail,
   authName
@@ -831,6 +931,7 @@ function Header({
   onSave: (user: User) => void;
   onToggleTheme: () => void;
   onNewFuel: () => void;
+  onOpenAuth: () => void;
   onSignOut: () => void;
   authEmail: string | null;
   authName: string | null;
@@ -856,17 +957,35 @@ function Header({
               </Pressable>
               {accountOpen ? (
                 <View style={styles.accountMenu}>
-                  {authName ? <Text style={styles.accountName}>{authName}</Text> : null}
-                  {authEmail ? <Text style={styles.accountEmail}>{authEmail}</Text> : null}
-                  <Pressable
-                    style={styles.accountMenuItem}
-                    onPress={() => {
-                      setAccountOpen(false);
-                      onSignOut();
-                    }}
-                  >
-                    <Text style={styles.accountMenuText}>Sair</Text>
-                  </Pressable>
+                  {authEmail ? (
+                    <>
+                      {authName ? <Text style={styles.accountName}>{authName}</Text> : null}
+                      <Text style={styles.accountEmail}>{authEmail}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.accountEmail}>Faça login para salvar seus dados.</Text>
+                  )}
+                  {authEmail ? (
+                    <Pressable
+                      style={styles.accountMenuItem}
+                      onPress={() => {
+                        setAccountOpen(false);
+                        onSignOut();
+                      }}
+                    >
+                      <Text style={styles.accountMenuText}>Sair</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      style={styles.accountMenuItem}
+                      onPress={() => {
+                        setAccountOpen(false);
+                        onOpenAuth();
+                      }}
+                    >
+                      <Text style={styles.accountMenuText}>Login / criar conta</Text>
+                    </Pressable>
+                  )}
                 </View>
               ) : null}
             </View>
@@ -878,8 +997,8 @@ function Header({
       <Pressable style={styles.headerPrimaryButton} onPress={onNewFuel}>
         <View style={styles.headerPrimaryButtonCircle}>
           <Text style={styles.headerPrimaryButtonPlus}>+</Text>
+          <Text style={styles.headerPrimaryButtonText}>Abastecer</Text>
         </View>
-        <Text style={styles.headerPrimaryButtonText}>Abastecer</Text>
       </Pressable>
     </View>
   );
@@ -901,6 +1020,22 @@ function Header({
         onPress={() => name.trim() && onSave({ name: name.trim() })}
       >
         <Text style={styles.primaryButtonText}>Começar</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function DemoBanner({ onOpenAuth }: { onOpenAuth: () => void }) {
+  const { styles } = useThemeStyles();
+
+  return (
+    <View style={styles.demoBanner}>
+      <View style={styles.demoBannerTextGroup}>
+        <Text style={styles.demoBannerTitle}>Dados de exemplo</Text>
+        <Text style={styles.demoBannerText}>Entre para começar com seus próprios abastecimentos.</Text>
+      </View>
+      <Pressable style={styles.demoBannerButton} onPress={onOpenAuth}>
+        <Text style={styles.demoBannerButtonText}>Login</Text>
       </Pressable>
     </View>
   );
@@ -1983,12 +2118,14 @@ function Tabs({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void 
   const { styles } = useThemeStyles();
   const tabs: Tab[] = ["Resumo", "Abastecimentos", "Postos", "Carros"];
   return (
-    <View style={styles.tabs}>
-      {tabs.map((tab) => (
-        <Pressable key={tab} style={[styles.tab, active === tab && styles.activeTab]} onPress={() => onChange(tab)}>
-          <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{tab}</Text>
-        </Pressable>
-      ))}
+    <View style={styles.tabsBar}>
+      <View style={styles.tabs}>
+        {tabs.map((tab) => (
+          <Pressable key={tab} style={[styles.tab, active === tab && styles.activeTab]} onPress={() => onChange(tab)}>
+            <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{tab}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -2277,6 +2414,60 @@ function createStyles(theme: Theme) {
     flex: 0,
     width: "100%"
   },
+  authTabs: {
+    flexDirection: "row",
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 4,
+    gap: 4
+  },
+  authTab: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  authTabActive: {
+    backgroundColor: theme.primary
+  },
+  authTabText: {
+    color: theme.muted,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  authTabTextActive: {
+    color: "#FFFFFF"
+  },
+  authDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  authDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.border
+  },
+  authDividerText: {
+    color: theme.muted,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  formErrorBox: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D94A4A",
+    backgroundColor: theme.mode === "dark" ? "rgba(217,74,74,0.14)" : "#FCEAEA",
+    padding: 10
+  },
+  formErrorText: {
+    color: "#D94A4A",
+    fontSize: 13,
+    lineHeight: 18
+  },
   googleButton: {
     minHeight: 50,
     borderRadius: 8,
@@ -2318,33 +2509,34 @@ function createStyles(theme: Theme) {
   headerPrimaryButton: {
     position: "relative",
     width: "100%",
-    minHeight: 84,
+    minHeight: 94,
     borderRadius: 0,
     backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
     paddingHorizontal: 12,
     zIndex: 1
   },
   headerPrimaryButtonCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 86,
+    height: 86,
+    borderRadius: 43,
     backgroundColor: theme.primary,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    gap: 0
   },
   headerPrimaryButtonPlus: {
     color: "#FFFFFF",
     fontSize: 34,
     fontWeight: "800",
-    lineHeight: 36
+    lineHeight: 32
   },
   headerPrimaryButtonText: {
-    color: theme.muted,
-    fontSize: 12,
-    fontWeight: "700"
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 14
   },
   headerSecondaryButton: {
     minHeight: 30,
@@ -2359,6 +2551,47 @@ function createStyles(theme: Theme) {
   headerSecondaryButtonText: {
     color: theme.muted,
     fontSize: 11,
+    fontWeight: "900"
+  },
+  demoBanner: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.primarySoft,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  demoBannerTextGroup: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  demoBannerTitle: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  demoBannerText: {
+    color: theme.muted,
+    fontSize: 12,
+    lineHeight: 16
+  },
+  demoBannerButton: {
+    minHeight: 34,
+    borderRadius: 8,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  demoBannerButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "900"
   },
   accountBox: {
@@ -2550,7 +2783,7 @@ function createStyles(theme: Theme) {
   },
   content: {
     padding: 16,
-    paddingBottom: 104
+    paddingBottom: 112
   },
   stack: {
     gap: 14
@@ -3115,24 +3348,29 @@ function createStyles(theme: Theme) {
     fontSize: 15,
     fontWeight: "600"
   },
-  tabs: {
+  tabsBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 72,
-    paddingHorizontal: 8,
+    minHeight: 76,
     paddingTop: 8,
     paddingBottom: 10,
     backgroundColor: theme.surface,
     borderTopWidth: 1,
     borderTopColor: theme.border,
+    alignItems: "center"
+  },
+  tabs: {
+    width: "100%",
+    maxWidth: 430,
+    paddingHorizontal: 8,
     flexDirection: "row",
     gap: 5
   },
   tab: {
     flex: 1,
-    minHeight: 46,
+    minHeight: 52,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -3143,7 +3381,7 @@ function createStyles(theme: Theme) {
   },
   tabText: {
     color: theme.muted,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "800"
   },
   activeTabText: {
