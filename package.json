@@ -1,5 +1,5 @@
 {
-  "name": "abastece-certo",
+  "name": "litro-certo",
   "version": "0.1.0",
   "private": true,
   "main": "expo/AppEntry.js",
@@ -13,9 +13,12 @@
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@supabase/supabase-js": "^2.105.1",
+    "@types/leaflet": "^1.9.21",
     "expo": "~51.0.28",
     "expo-location": "~17.0.1",
     "expo-status-bar": "~1.12.1",
+    "leaflet": "^1.9.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.5",

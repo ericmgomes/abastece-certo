@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Abastece Certo",
-    "slug": "abastece-certo",
+    "name": "Litro Certo",
+    "slug": "litro-certo",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -10,13 +10,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.abastececerto.app",
+      "bundleIdentifier": "com.litrocerto.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Usamos sua localização para sugerir o posto onde você está abastecendo."
       }
     },
     "android": {
-      "package": "com.abastececerto.app",
+      "package": "com.litrocerto.app",
       "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
     },
     "web": {

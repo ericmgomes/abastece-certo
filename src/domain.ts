@@ -19,12 +19,15 @@ export type Station = {
   id: string;
   name: string;
   address: string;
+  city?: string;
+  state?: string;
   latitude: number;
   longitude: number;
 };
 
 export type FuelLog = {
   id: string;
+  sequence?: number;
   carId: string;
   stationId: string;
   fuel: FuelType;
@@ -87,6 +90,26 @@ export class IdFactory {
 export class MoneyParser {
   static toNumber(value: string) {
     return Number(value.replace(",", "."));
+  }
+}
+
+export class BrazilianPlate {
+  static normalize(value: string) {
+    const cleaned = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 7);
+    if (/^[A-Z]{3}\d{4}$/.test(cleaned)) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    }
+
+    return cleaned;
+  }
+
+  static isValid(value: string) {
+    const cleaned = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    if (/^[A-Z]{3}\d{4}$/.test(cleaned)) {
+      return true;
+    }
+
+    return /^[A-Z]{3}\d[A-Z]\d{2}$/.test(cleaned);
   }
 }
 
@@ -181,17 +204,19 @@ export class CarFactory {
     brand: string;
     model: string;
     year: string;
+    acceptedFuel?: FuelType[];
     defaultFuel: FuelType;
   }): Car {
+    const acceptedFuel = input.acceptedFuel?.length ? input.acceptedFuel : [input.defaultFuel];
     return {
       id: IdFactory.create("carro"),
-      plate: input.plate.trim().toUpperCase(),
+      plate: BrazilianPlate.normalize(input.plate),
       nickname: input.nickname.trim(),
       brand: input.brand.trim(),
       model: input.model.trim(),
       year: input.year.trim(),
-      acceptedFuel: fuels,
-      defaultFuel: input.defaultFuel
+      acceptedFuel,
+      defaultFuel: acceptedFuel.includes(input.defaultFuel) ? input.defaultFuel : acceptedFuel[0]
     };
   }
 
@@ -203,27 +228,32 @@ export class CarFactory {
       brand: string;
       model: string;
       year: string;
+      acceptedFuel: FuelType[];
       defaultFuel: FuelType;
     }
   ): Car {
+    const acceptedFuel = input.acceptedFuel.length ? input.acceptedFuel : [input.defaultFuel];
     return {
       ...car,
-      plate: input.plate.trim().toUpperCase(),
+      plate: BrazilianPlate.normalize(input.plate),
       nickname: input.nickname.trim(),
       brand: input.brand.trim(),
       model: input.model.trim(),
       year: input.year.trim(),
-      defaultFuel: input.defaultFuel
+      acceptedFuel,
+      defaultFuel: acceptedFuel.includes(input.defaultFuel) ? input.defaultFuel : acceptedFuel[0]
     };
   }
 }
 
 export class StationFactory {
-  static createManual(input: { name: string; latitude?: number; longitude?: number }): Station {
+  static createManual(input: { name: string; city?: string; state?: string; latitude?: number; longitude?: number }): Station {
     return {
       id: IdFactory.create("posto"),
       name: input.name.trim(),
       address: "Cadastrado manualmente",
+      city: input.city?.trim(),
+      state: input.state?.trim().toUpperCase(),
       latitude: input.latitude ?? -23.5614,
       longitude: input.longitude ?? -46.6559
     };
@@ -275,7 +305,10 @@ export class DateFormatter {
   }
 
   static inputDate(date: string) {
-    return new Date(date).toISOString().slice(0, 10);
+    const parsed = new Date(date);
+    const day = String(parsed.getDate()).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    return `${day}-${month}-${parsed.getFullYear()}`;
   }
 }
 
@@ -287,7 +320,7 @@ export class DateInputParser {
       return DateInputParser.safeIso(`${trimmed}T12:00:00`);
     }
 
-    const match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const match = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
     if (!match) {
       return undefined;
     }
@@ -370,16 +403,33 @@ export class DashboardCalculator {
   }
 
   private monthlyTotals(): MonthlyTotal[] {
-    const monthlyMap = this.state.logs.reduce<Record<string, number>>((acc, log) => {
-      const key = DateFormatter.monthKey(log.createdAt);
-      acc[key] = (acc[key] ?? 0) + log.paid;
+    const monthlyMap = this.state.logs.reduce<Record<string, { label: string; value: number; date: Date }>>((acc, log) => {
+      const date = new Date(log.createdAt);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      acc[key] = acc[key] ?? {
+        label: DateFormatter.monthKey(log.createdAt),
+        value: 0,
+        date: new Date(date.getFullYear(), date.getMonth(), 1)
+      };
+      acc[key].value += log.paid;
       return acc;
     }, {});
 
-    return Object.entries(monthlyMap)
-      .map(([label, value]) => ({ label, value }))
-      .slice(0, 6)
-      .reverse();
+    Array.from({ length: 3 }, (_item, index) =>
+      new Date(this.referenceDate.getFullYear(), this.referenceDate.getMonth() - (2 - index), 1)
+    ).forEach((date) => {
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        monthlyMap[key] = monthlyMap[key] ?? {
+          label: date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+          value: 0,
+          date: new Date(date.getFullYear(), date.getMonth(), 1)
+        };
+      });
+
+    return Object.values(monthlyMap)
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(-6)
+      .map(({ label, value }) => ({ label, value }));
   }
 
   private potentialSavings(bestStation?: StationRankingItem) {

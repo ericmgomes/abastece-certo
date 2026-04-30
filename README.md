@@ -1,4 +1,4 @@
-# Abastece Certo
+# Litro Certo
 
 App mobile para iOS e Android que registra abastecimentos, calcula o preco real por litro e ajuda o motorista a descobrir os postos mais baratos com base no proprio historico.
 
