@@ -16,12 +16,10 @@ type ProfileRow = {
 type CarRow = {
   id: string;
   owner_id: string;
-  plate: string;
   vehicle_type: VehicleType | null;
   nickname: string;
   brand: string;
   model: string;
-  year: string;
   accepted_fuel: FuelType[];
   default_fuel: FuelType;
 };
@@ -47,9 +45,14 @@ type FuelLogRow = {
   paid: number;
   liters: number;
   price_per_liter: number;
+  odometer_km: number | null;
   created_at: string;
   latitude: number | null;
   longitude: number | null;
+};
+
+type PersistedRow = {
+  id: string;
 };
 
 export class SupabaseAppRepository {
@@ -122,19 +125,19 @@ export class SupabaseAppRepository {
       throw profileResult.error;
     }
 
-    await this.clearRows("fuel_logs", ownerId);
-    await this.clearRows("cars", ownerId);
-    await this.clearRows("stations", ownerId);
-    await this.insertRows("cars", state.cars.map((car) => this.carToRow(ownerId, car)));
-    await this.insertRows("stations", state.stations.map((station) => this.stationToRow(ownerId, station)));
-    await this.insertRows("fuel_logs", state.logs.map((log) => this.logToRow(ownerId, log)));
+    await this.upsertRows("cars", state.cars.map((car) => this.carToRow(ownerId, car)));
+    await this.upsertRows("stations", state.stations.map((station) => this.stationToRow(ownerId, station)));
+    await this.upsertRows("fuel_logs", state.logs.map((log) => this.logToRow(ownerId, log)));
+    await this.deleteMissingRows("cars", ownerId, state.cars.map((car) => car.id));
+    await this.deleteMissingRows("stations", ownerId, state.stations.map((station) => station.id));
   }
 
   async listUserSummaries(): Promise<UserSummary[]> {
-    const [profilesResult, carsResult, stationsResult] = await Promise.all([
+    const [profilesResult, carsResult, stationsResult, logsResult] = await Promise.all([
       supabase.from("profiles").select("owner_id,name,email,updated_at").order("updated_at", { ascending: false }),
       supabase.from("cars").select("owner_id,id"),
-      supabase.from("stations").select("owner_id,id")
+      supabase.from("stations").select("owner_id,id"),
+      supabase.from("fuel_logs").select("owner_id,id")
     ]);
 
     if (profilesResult.error) {
@@ -149,8 +152,13 @@ export class SupabaseAppRepository {
       throw stationsResult.error;
     }
 
+    if (logsResult.error) {
+      throw logsResult.error;
+    }
+
     const vehicleCounts = this.countByOwner(carsResult.data ?? []);
     const stationCounts = this.countByOwner(stationsResult.data ?? []);
+    const logCounts = this.countByOwner(logsResult.data ?? []);
 
     return (profilesResult.data ?? []).map((profile) => {
       const row = profile as Pick<ProfileRow, "owner_id" | "name" | "email" | "updated_at">;
@@ -160,27 +168,41 @@ export class SupabaseAppRepository {
         email: row.email ?? "Email não salvo",
         vehicles: vehicleCounts.get(row.owner_id) ?? 0,
         stations: stationCounts.get(row.owner_id) ?? 0,
+        fuelLogs: logCounts.get(row.owner_id) ?? 0,
         updatedAt: row.updated_at ?? ""
       };
     });
   }
 
-  private async clearRows(table: "cars" | "stations" | "fuel_logs", ownerId: string) {
-    const deleteResult = await supabase.from(table).delete().eq("owner_id", ownerId);
-    if (deleteResult.error) {
-      throw deleteResult.error;
-    }
-  }
-
-  private async insertRows(table: "cars" | "stations" | "fuel_logs", rows: unknown[]) {
+  private async upsertRows(table: "cars" | "stations" | "fuel_logs", rows: unknown[]) {
     if (rows.length === 0) {
       return;
     }
 
-    const insertResult = await supabase.from(table).insert(rows);
+    const insertResult = await supabase.from(table).upsert(rows, { onConflict: "id" });
     if (insertResult.error) {
       throw insertResult.error;
     }
+  }
+
+  private async deleteMissingRows(table: "cars" | "stations" | "fuel_logs", ownerId: string, keptIds: string[]) {
+    if (keptIds.length === 0) {
+      return;
+    }
+
+    const existingResult = await supabase.from(table).select("id").eq("owner_id", ownerId);
+    if (existingResult.error) {
+      throw existingResult.error;
+    }
+
+    const kept = new Set(keptIds);
+    const rowsToDelete = ((existingResult.data ?? []) as PersistedRow[]).filter((row) => !kept.has(row.id));
+    await Promise.all(rowsToDelete.map(async (row) => {
+      const deleteResult = await supabase.from(table).delete().eq("owner_id", ownerId).eq("id", row.id);
+      if (deleteResult.error) {
+        throw deleteResult.error;
+      }
+    }));
   }
 
   private countByOwner(rows: Array<{ owner_id?: string }>) {
@@ -199,12 +221,10 @@ export class SupabaseAppRepository {
   private carFromRow(row: CarRow): Car {
     return {
       id: row.id,
-      plate: row.plate,
       vehicleType: row.vehicle_type ?? "Carro",
       nickname: row.nickname,
       brand: row.brand,
       model: row.model,
-      year: row.year,
       acceptedFuel: row.accepted_fuel,
       defaultFuel: row.default_fuel
     };
@@ -214,12 +234,10 @@ export class SupabaseAppRepository {
     return {
       id: car.id,
       owner_id: ownerId,
-      plate: car.plate,
       vehicle_type: car.vehicleType ?? "Carro",
       nickname: car.nickname,
       brand: car.brand,
       model: car.model,
-      year: car.year,
       accepted_fuel: car.acceptedFuel,
       default_fuel: car.defaultFuel
     };
@@ -260,6 +278,7 @@ export class SupabaseAppRepository {
       paid: row.paid,
       liters: row.liters,
       pricePerLiter: row.price_per_liter,
+      odometerKm: row.odometer_km ?? undefined,
       createdAt: row.created_at,
       latitude: row.latitude ?? undefined,
       longitude: row.longitude ?? undefined
@@ -277,6 +296,7 @@ export class SupabaseAppRepository {
       paid: log.paid,
       liters: log.liters,
       price_per_liter: log.pricePerLiter,
+      odometer_km: log.odometerKm ?? null,
       created_at: log.createdAt,
       latitude: log.latitude ?? null,
       longitude: log.longitude ?? null

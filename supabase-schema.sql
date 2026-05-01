@@ -13,16 +13,17 @@ create table if not exists profiles (
 create table if not exists cars (
   id text primary key,
   owner_id text not null references profiles(owner_id) on delete cascade,
-  plate text not null,
   vehicle_type text not null default 'Carro',
   nickname text not null,
   brand text not null default '',
   model text not null default '',
-  year text not null default '',
   accepted_fuel text[] not null default '{}',
   default_fuel text not null,
   updated_at timestamp with time zone not null default now()
 );
+
+alter table cars drop column if exists plate;
+alter table cars drop column if exists year;
 
 create table if not exists stations (
   id text primary key,
@@ -46,6 +47,7 @@ create table if not exists fuel_logs (
   paid numeric not null,
   liters numeric not null,
   price_per_liter numeric not null,
+  odometer_km numeric,
   created_at timestamp with time zone not null,
   latitude double precision,
   longitude double precision,
@@ -72,6 +74,7 @@ drop policy if exists "Admin can read cars" on cars;
 drop policy if exists "Users can manage own stations" on stations;
 drop policy if exists "Admin can read stations" on stations;
 drop policy if exists "Users can manage own fuel logs" on fuel_logs;
+drop policy if exists "Admin can read fuel logs" on fuel_logs;
 
 create policy "Users can manage own profile"
   on profiles for all
@@ -104,3 +107,7 @@ create policy "Users can manage own fuel logs"
   on fuel_logs for all
   using (owner_id = auth.uid()::text)
   with check (owner_id = auth.uid()::text);
+
+create policy "Admin can read fuel logs"
+  on fuel_logs for select
+  using (auth.jwt() ->> 'email' = 'ericgomes@gmail.com');

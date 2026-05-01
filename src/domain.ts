@@ -8,12 +8,10 @@ export type User = {
 
 export type Car = {
   id: string;
-  plate: string;
   vehicleType: VehicleType;
   nickname: string;
   brand: string;
   model: string;
-  year: string;
   acceptedFuel: FuelType[];
   defaultFuel: FuelType;
 };
@@ -37,6 +35,7 @@ export type FuelLog = {
   paid: number;
   liters: number;
   pricePerLiter: number;
+  odometerKm?: number;
   createdAt: string;
   latitude?: number;
   longitude?: number;
@@ -55,7 +54,7 @@ export type AppState = {
 };
 
 export type ThemeMode = "light" | "dark";
-export type ThemePalette = "green" | "pink" | "blue";
+export type ThemePalette = "green" | "pink" | "blue" | "orange";
 
 export type UserSummary = {
   ownerId: string;
@@ -63,6 +62,7 @@ export type UserSummary = {
   email: string;
   vehicles: number;
   stations: number;
+  fuelLogs: number;
   updatedAt: string;
 };
 
@@ -85,6 +85,7 @@ export type MonthlyTotal = {
 
 export type DashboardMetrics = {
   monthTotal: number;
+  averageKmPerLiter?: number;
   bestStation?: StationRankingItem;
   stationRanking: StationRankingItem[];
   fuelAverages: FuelAverage[];
@@ -155,6 +156,46 @@ export class FuelPrice {
   }
 }
 
+export class FuelEfficiencyCalculator {
+  static calculate(logs: FuelLog[]) {
+    return logs
+      .filter((log) => typeof log.odometerKm === "number" && Number.isFinite(log.odometerKm))
+      .sort((a, b) => {
+        const dateDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (dateDifference !== 0) {
+          return dateDifference;
+        }
+
+        return (a.sequence ?? 0) - (b.sequence ?? 0);
+      })
+      .reduce<Array<{ logId: string; kmPerLiter: number; distanceKm: number }>>((entries, log, index, sortedLogs) => {
+        const previous = [...sortedLogs]
+          .slice(0, index)
+          .reverse()
+          .find((item) => item.carId === log.carId && typeof item.odometerKm === "number");
+
+        if (!previous?.odometerKm || !log.odometerKm) {
+          return entries;
+        }
+
+        const distanceKm = log.odometerKm - previous.odometerKm;
+        if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+          return entries;
+        }
+
+        if (!Number.isFinite(log.liters) || log.liters <= 0) {
+          return entries;
+        }
+
+        return [...entries, { logId: log.id, kmPerLiter: distanceKm / log.liters, distanceKm }];
+      }, []);
+  }
+
+  static valueForLog(log: FuelLog, logs: FuelLog[]) {
+    return FuelEfficiencyCalculator.calculate(logs).find((entry) => entry.logId === log.id);
+  }
+}
+
 export class FuelLogFactory {
   static create(input: {
     carId: string;
@@ -162,6 +203,7 @@ export class FuelLogFactory {
     fuel: FuelType;
     paid: number;
     liters: number;
+    odometerKm?: number;
     createdAt?: string;
     latitude?: number;
     longitude?: number;
@@ -176,6 +218,7 @@ export class FuelLogFactory {
       paid: input.paid,
       liters: input.liters,
       pricePerLiter: price.valuePerLiter(),
+      odometerKm: input.odometerKm,
       createdAt: input.createdAt ?? new Date().toISOString(),
       latitude: input.latitude,
       longitude: input.longitude
@@ -190,6 +233,7 @@ export class FuelLogFactory {
       fuel: FuelType;
       paid: number;
       liters: number;
+      odometerKm?: number;
       createdAt: string;
       latitude?: number;
       longitude?: number;
@@ -205,6 +249,7 @@ export class FuelLogFactory {
       paid: input.paid,
       liters: input.liters,
       pricePerLiter: price.valuePerLiter(),
+      odometerKm: input.odometerKm,
       createdAt: input.createdAt,
       latitude: input.latitude ?? log.latitude,
       longitude: input.longitude ?? log.longitude
@@ -214,24 +259,20 @@ export class FuelLogFactory {
 
 export class CarFactory {
   static create(input: {
-    plate: string;
     vehicleType?: VehicleType;
     nickname: string;
     brand: string;
     model: string;
-    year: string;
     acceptedFuel?: FuelType[];
     defaultFuel: FuelType;
   }): Car {
     const acceptedFuel = input.acceptedFuel?.length ? input.acceptedFuel : [input.defaultFuel];
     return {
       id: IdFactory.create("carro"),
-      plate: BrazilianPlate.normalize(input.plate),
       vehicleType: input.vehicleType ?? "Carro",
       nickname: input.nickname.trim(),
       brand: input.brand.trim(),
       model: input.model.trim(),
-      year: input.year.trim(),
       acceptedFuel,
       defaultFuel: acceptedFuel.includes(input.defaultFuel) ? input.defaultFuel : acceptedFuel[0]
     };
@@ -240,12 +281,10 @@ export class CarFactory {
   static update(
     car: Car,
     input: {
-      plate: string;
       vehicleType: VehicleType;
       nickname: string;
       brand: string;
       model: string;
-      year: string;
       acceptedFuel: FuelType[];
       defaultFuel: FuelType;
     }
@@ -253,12 +292,10 @@ export class CarFactory {
     const acceptedFuel = input.acceptedFuel.length ? input.acceptedFuel : [input.defaultFuel];
     return {
       ...car,
-      plate: BrazilianPlate.normalize(input.plate),
       vehicleType: input.vehicleType,
       nickname: input.nickname.trim(),
       brand: input.brand.trim(),
       model: input.model.trim(),
-      year: input.year.trim(),
       acceptedFuel,
       defaultFuel: acceptedFuel.includes(input.defaultFuel) ? input.defaultFuel : acceptedFuel[0]
     };
@@ -329,14 +366,22 @@ export class DateFormatter {
     const month = String(parsed.getMonth() + 1).padStart(2, "0");
     return `${day}-${month}-${parsed.getFullYear()}`;
   }
+
+  static inputTime(date: string) {
+    const parsed = new Date(date);
+    const hour = String(parsed.getHours()).padStart(2, "0");
+    const minute = String(parsed.getMinutes()).padStart(2, "0");
+    return `${hour}:${minute}`;
+  }
 }
 
 export class DateInputParser {
-  static toIso(value: string) {
+  static toIso(value: string, time = "12:00") {
     const trimmed = value.trim();
+    const normalizedTime = DateInputParser.normalizedTime(time);
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      return DateInputParser.safeIso(`${trimmed}T12:00:00`);
+      return DateInputParser.safeIso(`${trimmed}T${normalizedTime}:00`);
     }
 
     const match = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
@@ -344,7 +389,18 @@ export class DateInputParser {
       return undefined;
     }
 
-    return DateInputParser.safeIso(`${match[3]}-${match[2]}-${match[1]}T12:00:00`);
+    return DateInputParser.safeIso(`${match[3]}-${match[2]}-${match[1]}T${normalizedTime}:00`);
+  }
+
+  private static normalizedTime(value: string) {
+    const match = value.trim().match(/^(\d{1,2}):?(\d{2})$/);
+    if (!match) {
+      return "12:00";
+    }
+
+    const hour = Math.min(23, Math.max(0, Number(match[1])));
+    const minute = Math.min(59, Math.max(0, Number(match[2])));
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   }
 
   private static safeIso(value: string) {
@@ -369,6 +425,7 @@ export class DashboardCalculator {
 
     return {
       monthTotal: this.monthTotal(),
+      averageKmPerLiter: this.averageKmPerLiter(),
       bestStation,
       stationRanking,
       fuelAverages: this.fuelAverages(),
@@ -419,6 +476,15 @@ export class DashboardCalculator {
     const average = fuelLogs.reduce((sum, log) => sum + log.pricePerLiter, 0) / Math.max(fuelLogs.length, 1);
 
     return { name: fuel, average, count: fuelLogs.length };
+  }
+
+  private averageKmPerLiter() {
+    const entries = FuelEfficiencyCalculator.calculate(this.state.logs);
+    if (entries.length === 0) {
+      return undefined;
+    }
+
+    return entries.reduce((sum, entry) => sum + entry.kmPerLiter, 0) / entries.length;
   }
 
   private monthlyTotals(): MonthlyTotal[] {

@@ -18,7 +18,6 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   AppState,
-  BrazilianPlate,
   Car,
   CarFactory,
   DashboardCalculator,
@@ -27,6 +26,7 @@ import {
   DateFormatter,
   FuelLog,
   FuelLogFactory,
+  FuelEfficiencyCalculator,
   FuelPrice,
   FuelType,
   MoneyParser,
@@ -47,6 +47,7 @@ import { supabase } from "./src/supabaseClient";
 type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos";
 type UtilityScreen = "help" | "privacy" | "users" | null;
 const storageKey = "litro-certo:v1";
+const guestStorageKey = "litro-certo:guest:v1";
 const appRepository = new SupabaseAppRepository();
 
 const initialStations: Station[] = [
@@ -123,34 +124,28 @@ async function geocodeStationAddress(address: string, city: string, stateName: s
 const demoCars: Car[] = [
   {
     id: "demo-compass",
-    plate: "BRA2E19",
     vehicleType: "Carro",
     nickname: "Compass",
     brand: "Jeep",
     model: "Compass",
-    year: "2022",
     acceptedFuel: fuels,
     defaultFuel: "Gasolina comum"
   },
   {
     id: "demo-onix",
-    plate: "QWE8R44",
     vehicleType: "Carro",
     nickname: "Onix",
     brand: "Chevrolet",
     model: "Onix Plus",
-    year: "2020",
     acceptedFuel: fuels,
     defaultFuel: "Etanol"
   },
   {
     id: "demo-hilux",
-    plate: "HIL7X10",
     vehicleType: "Caminhonete",
     nickname: "Hilux",
     brand: "Toyota",
     model: "Hilux",
-    year: "2021",
     acceptedFuel: ["Diesel"],
     defaultFuel: "Diesel"
   }
@@ -171,6 +166,7 @@ function demoLog(input: {
   fuel: FuelType;
   paid: number;
   liters: number;
+  odometerKm: number;
   daysAgo: number;
 }): FuelLog {
   return {
@@ -182,23 +178,24 @@ function demoLog(input: {
     paid: input.paid,
     liters: input.liters,
     pricePerLiter: new FuelPrice(input.paid, input.liters).valuePerLiter(),
+    odometerKm: input.odometerKm,
     createdAt: daysAgo(input.daysAgo)
   };
 }
 
 const demoLogs: FuelLog[] = [
-  demoLog({ id: "demo-log-1", sequence: 8, carId: "demo-compass", stationId: "auto-centro", fuel: "Gasolina comum", paid: 150, liters: 22, daysAgo: 1 }),
-  demoLog({ id: "demo-log-2", sequence: 7, carId: "demo-onix", stationId: "rede-economia", fuel: "Etanol", paid: 126, liters: 31.5, daysAgo: 4 }),
-  demoLog({ id: "demo-log-3", sequence: 6, carId: "demo-compass", stationId: "posto-avenida", fuel: "Gasolina aditivada", paid: 210, liters: 29.8, daysAgo: 8 }),
-  demoLog({ id: "demo-log-4", sequence: 5, carId: "demo-hilux", stationId: "rede-economia", fuel: "Diesel", paid: 320, liters: 48.2, daysAgo: 12 }),
-  demoLog({ id: "demo-log-5", sequence: 4, carId: "demo-onix", stationId: "auto-centro", fuel: "Etanol", paid: 118, liters: 30, daysAgo: 19 }),
-  demoLog({ id: "demo-log-6", sequence: 3, carId: "demo-compass", stationId: "rede-economia", fuel: "Gasolina comum", paid: 180, liters: 27.6, daysAgo: 34 }),
-  demoLog({ id: "demo-log-7", sequence: 2, carId: "demo-hilux", stationId: "posto-avenida", fuel: "Diesel", paid: 290, liters: 42.7, daysAgo: 42 }),
-  demoLog({ id: "demo-log-8", sequence: 1, carId: "demo-onix", stationId: "posto-avenida", fuel: "Gasolina comum", paid: 160, liters: 24.5, daysAgo: 66 })
+  demoLog({ id: "demo-log-1", sequence: 8, carId: "demo-compass", stationId: "auto-centro", fuel: "Gasolina comum", paid: 150, liters: 22, odometerKm: 42620, daysAgo: 1 }),
+  demoLog({ id: "demo-log-2", sequence: 7, carId: "demo-onix", stationId: "rede-economia", fuel: "Etanol", paid: 126, liters: 31.5, odometerKm: 67880, daysAgo: 4 }),
+  demoLog({ id: "demo-log-3", sequence: 6, carId: "demo-compass", stationId: "posto-avenida", fuel: "Gasolina aditivada", paid: 210, liters: 29.8, odometerKm: 42370, daysAgo: 8 }),
+  demoLog({ id: "demo-log-4", sequence: 5, carId: "demo-hilux", stationId: "rede-economia", fuel: "Diesel", paid: 320, liters: 48.2, odometerKm: 91240, daysAgo: 12 }),
+  demoLog({ id: "demo-log-5", sequence: 4, carId: "demo-onix", stationId: "auto-centro", fuel: "Etanol", paid: 118, liters: 30, odometerKm: 67550, daysAgo: 19 }),
+  demoLog({ id: "demo-log-6", sequence: 3, carId: "demo-compass", stationId: "rede-economia", fuel: "Gasolina comum", paid: 180, liters: 27.6, odometerKm: 42080, daysAgo: 34 }),
+  demoLog({ id: "demo-log-7", sequence: 2, carId: "demo-hilux", stationId: "posto-avenida", fuel: "Diesel", paid: 290, liters: 42.7, odometerKm: 90780, daysAgo: 42 }),
+  demoLog({ id: "demo-log-8", sequence: 1, carId: "demo-onix", stationId: "posto-avenida", fuel: "Gasolina comum", paid: 160, liters: 24.5, odometerKm: 67290, daysAgo: 66 })
 ];
 
 const demoState: AppState = {
-  user: { name: "Eric Gomes" },
+  user: { name: "Usuário Demo" },
   selectedCarId: "demo-compass",
   filteredCarIds: demoCars.map((car) => car.id),
   cars: demoCars,
@@ -270,6 +267,24 @@ function nextLogSequence(logs: FuelLog[]) {
   return Math.max(0, ...logs.map((log) => log.sequence ?? 0)) + 1;
 }
 
+function validFilteredCarIds(cars: Car[], filteredCarIds?: string[]) {
+  const carIds = cars.map((car) => car.id);
+  const validIds = (filteredCarIds ?? []).filter((id) => carIds.includes(id));
+  if (validIds.length === 0) {
+    return carIds;
+  }
+
+  return validIds;
+}
+
+function validSelectedCarId(cars: Car[], selectedCarId: string | null | undefined) {
+  if (selectedCarId && cars.some((car) => car.id === selectedCarId)) {
+    return selectedCarId;
+  }
+
+  return cars[0]?.id ?? null;
+}
+
 function logNumberMap(logs: FuelLog[]) {
   return new Map(logs.map((log) => [log.id, log.sequence ?? 0]));
 }
@@ -313,10 +328,22 @@ const starterState: AppState = {
   demoDataLoaded: false
 };
 
-const currency = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL"
-});
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function transparentColor(hexColor: string, alpha: number) {
+  const normalized = hexColor.replace("#", "");
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
 
 type Theme = ReturnType<typeof buildTheme>;
 type ThemeContextValue = {
@@ -338,8 +365,6 @@ function useThemeStyles() {
 }
 
 function buildTheme(mode: ThemeMode, palette: ThemePalette) {
-  const greenFont = Platform.select({ ios: "Avenir", android: "sans-serif", default: "Arial" }) ?? "sans-serif";
-  const pinkFont = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia" }) ?? "serif";
   const blueFont = Platform.select({ ios: "Avenir", android: "sans-serif", default: "Verdana" }) ?? "sans-serif";
 
   const palettes = {
@@ -357,8 +382,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         accent: "#2DBE71",
         input: "#FFFFFF",
         map: "#D7EDDE",
-        fontFamily: greenFont,
-        headingFontFamily: greenFont
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
       },
       dark: {
         background: "#071B16",
@@ -373,8 +398,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         accent: "#7DDC9D",
         input: "#0B211B",
         map: "#14382E",
-        fontFamily: greenFont,
-        headingFontFamily: greenFont
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
       }
     },
     pink: {
@@ -391,8 +416,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         accent: "#FF7AB8",
         input: "#FFFFFF",
         map: "#FBE2EE",
-        fontFamily: pinkFont,
-        headingFontFamily: pinkFont
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
       },
       dark: {
         background: "#210817",
@@ -407,8 +432,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         accent: "#FF9FCA",
         input: "#2A0C1D",
         map: "#44152F",
-        fontFamily: pinkFont,
-        headingFontFamily: pinkFont
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
       }
     },
     blue: {
@@ -444,6 +469,40 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         fontFamily: blueFont,
         headingFontFamily: blueFont
       }
+    },
+    orange: {
+      light: {
+        background: "#FFF5EC",
+        surface: "#FFFFFF",
+        surfaceAlt: "#FFF9F3",
+        border: "#F3CBA4",
+        text: "#2B1A0C",
+        muted: "#7C654E",
+        primary: "#D66A1D",
+        primaryDark: "#9A4710",
+        primarySoft: "#FFE0C4",
+        accent: "#FF9B45",
+        input: "#FFFFFF",
+        map: "#F8E0C9",
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
+      },
+      dark: {
+        background: "#1E1007",
+        surface: "#301B0F",
+        surfaceAlt: "#422514",
+        border: "#764522",
+        text: "#FFF7EF",
+        muted: "#E5B98D",
+        primary: "#FF8A33",
+        primaryDark: "#C45C16",
+        primarySoft: "#5B331A",
+        accent: "#FFB274",
+        input: "#261307",
+        map: "#3C2414",
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
+      }
     }
   };
 
@@ -468,6 +527,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const scrollRef = useRef<ScrollView>(null);
+  const saveErrorShownRef = useRef(false);
   const themeMode = state.themeMode ?? "light";
   const themePalette = state.themePalette ?? "green";
   const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
@@ -483,8 +543,32 @@ export default function App() {
     };
   }
 
-  function loadDemoState() {
-    setState(withDemoData(starterState));
+  async function loadGuestState() {
+    try {
+      const stored = await AsyncStorage.getItem(guestStorageKey);
+      if (!stored) {
+        setState(withDemoData(starterState));
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as AppState;
+      setState(withDemoData({
+        ...starterState,
+        ...parsed,
+        user: parsed.user?.email ? demoState.user : parsed.user ?? demoState.user,
+        logs: sortFuelLogs(withStableLogSequences(parsed.logs ?? []))
+      }));
+    } catch {
+      setState(withDemoData(starterState));
+    }
+  }
+
+  function enterGuestMode() {
+    setOwnerId(null);
+    setAuthEmail(null);
+    setAuthName(null);
+    void loadGuestState();
+    setAuthScreenOpen(false);
   }
 
   async function loadStateForOwner(loadedOwnerId: string, name: string | null, email: string | null) {
@@ -494,11 +578,16 @@ export default function App() {
       const remoteState = await appRepository.load(loadedOwnerId);
       if (remoteState) {
         const mergedRemoteState = { ...starterState, ...remoteState } as AppState;
+        const cars = mergedRemoteState.cars ?? [];
+        const sessionUser = {
+          name: name ?? email?.split("@")[0] ?? mergedRemoteState.user?.name ?? "Usuário",
+          email: email ?? mergedRemoteState.user?.email
+        };
         setState({
           ...mergedRemoteState,
-          user: mergedRemoteState.user
-            ? { ...mergedRemoteState.user, email: mergedRemoteState.user.email ?? fallbackState.user?.email }
-            : fallbackState.user,
+          user: sessionUser,
+          selectedCarId: validSelectedCarId(cars, mergedRemoteState.selectedCarId),
+          filteredCarIds: validFilteredCarIds(cars, mergedRemoteState.filteredCarIds),
           stations: mergedRemoteState.stations ?? [],
           logs: sortFuelLogs(withStableLogSequences(mergedRemoteState.logs))
         });
@@ -520,10 +609,13 @@ export default function App() {
         const sessionUser = data.session?.user;
 
         if (!sessionUser) {
-          setOwnerId(null);
-          setAuthEmail(null);
-          setAuthName(null);
-          loadDemoState();
+          enterGuestMode();
+          return;
+        }
+
+        if (!sessionUser.email) {
+          await supabase.auth.signOut();
+          enterGuestMode();
           return;
         }
 
@@ -548,10 +640,13 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const sessionUser = session?.user;
       if (!sessionUser) {
-        setOwnerId(null);
-        setAuthEmail(null);
-        setAuthName(null);
-        loadDemoState();
+        enterGuestMode();
+        return;
+      }
+
+      if (!sessionUser.email) {
+        supabase.auth.signOut().catch(() => undefined);
+        enterGuestMode();
         return;
       }
 
@@ -580,22 +675,35 @@ export default function App() {
     }
 
     const timeout = setTimeout(() => {
-      AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch(() => undefined);
+      const localStorageKey = ownerId ? `${storageKey}:${ownerId}` : guestStorageKey;
+      AsyncStorage.setItem(localStorageKey, JSON.stringify(state)).catch((error) => {
+        console.warn("Não foi possível salvar localmente.", error);
+      });
 
       if (!ownerId) {
         return;
       }
 
-      appRepository.save(ownerId, state).catch(() => undefined);
+      appRepository.save(ownerId, state)
+        .then(() => {
+          saveErrorShownRef.current = false;
+        })
+        .catch((error) => {
+          console.warn("Não foi possível salvar no Supabase.", error);
+          if (saveErrorShownRef.current) {
+            return;
+          }
+
+          saveErrorShownRef.current = true;
+          Alert.alert("Não foi possível salvar", "Seu registro apareceu na tela, mas ainda não foi salvo. Confira a conexão ou o banco de dados.");
+        });
     }, 650);
 
     return () => clearTimeout(timeout);
   }, [ownerId, ready, state]);
 
   const selectedCar = state.cars.find((car) => car.id === state.selectedCarId) ?? state.cars[0];
-  const activeCarIds = state.filteredCarIds?.length
-    ? state.filteredCarIds
-    : state.cars.map((car) => car.id);
+  const activeCarIds = validFilteredCarIds(state.cars, state.filteredCarIds);
   const filteredLogs = state.logs.filter((log) => activeCarIds.includes(log.carId));
   const filteredState = useMemo(
     () => ({ ...state, logs: filteredLogs }),
@@ -609,6 +717,22 @@ export default function App() {
 
   function updateState(next: Partial<AppState>) {
     setState((current) => ({ ...current, ...next }));
+  }
+
+  function saveUser(user: User) {
+    updateState({ user });
+    setAuthName(user.name);
+
+    if (!ownerId) {
+      return;
+    }
+
+    supabase.auth.updateUser({
+      data: {
+        full_name: user.name,
+        name: user.name
+      }
+    }).catch(() => undefined);
   }
 
   function moveMonth(offset: number) {
@@ -625,10 +749,24 @@ export default function App() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    setOwnerId(null);
-    setAuthEmail(null);
-    setAuthName(null);
-    loadDemoState();
+    enterGuestMode();
+  }
+
+  function confirmSignOut() {
+    if (Platform.OS === "web") {
+      const confirmed = globalThis.confirm?.("Deseja sair da sua conta?");
+      if (!confirmed) {
+        return;
+      }
+
+      void signOut();
+      return;
+    }
+
+    Alert.alert("Sair", "Deseja sair da sua conta?", [
+      { text: "Não", style: "cancel" },
+      { text: "Sim", style: "destructive", onPress: () => void signOut() }
+    ]);
   }
 
   function toggleFilterCar(carId: string) {
@@ -648,6 +786,11 @@ export default function App() {
   }
 
   function openEditFuelForm(logId: string) {
+    if (editingLogId === logId) {
+      closeFuelForm();
+      return;
+    }
+
     setEditingLogId(logId);
     setFuelFormMode("edit");
     setTab("Abastecimentos");
@@ -715,7 +858,9 @@ export default function App() {
         <Cars
           cars={state.cars}
           logs={state.logs}
+          stations={state.stations}
           selectedCarId={state.selectedCarId}
+          onEditLog={openEditFuelForm}
           onSelect={(selectedCarId) => updateState({ selectedCarId })}
           onSave={(car) =>
             setState((current) => ({
@@ -854,7 +999,11 @@ export default function App() {
         <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
           <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
           <SafeAreaView style={styles.shell}>
-            <AuthScreen onToggleTheme={toggleTheme} onThemePaletteSelect={selectThemePalette} onCancel={() => setAuthScreenOpen(false)} />
+            <AuthScreen
+              onToggleTheme={toggleTheme}
+              onThemePaletteSelect={selectThemePalette}
+              onCancel={() => setAuthScreenOpen(false)}
+            />
           </SafeAreaView>
         </ThemeContext.Provider>
       </SafeAreaProvider>
@@ -872,7 +1021,7 @@ export default function App() {
           >
             <Header
               user={state.user}
-              onSave={(user) => updateState({ user })}
+              onSave={saveUser}
               onToggleTheme={toggleTheme}
               onThemePaletteSelect={selectThemePalette}
               onNewFuel={openNewFuelForm}
@@ -889,7 +1038,7 @@ export default function App() {
                 closeFuelForm();
                 setUtilityScreen("users");
               }}
-              onSignOut={signOut}
+              onSignOut={confirmSignOut}
               authEmail={authEmail}
               authName={authName}
             />
@@ -925,6 +1074,7 @@ function AuthScreen({
 }) {
   const { mode, palette, styles, theme } = useThemeStyles();
   const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -939,7 +1089,13 @@ function AuthScreen({
 
   async function submit(mode: "signIn" | "signUp") {
     setFormError(null);
+    const trimmedName = name.trim();
     const trimmedEmail = email.trim();
+    if (mode === "signUp" && trimmedName.length < 2) {
+      setFormError("Informe seu nome para criar a conta.");
+      return;
+    }
+
     if (!isValidEmail(trimmedEmail)) {
       setFormError("Informe um email válido para continuar.");
       return;
@@ -964,7 +1120,15 @@ function AuthScreen({
     const credentials = { email: trimmedEmail, password };
     const result = mode === "signIn"
       ? await supabase.auth.signInWithPassword(credentials)
-      : await supabase.auth.signUp(credentials);
+      : await supabase.auth.signUp({
+          ...credentials,
+          options: {
+            data: {
+              full_name: trimmedName,
+              name: trimmedName
+            }
+          }
+        });
     setLoading(false);
 
     if (result.error) {
@@ -1003,10 +1167,10 @@ function AuthScreen({
           <Pressable style={styles.headerSecondaryButton} onPress={onCancel}>
             <Text style={styles.headerSecondaryButtonText}>Agora não</Text>
           </Pressable>
+          <ThemePalettePicker onSelect={onThemePaletteSelect} />
           <Pressable style={styles.themeButton} onPress={onToggleTheme}>
             <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
           </Pressable>
-          <ThemePalettePicker onSelect={onThemePaletteSelect} />
         </View>
       </View>
       <View style={styles.authCard}>
@@ -1037,6 +1201,16 @@ function AuthScreen({
             <Text style={[styles.authTabText, !isSignIn && styles.authTabTextActive]}>Criar conta</Text>
           </Pressable>
         </View>
+        {!isSignIn ? (
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Nome"
+            autoCapitalize="words"
+            placeholderTextColor={theme.muted}
+            style={styles.input}
+          />
+        ) : null}
         <TextInput
           value={email}
           onChangeText={setEmail}
@@ -1109,23 +1283,49 @@ function Header({
   authEmail: string | null;
   authName: string | null;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(user?.name ?? "");
   const [accountOpen, setAccountOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
   const { mode, styles, theme } = useThemeStyles();
   const isAdmin = authEmail?.toLowerCase() === "ericgomes@gmail.com";
+
+  useEffect(() => {
+    setName(user?.name ?? "");
+  }, [user?.name]);
+
+  function updateOwnName(nextName: string) {
+    setName(nextName);
+    const trimmed = nextName.trim();
+    if (!trimmed || !user) {
+      return;
+    }
+
+    onSave({ ...user, name: trimmed });
+  }
+
+  function finishNameEdition() {
+    const trimmed = name.trim();
+    if (!trimmed || !user) {
+      setName(user?.name ?? "");
+    }
+
+    setEditingName(false);
+  }
 
   if (user) {
     return (
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <View>
+          <View style={styles.brandBlock}>
             <Text style={styles.brand}>Litro Certo</Text>
           </View>
-          <View style={styles.headerSecondaryActions}>
-            <ThemePalettePicker onSelect={onThemePaletteSelect} />
-            <Pressable style={styles.themeButton} onPress={onToggleTheme}>
-              <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
-            </Pressable>
+          <View style={styles.headerTools}>
+            <View style={styles.colorControlCluster}>
+              <ThemePalettePicker onSelect={onThemePaletteSelect} />
+              <Pressable style={styles.themeButton} onPress={onToggleTheme}>
+                <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
+              </Pressable>
+            </View>
             <View style={styles.accountBox}>
               <Pressable style={styles.accountButton} onPress={() => setAccountOpen((current) => !current)}>
                 <View style={styles.accountIcon}>
@@ -1134,66 +1334,100 @@ function Header({
                 </View>
               </Pressable>
               {accountOpen ? (
-                <View style={styles.accountMenu}>
-                  {authEmail ? (
-                    <>
-                      {authName ? <Text style={styles.accountName}>{authName}</Text> : null}
-                      <Text style={styles.accountEmail}>{authEmail}</Text>
-                    </>
-                  ) : (
-                    <Text style={styles.accountEmail}>Faça login para salvar seus dados.</Text>
-                  )}
-                  <Pressable
-                    style={styles.accountMenuItem}
-                    onPress={() => {
-                      setAccountOpen(false);
-                      onOpenHelp();
-                    }}
-                  >
-                    <Text style={styles.accountMenuText}>Ajuda</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.accountMenuItem}
-                    onPress={() => {
-                      setAccountOpen(false);
-                      onOpenPrivacy();
-                    }}
-                  >
-                    <Text style={styles.accountMenuText}>Privacidade</Text>
-                  </Pressable>
-                  {isAdmin ? (
+                <>
+                  <Pressable style={styles.menuDismissLayer} onPress={() => setAccountOpen(false)} />
+                  <View style={styles.accountMenu}>
+                    {authEmail ? (
+                      <View style={styles.accountIdentity}>
+                        {editingName ? (
+                          <TextInput
+                            value={name}
+                            onChangeText={updateOwnName}
+                            onBlur={finishNameEdition}
+                            placeholder="Seu nome"
+                            placeholderTextColor={theme.muted}
+                            style={styles.accountNameInput}
+                            autoFocus
+                          />
+                        ) : (
+                          <Pressable onPress={() => setEditingName(true)}>
+                            <Text style={styles.accountName}>{user.name}</Text>
+                          </Pressable>
+                        )}
+                        <Text style={styles.accountEmail}>{authEmail}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.accountIdentity}>
+                        {editingName ? (
+                          <TextInput
+                            value={name}
+                            onChangeText={updateOwnName}
+                            onBlur={finishNameEdition}
+                            placeholder="Seu nome"
+                            placeholderTextColor={theme.muted}
+                            style={styles.accountNameInput}
+                            autoFocus
+                          />
+                        ) : (
+                          <Pressable onPress={() => setEditingName(true)}>
+                            <Text style={styles.accountName}>{user.name}</Text>
+                          </Pressable>
+                        )}
+                        <Text style={styles.accountEmail}>Faça login para salvar seus dados.</Text>
+                      </View>
+                    )}
                     <Pressable
                       style={styles.accountMenuItem}
                       onPress={() => {
                         setAccountOpen(false);
-                        onOpenUsers();
+                        onOpenHelp();
                       }}
                     >
-                      <Text style={styles.accountMenuText}>Usuários</Text>
+                      <Text style={styles.accountMenuText}>Ajuda</Text>
                     </Pressable>
-                  ) : null}
-                  {authEmail ? (
                     <Pressable
                       style={styles.accountMenuItem}
                       onPress={() => {
                         setAccountOpen(false);
-                        onSignOut();
+                        onOpenPrivacy();
                       }}
                     >
-                      <Text style={styles.accountMenuText}>Sair</Text>
+                      <Text style={styles.accountMenuText}>Privacidade</Text>
                     </Pressable>
-                  ) : (
-                    <Pressable
-                      style={styles.accountMenuItem}
-                      onPress={() => {
-                        setAccountOpen(false);
-                        onOpenAuth();
-                      }}
-                    >
-                      <Text style={styles.accountMenuText}>Login / criar conta</Text>
-                    </Pressable>
-                  )}
-                </View>
+                    {isAdmin ? (
+                      <Pressable
+                        style={styles.accountMenuItem}
+                        onPress={() => {
+                          setAccountOpen(false);
+                          onOpenUsers();
+                        }}
+                      >
+                        <Text style={styles.accountMenuText}>Usuários</Text>
+                      </Pressable>
+                    ) : null}
+                    {authEmail ? (
+                      <Pressable
+                        style={styles.accountMenuItem}
+                        onPress={() => {
+                          setAccountOpen(false);
+                          onSignOut();
+                        }}
+                      >
+                        <Text style={styles.accountMenuText}>Sair</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={styles.accountMenuItem}
+                        onPress={() => {
+                          setAccountOpen(false);
+                          onOpenAuth();
+                        }}
+                      >
+                        <Text style={styles.accountMenuText}>Login / criar conta</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </>
               ) : null}
             </View>
           </View>
@@ -1234,7 +1468,8 @@ function ThemePalettePicker({ onSelect }: { onSelect: (palette: ThemePalette) =>
   const options: Array<{ value: ThemePalette; color: string; label: string }> = [
     { value: "green", color: "#178A4A", label: "Verde" },
     { value: "pink", color: "#D63384", label: "Rosa" },
-    { value: "blue", color: "#1D6FD6", label: "Azul" }
+    { value: "blue", color: "#1D6FD6", label: "Azul" },
+    { value: "orange", color: "#D66A1D", label: "Laranja" }
   ];
 
   return (
@@ -1271,11 +1506,7 @@ function HelpScreen({ onClose }: { onClose: () => void }) {
         </View>
         <View style={styles.helpBlock}>
           <Text style={styles.itemTitle}>Quando usar?</Text>
-          <Text style={styles.helpText}>Use logo depois de abastecer, enquanto o valor pago, os litros e o posto ainda estão fáceis de conferir. Também dá para registrar em outra data se você esqueceu.</Text>
-        </View>
-        <View style={styles.helpBlock}>
-          <Text style={styles.itemTitle}>Por quê?</Text>
-          <Text style={styles.helpText}>Porque o preço anunciado nem sempre mostra o seu custo real ao longo do mês. Seu histórico pessoal ajuda a decidir onde abastecer melhor.</Text>
+          <Text style={styles.helpText}>Use sempre que abastecer para guardar valor, litros, posto e data. Se esquecer de registrar na hora, você pode lançar depois escolhendo a data correta.</Text>
         </View>
       </Section>
     </View>
@@ -1333,15 +1564,18 @@ function UsersAdmin({ onClose }: { onClose: () => void }) {
 
   const totalVehicles = summaries.reduce((sum, item) => sum + item.vehicles, 0);
   const totalStations = summaries.reduce((sum, item) => sum + item.stations, 0);
+  const totalFuelLogs = summaries.reduce((sum, item) => sum + item.fuelLogs, 0);
 
   return (
     <View style={styles.stack}>
       <Section title="Usuários" rightAction={<Pressable style={styles.closeButton} onPress={onClose}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
         <View style={styles.grid}>
           <MetricCard label="Usuários" value={String(summaries.length)} />
+          <MetricCard label="Abastecimentos" value={String(totalFuelLogs)} />
           <MetricCard label="Postos" value={String(totalStations)} />
           <MetricCard label="Veículos" value={String(totalVehicles)} />
         </View>
+        <View style={styles.mapListDivider} />
         {loading ? <Text style={styles.muted}>Carregando usuários...</Text> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {!loading && !error && summaries.length === 0 ? (
@@ -1357,6 +1591,7 @@ function UsersAdmin({ onClose }: { onClose: () => void }) {
             <View style={styles.right}>
               <Text style={styles.itemTitle}>{summary.vehicles} veículos</Text>
               <Text style={styles.muted}>{summary.stations} postos</Text>
+              <Text style={styles.muted}>{summary.fuelLogs} abastecimentos</Text>
             </View>
           </View>
         ))}
@@ -1371,8 +1606,8 @@ function DemoBanner({ onOpenAuth }: { onOpenAuth: () => void }) {
   return (
     <View style={styles.demoBanner}>
       <View style={styles.demoBannerTextGroup}>
-        <Text style={styles.demoBannerTitle}>Dados de exemplo</Text>
-        <Text style={styles.demoBannerText}>Entre para começar com seus próprios abastecimentos.</Text>
+        <Text style={styles.demoBannerTitle}>Você está vendo dados de exemplo</Text>
+        <Text style={styles.demoBannerText}>Estes abastecimentos não são reais. Faça login para começar com seus próprios dados.</Text>
       </View>
       <Pressable style={styles.demoBannerButton} onPress={onOpenAuth}>
         <Text style={styles.demoBannerButtonText}>Login</Text>
@@ -1437,26 +1672,29 @@ function Home({
 
   return (
     <View style={styles.stack}>
-      <View style={styles.monthSwitcher}>
-        <Pressable style={styles.iconButton} onPress={onPreviousMonth}>
-          <Text style={styles.iconButtonText}>‹</Text>
-        </Pressable>
-        <Text style={styles.monthTitle}>{monthLabel}</Text>
-        <Pressable style={styles.iconButton} onPress={onNextMonth}>
-          <Text style={styles.iconButtonText}>›</Text>
-        </Pressable>
-      </View>
+      <Section title="">
+        <View style={styles.monthSwitcher}>
+          <Pressable style={styles.iconButton} onPress={onPreviousMonth}>
+            <Text style={styles.iconButtonText}>‹</Text>
+          </Pressable>
+          <Text style={styles.monthTitle}>{monthLabel}</Text>
+          <Pressable style={styles.iconButton} onPress={onNextMonth}>
+            <Text style={styles.iconButtonText}>›</Text>
+          </Pressable>
+        </View>
 
-      <View style={styles.grid}>
-        <MetricCard label="Gasto do mês" value={currency.format(metrics.monthTotal)} />
-        <MetricCard label="Último abastecimento" value={last ? `${currency.format(last.pricePerLiter)}/L` : "Sem dados"} />
-      </View>
+        <View style={styles.grid}>
+          <MetricCard label="Gasto mês" value={formatCurrency(metrics.monthTotal)} small={metrics.monthTotal >= 100} />
+          <MetricCard label="Último R$/L" value={last ? formatCurrency(last.pricePerLiter) : ""} small />
+          <MetricCard label="Média km/L" value={metrics.averageKmPerLiter ? metrics.averageKmPerLiter.toFixed(1) : ""} small />
+        </View>
 
-      <Section title="Gasto mensal">
+        <View style={styles.mapListDivider} />
+        <Text style={styles.sectionTitle}>Gasto mensal</Text>
         <Bars data={metrics.monthlyTotals} />
-      </Section>
 
-      <Section title="Média por combustível">
+        <View style={styles.mapListDivider} />
+        <Text style={styles.sectionTitle}>Média por combustível</Text>
         {metrics.fuelAverages.length === 0 ? (
           <Empty text="Registre abastecimentos para comparar combustíveis." />
         ) : (
@@ -1464,13 +1702,12 @@ function Home({
             {metrics.fuelAverages.map((fuel) => (
               <Pressable key={fuel.name} style={(state) => [styles.fuelCard, isHovered(state) && styles.listItemHover]}>
                 <Text style={styles.itemTitle}>{fuel.name}</Text>
-                <Text style={styles.itemTitle}>{currency.format(fuel.average)}/L</Text>
+                <Text style={styles.itemTitle}>{formatCurrency(fuel.average)}/L</Text>
               </Pressable>
             ))}
           </View>
         )}
       </Section>
-
     </View>
   );
 }
@@ -1499,14 +1736,18 @@ function RegisterFuel({
   const [fuel, setFuel] = useState<FuelType>(selectedCar?.defaultFuel ?? "Gasolina comum");
   const [paid, setPaid] = useState("");
   const [liters, setLiters] = useState("");
+  const [odometerKm, setOdometerKm] = useState("");
   const [date, setDate] = useState(DateFormatter.inputDate(new Date().toISOString()));
+  const [time, setTime] = useState(DateFormatter.inputTime(new Date().toISOString()));
   const [stationId, setStationId] = useState(stations[0]?.id ?? "");
   const [location, setLocation] = useState(fakeCurrentLocation);
   const [draftLog, setDraftLog] = useState<FuelLog | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<ToastNotice | null>(null);
   const [activeField, setActiveField] = useState("paid");
+  const [dirty, setDirty] = useState(false);
   const currentCar = cars.find((car) => car.id === carId) ?? selectedCar;
+  const fuelOptions = currentCar?.acceptedFuel?.length ? currentCar.acceptedFuel : fuels;
 
   useEffect(() => {
     if (!selectedCar || editingLog) {
@@ -1518,8 +1759,22 @@ function RegisterFuel({
   }, [editingLog, selectedCar?.id]);
 
   useEffect(() => {
+    if (!currentCar || editingLog) {
+      return;
+    }
+
+    if (currentCar.acceptedFuel.includes(fuel)) {
+      return;
+    }
+
+    setFuel(currentCar.defaultFuel ?? currentCar.acceptedFuel[0] ?? "Gasolina comum");
+  }, [carId, currentCar?.id, editingLog, fuel]);
+
+  useEffect(() => {
     if (!editingLog) {
-      setDate(DateFormatter.inputDate(new Date().toISOString()));
+      const now = new Date().toISOString();
+      setDate(DateFormatter.inputDate(now));
+      setTime(DateFormatter.inputTime(now));
       return;
     }
 
@@ -1527,10 +1782,13 @@ function RegisterFuel({
     setFuel(editingLog.fuel);
     setPaid(String(editingLog.paid).replace(".", ","));
     setLiters(String(editingLog.liters).replace(".", ","));
+    setOdometerKm(editingLog.odometerKm ? String(editingLog.odometerKm).replace(".", ",") : "");
     setDate(DateFormatter.inputDate(editingLog.createdAt));
+    setTime(DateFormatter.inputTime(editingLog.createdAt));
     setStationId(editingLog.stationId);
     setDraftLog(null);
     setSaveStatus(null);
+    setDirty(false);
   }, [editingLog?.id]);
 
   useEffect(() => {
@@ -1554,6 +1812,7 @@ function RegisterFuel({
   const parsedPaid = MoneyParser.toNumber(paid);
   const parsedLiters = MoneyParser.toNumber(liters);
   const price = new FuelPrice(parsedPaid, parsedLiters).valuePerLiter();
+  const parsedOdometerKm = odometerKm.trim() ? MoneyParser.toNumber(odometerKm) : undefined;
 
   function buildPayload() {
     if (!currentCar) {
@@ -1563,6 +1822,7 @@ function RegisterFuel({
 
     const paidNumber = MoneyParser.toNumber(paid);
     const litersNumber = MoneyParser.toNumber(liters);
+    const odometerNumber = odometerKm.trim() ? MoneyParser.toNumber(odometerKm) : undefined;
     const fuelPrice = new FuelPrice(paidNumber, litersNumber);
 
     if (!fuelPrice.isValid()) {
@@ -1570,9 +1830,14 @@ function RegisterFuel({
       return undefined;
     }
 
-    const createdAt = DateInputParser.toIso(date);
+    if (odometerKm.trim() && (!Number.isFinite(odometerNumber) || Number(odometerNumber) <= 0)) {
+      setSaveStatus("Informe uma quilometragem válida.");
+      return undefined;
+    }
+
+    const createdAt = DateInputParser.toIso(date, time);
     if (!createdAt) {
-      setSaveStatus("Data inválida. Use DD-MM-AAAA.");
+      setSaveStatus("Data inválida. Use DD-MM-AAAA e HH:MM.");
       return undefined;
     }
 
@@ -1582,6 +1847,7 @@ function RegisterFuel({
       fuel,
       paid: paidNumber,
       liters: litersNumber,
+      odometerKm: odometerNumber,
       createdAt,
       latitude: location.latitude,
       longitude: location.longitude
@@ -1590,6 +1856,10 @@ function RegisterFuel({
 
   useEffect(() => {
     const timeout = setTimeout(() => {
+      if (!dirty) {
+        return;
+      }
+
       const payload = buildPayload();
       if (!payload) {
         return;
@@ -1616,7 +1886,7 @@ function RegisterFuel({
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [carId, fuel, paid, liters, date, stationId, location.latitude, location.longitude, editingLog?.id, draftLog?.id]);
+  }, [dirty, carId, fuel, paid, liters, odometerKm, date, time, stationId, location.latitude, location.longitude, editingLog?.id, draftLog?.id]);
 
   return (
     <View style={styles.stack}>
@@ -1640,10 +1910,11 @@ function RegisterFuel({
                   {cars.map((car) => (
                     <Choice
                       key={car.id}
-                      label={`${car.nickname} - ${car.plate}`}
+                      label={car.nickname}
                       active={car.id === currentCar?.id}
                       onPress={() => {
                         setActiveField("car");
+                        setDirty(true);
                         setCarId(car.id);
                         onCarSelect(car.id);
                       }}
@@ -1658,13 +1929,14 @@ function RegisterFuel({
               <View style={styles.inlineField}>
                 <Text style={styles.inlineLabel}>Combustível</Text>
                 <View style={styles.choiceFieldWrap}>
-                  {fuels.map((item) => (
+                  {fuelOptions.map((item) => (
                     <Choice
                       key={item}
                       label={item}
                       active={item === fuel}
                       onPress={() => {
                         setActiveField("fuel");
+                        setDirty(true);
                         setFuel(item);
                       }}
                     />
@@ -1681,6 +1953,7 @@ function RegisterFuel({
                 onFocus={() => setActiveField("paid")}
                 onChangeText={(value) => {
                   setActiveField("paid");
+                  setDirty(true);
                   setPaid(value);
                 }}
                 keyboardType="decimal-pad"
@@ -1694,11 +1967,26 @@ function RegisterFuel({
                 onFocus={() => setActiveField("liters")}
                 onChangeText={(value) => {
                   setActiveField("liters");
+                  setDirty(true);
                   setLiters(value);
                 }}
                 keyboardType="decimal-pad"
               />
               <FieldToast notice={notice} anchor="liters" />
+            </View>
+            <View style={styles.fieldToastAnchor}>
+              <Field
+                label="Km atual"
+                value={odometerKm}
+                onFocus={() => setActiveField("odometerKm")}
+                onChangeText={(value) => {
+                  setActiveField("odometerKm");
+                  setDirty(true);
+                  setOdometerKm(value);
+                }}
+                keyboardType="decimal-pad"
+              />
+              <FieldToast notice={notice} anchor="odometerKm" />
             </View>
 
             <View style={styles.fieldToastAnchor}>
@@ -1708,10 +1996,24 @@ function RegisterFuel({
                 onFocus={() => setActiveField("date")}
                 onChange={(value) => {
                   setActiveField("date");
+                  setDirty(true);
                   setDate(value);
                 }}
               />
               <FieldToast notice={notice} anchor="date" />
+            </View>
+            <View style={styles.fieldToastAnchor}>
+              <TimeSelector
+                label="Hora"
+                value={time}
+                onFocus={() => setActiveField("time")}
+                onChange={(value) => {
+                  setActiveField("time");
+                  setDirty(true);
+                  setTime(value);
+                }}
+              />
+              <FieldToast notice={notice} anchor="time" />
             </View>
 
             <View style={styles.fieldToastAnchor}>
@@ -1725,6 +2027,7 @@ function RegisterFuel({
                       active={station.id === stationId}
                       onPress={() => {
                         setActiveField("station");
+                        setDirty(true);
                         setStationId(station.id);
                       }}
                     />
@@ -1737,7 +2040,10 @@ function RegisterFuel({
 
             <View style={styles.result}>
               <Text style={styles.label}>Preço real por litro</Text>
-              <Text style={styles.bigValue}>{Number.isFinite(price) ? currency.format(price) : "R$ 0,00"}</Text>
+              <Text style={styles.bigValue}>{Number.isFinite(price) ? formatCurrency(price) : "R$ 0"}</Text>
+              <Text style={styles.muted}>
+                {parsedOdometerKm ? `Km atual: ${parsedOdometerKm.toLocaleString("pt-BR")} km` : "Informe a km atual para calcular km/L nos próximos abastecimentos."}
+              </Text>
             </View>
           </>
         )}
@@ -1770,13 +2076,25 @@ function StationMap({
   onUpdate: (log: FuelLog) => void;
 }) {
   const { styles } = useThemeStyles();
+  const [mapExpanded, setMapExpanded] = useState(false);
   const logNumbers = logNumberMap(allLogs);
   const numberedLogs = logs.map((log) => ({ log, number: logNumbers.get(log.id) ?? 0 }));
 
   return (
     <View style={styles.stack}>
-      <Section title="Abastecimentos">
-        <View style={styles.mapPanel}>
+      <Section
+        title="Abastecimentos"
+        rightAction={
+          <Pressable
+            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
+            style={styles.mapHeaderIconButton}
+            onPress={() => setMapExpanded((current) => !current)}
+          >
+            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
+          </Pressable>
+        }
+      >
+        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
           <FuelMap numberedLogs={numberedLogs} stations={stations} />
         </View>
 
@@ -1787,6 +2105,7 @@ function StationMap({
           numberedLogs.map(({ log, number }) => {
             const station = stations.find((item) => item.id === log.stationId);
             const car = cars.find((item) => item.id === log.carId);
+            const efficiency = FuelEfficiencyCalculator.valueForLog(log, allLogs);
             return (
               <View key={log.id} style={styles.inlineEditGroup}>
                 <Pressable
@@ -1801,11 +2120,15 @@ function StationMap({
                     <Text style={styles.muted}>
                       {station?.name ?? "Posto"} - {car?.nickname ?? "Veículo"} - {log.fuel}
                     </Text>
+                    <Text style={styles.muted}>
+                      {log.odometerKm ? `${log.odometerKm.toLocaleString("pt-BR")} km` : "Km não informada"}
+                      {efficiency ? ` - ${efficiency.kmPerLiter.toFixed(1)} km/L` : ""}
+                    </Text>
                   </View>
                   <View style={styles.right}>
-                    <Text style={styles.itemTitle}>{currency.format(log.pricePerLiter)}/L</Text>
+                    <Text style={styles.itemTitle}>{formatCurrency(log.pricePerLiter)}/L</Text>
                     <Text style={styles.muted}>
-                      {currency.format(log.paid)} - {log.liters.toFixed(2)} L
+                      {formatCurrency(log.paid)} - {log.liters.toFixed(2)} L
                     </Text>
                   </View>
                 </Pressable>
@@ -1844,6 +2167,7 @@ function FuelMap({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const points = numberedLogs.map(({ log, number }, index) => {
     const station = stations.find((item) => item.id === log.stationId);
@@ -1901,8 +2225,14 @@ function FuelMap({
       attribution: "&copy; OpenStreetMap"
     }).addTo(map);
     leafletMapRef.current = map;
+    resizeObserverRef.current = new ResizeObserver(() => {
+      window.setTimeout(() => map.invalidateSize(), 0);
+    });
+    resizeObserverRef.current.observe(mapRef.current);
 
     return () => {
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       map.remove();
       leafletMapRef.current = null;
     };
@@ -1914,6 +2244,7 @@ function FuelMap({
       return;
     }
 
+    window.setTimeout(() => map.invalidateSize(), 0);
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
@@ -1980,10 +2311,32 @@ function FuelMap({
   });
 }
 
+function StationOverviewMap({ stations }: { stations: Station[] }) {
+  const numberedLogs = stations.map((station, index) => ({
+    number: index + 1,
+    log: {
+      id: `station-map-${station.id}`,
+      carId: "",
+      stationId: station.id,
+      fuel: "Gasolina comum" as FuelType,
+      paid: 1,
+      liters: 1,
+      pricePerLiter: 1,
+      createdAt: new Date().toISOString(),
+      latitude: station.latitude,
+      longitude: station.longitude
+    }
+  }));
+
+  return <FuelMap numberedLogs={numberedLogs} stations={stations} />;
+}
+
 function Cars({
   cars,
   logs,
+  stations,
   selectedCarId,
+  onEditLog,
   onSelect,
   onSave,
   onUpdate,
@@ -1991,7 +2344,9 @@ function Cars({
 }: {
   cars: Car[];
   logs: FuelLog[];
+  stations: Station[];
   selectedCarId: string | null;
+  onEditLog: (logId: string) => void;
   onSelect: (id: string) => void;
   onSave: (car: Car) => void;
   onUpdate: (car: Car) => void;
@@ -1999,6 +2354,7 @@ function Cars({
 }) {
   const { styles } = useThemeStyles();
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
+  const [selectedDetailsCarId, setSelectedDetailsCarId] = useState<string | null>(null);
   const carRanking = cars
     .map((car) => {
       const carLogs = logs.filter((log) => log.carId === car.id);
@@ -2028,22 +2384,31 @@ function Cars({
 
   return (
     <View style={styles.stack}>
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Meus veículos</Text>
-        <Pressable style={styles.addButton} onPress={openNewForm}>
-          <Text style={styles.addButtonText}>+</Text>
-        </Pressable>
-      </View>
+      <Section
+        title="Meus veículos"
+        rightAction={
+          <Pressable style={styles.addButton} onPress={openNewForm}>
+            <Text style={styles.addButtonText}>+</Text>
+          </Pressable>
+        }
+      >
+        {editingCarId === "new" ? (
+          <View style={styles.inlineEditGroup}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Adicionar veículo</Text>
+              <Pressable style={styles.closeButton} onPress={closeForm}>
+                <Text style={styles.closeButtonText}>×</Text>
+              </Pressable>
+            </View>
+            <View style={styles.inlineForm}>
+              <CarEditor onSave={onSave} onUpdate={onUpdate} onDelete={onDeleteCar} onCancel={closeForm} />
+            </View>
+            <View style={styles.mapListDivider} />
+          </View>
+        ) : null}
 
-      {editingCarId === "new" ? (
-        <Section title="Adicionar veículo" rightAction={<Pressable style={styles.closeButton} onPress={closeForm}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
-          <CarEditor onSave={onSave} onUpdate={onUpdate} onDelete={onDeleteCar} onCancel={closeForm} />
-        </Section>
-      ) : null}
-
-      <Section title="">
         {cars.length === 0 ? (
-          <Empty text="Cadastre seu primeiro veículo pela placa." />
+          <Empty text="Cadastre seu primeiro veículo." />
         ) : (
           cars.map((car) => (
             <View key={car.id} style={styles.inlineEditGroup}>
@@ -2058,7 +2423,7 @@ function Cars({
                 <View>
                   <Text style={styles.itemTitle}>{car.nickname}</Text>
                   <Text style={styles.muted}>
-                    {car.vehicleType ?? "Carro"} - {car.plate} - {car.brand} {car.model} {car.year}
+                    {[car.vehicleType ?? "Carro", car.brand, car.model].filter(Boolean).join(" - ")}
                   </Text>
                 </View>
                 <Text style={styles.pill}>{car.defaultFuel}</Text>
@@ -2077,31 +2442,37 @@ function Cars({
             </View>
           ))
         )}
-      </Section>
 
-      <Section title="Veículos que mais gastaram">
+        <View style={styles.mapListDivider} />
+        <Text style={styles.sectionTitle}>Veículos que mais gastaram</Text>
         {carRanking.length === 0 ? (
           <Empty text="O ranking nasce a partir dos abastecimentos registrados." />
         ) : (
           <>
             {carRanking.map((item, index) => (
-              <Pressable
-                key={item.car.id}
-                style={(state) => [
-                  styles.listItem,
-                  item.car.id === selectedCarId && styles.selectedItem,
-                  isHovered(state) && styles.listItemHover
-                ]}
-                onPress={() => openEditForm(item.car)}
-              >
-                <View style={styles.rankingInfo}>
-                  <Text style={styles.itemTitle}>
-                    {index + 1}. {item.car.nickname}
-                  </Text>
-                  <Text style={styles.muted}>{item.count} abastecimentos</Text>
-                </View>
-                <Text style={styles.rankingPrice}>{currency.format(item.total)}</Text>
-              </Pressable>
+              <React.Fragment key={item.car.id}>
+                <Pressable
+                  style={(state) => [
+                    styles.listItem,
+                    item.car.id === selectedCarId && styles.selectedItem,
+                    isHovered(state) && styles.listItemHover
+                  ]}
+                  onPress={() =>
+                    setSelectedDetailsCarId((current) => (current === item.car.id ? null : item.car.id))
+                  }
+                >
+                  <View style={styles.rankingInfo}>
+                    <Text style={styles.itemTitle}>
+                      {index + 1}. {item.car.nickname}
+                    </Text>
+                    <Text style={styles.muted}>{item.count} abastecimentos</Text>
+                  </View>
+                  <Text style={styles.rankingPrice}>{formatCurrency(item.total)}</Text>
+                </Pressable>
+                {selectedDetailsCarId === item.car.id ? (
+                  <CarFuelLogDetails carId={item.car.id} logs={logs} allLogs={logs} stations={stations} onEditLog={onEditLog} />
+                ) : null}
+              </React.Fragment>
             ))}
           </>
         )}
@@ -2125,30 +2496,25 @@ function CarEditor({
 }) {
   const { styles } = useThemeStyles();
   const [draftCar, setDraftCar] = useState<Car | null>(null);
-  const [plate, setPlate] = useState(car?.plate ?? "");
   const [vehicleType, setVehicleType] = useState<VehicleType>(car?.vehicleType ?? "Carro");
   const [nickname, setNickname] = useState(car?.nickname ?? "");
   const [brand, setBrand] = useState(car?.brand ?? "");
   const [model, setModel] = useState(car?.model ?? "");
-  const [year, setYear] = useState(car?.year || String(new Date().getFullYear()));
   const [acceptedFuel, setAcceptedFuel] = useState<FuelType[]>(car?.acceptedFuel?.length ? car.acceptedFuel : [car?.defaultFuel ?? "Gasolina comum"]);
   const [defaultFuel, setDefaultFuel] = useState<FuelType>(car?.defaultFuel ?? "Gasolina comum");
   const [status, setStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<ToastNotice | null>(null);
-  const [activeField, setActiveField] = useState("plate");
-  const plateIsInvalid = plate.trim().length > 0 && !BrazilianPlate.isValid(plate);
+  const [activeField, setActiveField] = useState("nickname");
 
   useEffect(() => {
     if (!car) {
       return;
     }
 
-    setPlate(car.plate);
     setVehicleType(car.vehicleType ?? "Carro");
     setNickname(car.nickname);
     setBrand(car.brand);
     setModel(car.model);
-    setYear(car.year);
     setAcceptedFuel(car.acceptedFuel?.length ? car.acceptedFuel : [car.defaultFuel]);
     setDefaultFuel(car.defaultFuel);
     setDraftCar(null);
@@ -2156,38 +2522,33 @@ function CarEditor({
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (!plate.trim() || !nickname.trim()) {
-        setStatus("Preencha placa e apelido para salvar.");
-        return;
-      }
-
-      if (!BrazilianPlate.isValid(plate)) {
-        setStatus("Use uma placa no padrão ABC-1234 ou ABC1D23.");
+      if (!nickname.trim()) {
+        setStatus("Preencha o apelido para salvar.");
         return;
       }
 
       if (car) {
-        onUpdate(CarFactory.update(car, { plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel }));
+        onUpdate(CarFactory.update(car, { vehicleType, nickname, brand, model, acceptedFuel, defaultFuel }));
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
       if (draftCar) {
-        const updated = CarFactory.update(draftCar, { plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel });
+        const updated = CarFactory.update(draftCar, { vehicleType, nickname, brand, model, acceptedFuel, defaultFuel });
         setDraftCar(updated);
         onUpdate(updated);
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
-      const created = CarFactory.create({ plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel });
+      const created = CarFactory.create({ vehicleType, nickname, brand, model, acceptedFuel, defaultFuel });
       setDraftCar(created);
       onSave(created);
       showFieldNotice(setNotice, "Veículo criado.", activeField);
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel, car?.id, draftCar?.id]);
+  }, [vehicleType, nickname, brand, model, acceptedFuel, defaultFuel, car?.id, draftCar?.id]);
 
   useEffect(() => {
     if (acceptedFuel.includes(defaultFuel)) {
@@ -2196,39 +2557,6 @@ function CarEditor({
 
     setDefaultFuel(acceptedFuel[0] ?? "Gasolina comum");
   }, [acceptedFuel, defaultFuel]);
-
-  function changeYear(offset: number) {
-    const numericYear = Number(year) || new Date().getFullYear();
-    updateYear(String(Math.min(2035, Math.max(1950, numericYear + offset))));
-  }
-
-  function updateYear(nextYear: string) {
-    setActiveField("year");
-    const normalizedYear = nextYear.replace(/\D/g, "").slice(0, 4);
-    setYear(normalizedYear);
-
-    if (!plate.trim() || !nickname.trim()) {
-      return;
-    }
-
-    if (car) {
-      onUpdate(CarFactory.update(car, { plate, vehicleType, nickname, brand, model, year: normalizedYear, acceptedFuel, defaultFuel }));
-      showFieldNotice(setNotice, "Veículo atualizado.", "year");
-      return;
-    }
-
-    if (draftCar) {
-      const updated = CarFactory.update(draftCar, { plate, vehicleType, nickname, brand, model, year: normalizedYear, acceptedFuel, defaultFuel });
-      setDraftCar(updated);
-      onUpdate(updated);
-      showFieldNotice(setNotice, "Veículo atualizado.", "year");
-    }
-  }
-
-  function updatePlate(nextPlate: string) {
-    setActiveField("plate");
-    setPlate(BrazilianPlate.normalize(nextPlate));
-  }
 
   function updateCarField(anchor: string, update: (value: string) => void) {
     return (value: string) => {
@@ -2265,13 +2593,6 @@ function CarEditor({
   return (
     <View style={styles.formStack}>
       <View style={styles.fieldToastAnchor}>
-        <Field label="Placa" value={plate} onFocus={() => setActiveField("plate")} onChangeText={updatePlate} autoCapitalize="characters" maxLength={8} />
-        <FieldToast notice={notice} anchor="plate" />
-      </View>
-      {plateIsInvalid ? (
-        <Text style={styles.errorText}>Placa inválida. Use ABC-1234 ou ABC1D23.</Text>
-      ) : null}
-      <View style={styles.fieldToastAnchor}>
         <View style={styles.inlineField}>
           <Text style={styles.inlineLabel}>Tipo</Text>
           <View style={styles.choiceFieldWrap}>
@@ -2304,32 +2625,22 @@ function CarEditor({
       </View>
       <View style={styles.fieldToastAnchor}>
         <View style={styles.inlineField}>
-          <Text style={styles.inlineLabel}>Ano</Text>
-          <View style={styles.stepper}>
-            <Pressable style={styles.stepperButton} onPress={() => changeYear(-1)}>
-              <Text style={styles.stepperButtonText}>−</Text>
-            </Pressable>
-            <TextInput
-              value={year}
-              onFocus={() => setActiveField("year")}
-              onChangeText={updateYear}
-              keyboardType="number-pad"
-              style={styles.stepperInput}
-            />
-            <Pressable style={styles.stepperButton} onPress={() => changeYear(1)}>
-              <Text style={styles.stepperButtonText}>+</Text>
-            </Pressable>
+          <Text style={styles.inlineLabel}>Combustíveis</Text>
+          <View style={styles.choiceFieldWrap}>
+            {fuels.map((fuel) => (
+              <Choice
+                key={fuel}
+                label={fuel}
+                active={acceptedFuel.includes(fuel)}
+                onPress={() => {
+                  setActiveField("acceptedFuel");
+                  toggleAcceptedFuel(fuel);
+                }}
+              />
+            ))}
           </View>
         </View>
-        <FieldToast notice={notice} anchor="year" />
-      </View>
-      <View style={styles.inlineField}>
-        <Text style={styles.inlineLabel}>Combustíveis</Text>
-        <View style={styles.choiceFieldWrap}>
-          {fuels.map((fuel) => (
-            <Choice key={fuel} label={fuel} active={acceptedFuel.includes(fuel)} onPress={() => toggleAcceptedFuel(fuel)} />
-          ))}
-        </View>
+        <FieldToast notice={notice} anchor="acceptedFuel" />
       </View>
       <Pressable style={styles.deleteButton} onPress={confirmDelete}>
         <Text style={styles.deleteButtonText}>Apagar veículo</Text>
@@ -2362,6 +2673,7 @@ function Stations({
   const { styles } = useThemeStyles();
   const [editingStationId, setEditingStationId] = useState<string | null>(null);
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   function openNewForm() {
     setEditingStationId("new");
@@ -2378,32 +2690,49 @@ function Stations({
 
   return (
     <View style={styles.stack}>
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Postos</Text>
-        <Pressable style={styles.addButton} onPress={openNewForm}>
-          <Text style={styles.addButtonText}>+</Text>
-        </Pressable>
-      </View>
+      <Section
+        title="Postos"
+        rightAction={
+          <Pressable style={styles.addButton} onPress={openNewForm}>
+            <Text style={styles.addButtonText}>+</Text>
+          </Pressable>
+        }
+      >
+        {editingStationId === "new" ? (
+          <View style={styles.inlineEditGroup}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Adicionar posto</Text>
+              <Pressable style={styles.closeButton} onPress={() => setEditingStationId(null)}>
+                <Text style={styles.closeButtonText}>×</Text>
+              </Pressable>
+            </View>
+            <View style={styles.inlineForm}>
+              <StationEditor
+                onSave={onSave}
+                onUpdate={onUpdate}
+                onDelete={onDeleteStation}
+                onCancel={() => setEditingStationId(null)}
+              />
+            </View>
+            <View style={styles.mapListDivider} />
+          </View>
+        ) : null}
 
-      {editingStationId === "new" ? (
-        <Section
-          title="Adicionar posto"
-          rightAction={
-            <Pressable style={styles.closeButton} onPress={() => setEditingStationId(null)}>
-              <Text style={styles.closeButtonText}>×</Text>
-            </Pressable>
-          }
-        >
-          <StationEditor
-            onSave={onSave}
-            onUpdate={onUpdate}
-            onDelete={onDeleteStation}
-            onCancel={() => setEditingStationId(null)}
-          />
-        </Section>
-      ) : null}
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Mapa de postos</Text>
+          <Pressable
+            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
+            style={styles.mapHeaderIconButton}
+            onPress={() => setMapExpanded((current) => !current)}
+          >
+            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
+          </Pressable>
+        </View>
+        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
+          <StationOverviewMap stations={stations} />
+        </View>
 
-      <Section title="">
+        <View style={styles.mapListDivider} />
         {stations.length === 0 ? (
           <Empty text="Cadastre seu primeiro posto." />
         ) : (
@@ -2434,9 +2763,9 @@ function Stations({
             </View>
           ))
         )}
-      </Section>
 
-      <Section title="Postos mais baratos">
+        <View style={styles.mapListDivider} />
+        <Text style={styles.sectionTitle}>Postos mais baratos</Text>
         <Ranking
           rows={metrics.stationRanking}
           selectedStationId={selectedStationId}
@@ -2593,12 +2922,23 @@ function StationEditor({
 function Tabs({ active, onChange }: { active: Tab | null; onChange: (tab: Tab) => void }) {
   const { styles } = useThemeStyles();
   const tabs: Tab[] = ["Resumo", "Abastecimentos", "Postos", "Veículos"];
+  const labels: Record<Tab, string> = {
+    Resumo: "Resumo",
+    Abastecimentos: "Abastecimentos",
+    Postos: "Postos",
+    Veículos: "Veículos"
+  };
+
   return (
     <View style={styles.tabsBar}>
       <View style={styles.tabs}>
         {tabs.map((tab) => (
-          <Pressable key={tab} style={[styles.tab, active === tab && styles.activeTab]} onPress={() => onChange(tab)}>
-            <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{tab}</Text>
+          <Pressable
+            key={tab}
+            style={[styles.tab, { flexGrow: labels[tab].length, flexBasis: 0 }, active === tab && styles.activeTab]}
+            onPress={() => onChange(tab)}
+          >
+            <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{labels[tab]}</Text>
           </Pressable>
         ))}
       </View>
@@ -2684,7 +3024,7 @@ function Ranking({
               </Text>
               <Text style={styles.muted}>{row.count} abastecimentos</Text>
             </View>
-            <Text style={styles.rankingPrice}>{currency.format(row.average)}/L</Text>
+            <Text style={styles.rankingPrice}>{formatCurrency(row.average)}/L</Text>
           </Pressable>
           {selectedStationId === row.id ? (
             <StationDetails
@@ -2728,7 +3068,7 @@ function StationDetails({
 
   return (
     <View style={styles.stationDetails}>
-      <Text style={styles.itemTitle}>Detalhes: {station.name}</Text>
+      <Text style={styles.itemTitle}>Abastecimentos</Text>
       {stationLogs.map((log) => {
         const car = cars.find((item) => item.id === log.carId);
         return (
@@ -2741,7 +3081,56 @@ function StationDetails({
               <Text style={styles.itemTitle}>#{logNumbers.get(log.id)} - {DateFormatter.compact(log.createdAt)}</Text>
               <Text style={styles.muted}>{car?.nickname ?? "Veículo"} - {log.fuel}</Text>
             </View>
-            <Text style={styles.itemTitle}>{currency.format(log.pricePerLiter)}/L</Text>
+            <Text style={styles.itemTitle}>{formatCurrency(log.pricePerLiter)}/L</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function CarFuelLogDetails({
+  carId,
+  logs,
+  allLogs,
+  stations,
+  onEditLog
+}: {
+  carId: string;
+  logs: FuelLog[];
+  allLogs: FuelLog[];
+  stations: Station[];
+  onEditLog?: (logId: string) => void;
+}) {
+  const { styles } = useThemeStyles();
+  const carLogs = logs.filter((log) => log.carId === carId);
+  const logNumbers = logNumberMap(allLogs);
+
+  if (carLogs.length === 0) {
+    return (
+      <View style={styles.stationDetails}>
+        <Text style={styles.itemTitle}>Abastecimentos</Text>
+        <Empty text="Nenhum abastecimento registrado para este veículo." />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.stationDetails}>
+      <Text style={styles.itemTitle}>Abastecimentos</Text>
+      {carLogs.map((log) => {
+        const station = stations.find((item) => item.id === log.stationId);
+        return (
+          <Pressable
+            key={log.id}
+            style={(state) => [styles.detailRow, isHovered(state) && styles.listItemHover]}
+            onPress={() => onEditLog?.(log.id)}
+          >
+            <View>
+              <Text style={styles.itemTitle}>#{logNumbers.get(log.id)} - {DateFormatter.compact(log.createdAt)}</Text>
+              <Text style={styles.muted}>{station?.name ?? "Posto"} - {log.fuel}</Text>
+            </View>
+            <Text style={styles.itemTitle}>{formatCurrency(log.pricePerLiter)}/L</Text>
           </Pressable>
         );
       })}
@@ -2836,6 +3225,56 @@ function DateSelector({
           keyboardType="number-pad"
           maxLength={4}
           style={[styles.datePartInput, styles.dateYearInput]}
+        />
+      </View>
+    </View>
+  );
+}
+
+function TimeSelector({
+  label,
+  value,
+  onChange,
+  onFocus
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+}) {
+  const { styles, theme } = useThemeStyles();
+  const [hour = "", minute = ""] = value.split(":");
+
+  function updatePart(part: "hour" | "minute", nextValue: string) {
+    const onlyNumbers = nextValue.replace(/\D/g, "").slice(0, 2);
+    const nextHour = part === "hour" ? onlyNumbers : hour;
+    const nextMinute = part === "minute" ? onlyNumbers : minute;
+    onChange(`${nextHour}:${nextMinute}`);
+  }
+
+  return (
+    <View style={styles.inlineField}>
+      <Text style={styles.inlineLabel}>{label}</Text>
+      <View style={styles.timeSelector}>
+        <TextInput
+          value={hour}
+          onFocus={onFocus}
+          onChangeText={(text) => updatePart("hour", text)}
+          placeholder="HH"
+          placeholderTextColor={theme.muted}
+          keyboardType="number-pad"
+          maxLength={2}
+          style={styles.datePartInput}
+        />
+        <TextInput
+          value={minute}
+          onFocus={onFocus}
+          onChangeText={(text) => updatePart("minute", text)}
+          placeholder="MM"
+          placeholderTextColor={theme.muted}
+          keyboardType="number-pad"
+          maxLength={2}
+          style={styles.datePartInput}
         />
       </View>
     </View>
@@ -3039,18 +3478,22 @@ function createStyles(theme: Theme) {
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 10,
     paddingBottom: 14,
-    gap: 14,
+    gap: 12,
     zIndex: 20
   },
   headerTop: {
     position: "relative",
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 16,
     zIndex: 30
+  },
+  brandBlock: {
+    flex: 1,
+    minWidth: 0
   },
   headerSecondaryActions: {
     position: "relative",
@@ -3059,6 +3502,27 @@ function createStyles(theme: Theme) {
     flexWrap: "wrap",
     gap: 8,
     zIndex: 40
+  },
+  headerTools: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    flexShrink: 0,
+    zIndex: 40
+  },
+  colorControlCluster: {
+    minHeight: 34,
+    borderRadius: 999,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 8,
+    paddingRight: 3,
+    gap: 6
   },
   headerPrimaryButton: {
     position: "relative",
@@ -3113,10 +3577,10 @@ function createStyles(theme: Theme) {
     marginHorizontal: 16,
     marginBottom: 10,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.border,
+    borderWidth: 2,
+    borderColor: theme.primary,
     backgroundColor: theme.primarySoft,
-    padding: 10,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -3129,14 +3593,14 @@ function createStyles(theme: Theme) {
   },
   demoBannerTitle: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
   demoBannerText: {
-    color: theme.muted,
-    fontSize: 12,
-    lineHeight: 16,
+    color: theme.text,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: theme.fontFamily
   },
   demoBannerButton: {
@@ -3155,15 +3619,18 @@ function createStyles(theme: Theme) {
   },
   accountBox: {
     position: "relative",
-    zIndex: 1000
+    zIndex: 1000,
+    flexShrink: 0
   },
   accountButton: {
     width: 34,
-    minHeight: 30,
-    borderRadius: 8,
+    minHeight: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "transparent"
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border
   },
   accountButtonText: {
     color: theme.primary,
@@ -3204,6 +3671,15 @@ function createStyles(theme: Theme) {
     zIndex: 1001,
     elevation: 20
   },
+  menuDismissLayer: {
+    position: "fixed" as never,
+    top: -1000,
+    right: -1000,
+    bottom: -1000,
+    left: -1000,
+    backgroundColor: "transparent",
+    zIndex: 1000
+  },
   accountEmail: {
     color: theme.muted,
     fontSize: 12,
@@ -3211,11 +3687,28 @@ function createStyles(theme: Theme) {
     lineHeight: 18,
     fontFamily: theme.fontFamily
   },
+  accountIdentity: {
+    gap: 3,
+    paddingHorizontal: 2,
+    paddingBottom: 2
+  },
   accountName: {
     color: theme.text,
     fontSize: 14,
     fontWeight: "900",
     lineHeight: 20,
+    fontFamily: theme.headingFontFamily
+  },
+  accountNameInput: {
+    minHeight: 34,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.input,
+    color: theme.text,
+    paddingHorizontal: 9,
+    fontSize: 14,
+    fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
   accountMenuItem: {
@@ -3272,7 +3765,7 @@ function createStyles(theme: Theme) {
     backgroundColor: theme.background
   },
   brand: {
-    fontSize: 26,
+    fontSize: 23,
     fontWeight: "800",
     color: theme.text,
     fontFamily: theme.headingFontFamily
@@ -3290,9 +3783,9 @@ function createStyles(theme: Theme) {
     backgroundColor: theme.primary
   },
   themeButton: {
-    width: 34,
-    minHeight: 30,
-    borderRadius: 8,
+    width: 30,
+    minHeight: 28,
+    borderRadius: 14,
     backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
@@ -3306,22 +3799,22 @@ function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   paletteInline: {
-    minHeight: 30,
+    minHeight: 34,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5
+    gap: 6
   },
   paletteDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.72)"
   },
   paletteDotActive: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: theme.text
   },
@@ -3349,7 +3842,7 @@ function createStyles(theme: Theme) {
   },
   section: {
     position: "relative",
-    backgroundColor: theme.surface,
+    backgroundColor: transparentColor(theme.surface, theme.mode === "dark" ? 0.9 : 0.78),
     borderRadius: 8,
     padding: 14,
     gap: 12,
@@ -3369,7 +3862,7 @@ function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   sectionTitleRow: {
-    minHeight: 36,
+    minHeight: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -3425,7 +3918,7 @@ function createStyles(theme: Theme) {
   },
   grid: {
     flexDirection: "row",
-    gap: 12
+    gap: 8
   },
   monthSwitcher: {
     minHeight: 52,
@@ -3464,28 +3957,35 @@ function createStyles(theme: Theme) {
   },
   metricCard: {
     flex: 1,
-    minHeight: 104,
+    minHeight: 88,
     backgroundColor: theme.surface,
     borderRadius: 8,
-    padding: 14,
-    justifyContent: "space-between",
+    padding: 7,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: theme.border
+    borderColor: theme.border,
+    gap: 5
   },
   metricLabel: {
     color: theme.muted,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
-    fontFamily: theme.fontFamily
+    lineHeight: 13,
+    fontFamily: theme.fontFamily,
+    textAlign: "center"
   },
   metricValue: {
     color: theme.text,
-    fontSize: 23,
+    fontSize: 16,
     fontWeight: "900",
-    fontFamily: theme.headingFontFamily
+    lineHeight: 19,
+    fontFamily: theme.headingFontFamily,
+    textAlign: "center"
   },
   metricValueSmall: {
-    fontSize: 18
+    fontSize: 14,
+    lineHeight: 17
   },
   bigValue: {
     color: theme.text,
@@ -3558,6 +4058,14 @@ function createStyles(theme: Theme) {
     alignItems: "center",
     gap: 6,
     minWidth: 0
+  },
+  timeSelector: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+    justifyContent: "flex-start"
   },
   dateInput: {
     flex: 1,
@@ -3770,7 +4278,8 @@ function createStyles(theme: Theme) {
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
-    justifyContent: "space-between",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 8
   },
   selectedItem: {
@@ -3789,7 +4298,11 @@ function createStyles(theme: Theme) {
     gap: 8,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    paddingTop: 12
+    paddingTop: 12,
+    marginLeft: 10,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: theme.border
   },
   detailRow: {
     minHeight: 58,
@@ -3916,6 +4429,46 @@ function createStyles(theme: Theme) {
     overflow: "hidden",
     position: "relative"
   },
+  mapPanelExpanded: {
+    height: Platform.OS === "web" ? "calc(100vh - 240px)" as never : 560,
+    minHeight: 420
+  },
+  mapHeaderIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.border
+  },
+  mapHeaderIconText: {
+    color: theme.primary,
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  mapExpandButton: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    zIndex: 5,
+    minHeight: 32,
+    borderRadius: 8,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  mapExpandButtonText: {
+    color: theme.primary,
+    fontSize: 12,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
   mapImage: {
     position: "absolute",
     width: "100%",
@@ -3966,25 +4519,25 @@ function createStyles(theme: Theme) {
   tabs: {
     width: "100%",
     maxWidth: 430,
-    paddingHorizontal: 8,
+    paddingHorizontal: 5,
     flexDirection: "row",
-    gap: 5
+    gap: 4
   },
   tab: {
-    flex: 1,
     minHeight: 52,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 2
+    paddingHorizontal: 5
   },
   activeTab: {
     backgroundColor: theme.primary
   },
   tabText: {
     color: theme.muted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
+    textAlign: "center",
     fontFamily: theme.fontFamily
   },
   activeTabText: {
