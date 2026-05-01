@@ -1,19 +1,23 @@
-import { AppState, Car, FuelLog, FuelType, Station, ThemeMode, User } from "../domain";
+import { AppState, Car, FuelLog, FuelType, Station, ThemeMode, ThemePalette, UserSummary, VehicleType } from "../domain";
 import { supabase } from "../supabaseClient";
 
 type ProfileRow = {
   owner_id: string;
   name: string | null;
+  email: string | null;
   selected_car_id: string | null;
   filtered_car_ids: string[] | null;
   theme_mode: ThemeMode | null;
+  theme_palette: ThemePalette | null;
   demo_data_loaded: boolean | null;
+  updated_at?: string;
 };
 
 type CarRow = {
   id: string;
   owner_id: string;
   plate: string;
+  vehicle_type: VehicleType | null;
   nickname: string;
   brand: string;
   model: string;
@@ -84,10 +88,11 @@ export class SupabaseAppRepository {
     const profile = profileResult.data as ProfileRow | null;
 
     return {
-      user: profile?.name ? { name: profile.name } : null,
+      user: profile?.name ? { name: profile.name, email: profile.email ?? undefined } : null,
       selectedCarId: profile?.selected_car_id ?? null,
       filteredCarIds: profile?.filtered_car_ids ?? [],
       themeMode: profile?.theme_mode ?? "light",
+      themePalette: profile?.theme_palette ?? "green",
       demoDataLoaded: profile?.demo_data_loaded ?? true,
       cars: (carsResult.data ?? []).map((row) => this.carFromRow(row as CarRow)),
       stations: (stationsResult.data ?? []).map((row) => this.stationFromRow(row as StationRow)),
@@ -103,10 +108,13 @@ export class SupabaseAppRepository {
     const profile: ProfileRow = {
       owner_id: ownerId,
       name: state.user?.name ?? null,
+      email: state.user?.email ?? null,
       selected_car_id: state.selectedCarId,
       filtered_car_ids: state.filteredCarIds ?? [],
       theme_mode: state.themeMode ?? "light",
-      demo_data_loaded: state.demoDataLoaded ?? false
+      theme_palette: state.themePalette ?? "green",
+      demo_data_loaded: state.demoDataLoaded ?? false,
+      updated_at: new Date().toISOString()
     };
 
     const profileResult = await supabase.from("profiles").upsert(profile, { onConflict: "owner_id" });
@@ -120,6 +128,41 @@ export class SupabaseAppRepository {
     await this.insertRows("cars", state.cars.map((car) => this.carToRow(ownerId, car)));
     await this.insertRows("stations", state.stations.map((station) => this.stationToRow(ownerId, station)));
     await this.insertRows("fuel_logs", state.logs.map((log) => this.logToRow(ownerId, log)));
+  }
+
+  async listUserSummaries(): Promise<UserSummary[]> {
+    const [profilesResult, carsResult, stationsResult] = await Promise.all([
+      supabase.from("profiles").select("owner_id,name,email,updated_at").order("updated_at", { ascending: false }),
+      supabase.from("cars").select("owner_id,id"),
+      supabase.from("stations").select("owner_id,id")
+    ]);
+
+    if (profilesResult.error) {
+      throw profilesResult.error;
+    }
+
+    if (carsResult.error) {
+      throw carsResult.error;
+    }
+
+    if (stationsResult.error) {
+      throw stationsResult.error;
+    }
+
+    const vehicleCounts = this.countByOwner(carsResult.data ?? []);
+    const stationCounts = this.countByOwner(stationsResult.data ?? []);
+
+    return (profilesResult.data ?? []).map((profile) => {
+      const row = profile as Pick<ProfileRow, "owner_id" | "name" | "email" | "updated_at">;
+      return {
+        ownerId: row.owner_id,
+        name: row.name ?? "Sem nome",
+        email: row.email ?? "Email não salvo",
+        vehicles: vehicleCounts.get(row.owner_id) ?? 0,
+        stations: stationCounts.get(row.owner_id) ?? 0,
+        updatedAt: row.updated_at ?? ""
+      };
+    });
   }
 
   private async clearRows(table: "cars" | "stations" | "fuel_logs", ownerId: string) {
@@ -140,10 +183,24 @@ export class SupabaseAppRepository {
     }
   }
 
+  private countByOwner(rows: Array<{ owner_id?: string }>) {
+    const counts = new Map<string, number>();
+    rows.forEach((row) => {
+      if (!row.owner_id) {
+        return;
+      }
+
+      counts.set(row.owner_id, (counts.get(row.owner_id) ?? 0) + 1);
+    });
+
+    return counts;
+  }
+
   private carFromRow(row: CarRow): Car {
     return {
       id: row.id,
       plate: row.plate,
+      vehicleType: row.vehicle_type ?? "Carro",
       nickname: row.nickname,
       brand: row.brand,
       model: row.model,
@@ -158,6 +215,7 @@ export class SupabaseAppRepository {
       id: car.id,
       owner_id: ownerId,
       plate: car.plate,
+      vehicle_type: car.vehicleType ?? "Carro",
       nickname: car.nickname,
       brand: car.brand,
       model: car.model,

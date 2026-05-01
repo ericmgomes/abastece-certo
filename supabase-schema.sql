@@ -1,9 +1,11 @@
 create table if not exists profiles (
   owner_id text primary key,
   name text,
+  email text,
   selected_car_id text,
   filtered_car_ids text[] not null default '{}',
   theme_mode text not null default 'light',
+  theme_palette text not null default 'green',
   demo_data_loaded boolean not null default false,
   updated_at timestamp with time zone not null default now()
 );
@@ -12,6 +14,7 @@ create table if not exists cars (
   id text primary key,
   owner_id text not null references profiles(owner_id) on delete cascade,
   plate text not null,
+  vehicle_type text not null default 'Carro',
   nickname text not null,
   brand text not null default '',
   model text not null default '',
@@ -63,8 +66,11 @@ drop policy if exists "MVP public cars access" on cars;
 drop policy if exists "MVP public stations access" on stations;
 drop policy if exists "MVP public fuel logs access" on fuel_logs;
 drop policy if exists "Users can manage own profile" on profiles;
+drop policy if exists "Admin can read profiles" on profiles;
 drop policy if exists "Users can manage own cars" on cars;
+drop policy if exists "Admin can read cars" on cars;
 drop policy if exists "Users can manage own stations" on stations;
+drop policy if exists "Admin can read stations" on stations;
 drop policy if exists "Users can manage own fuel logs" on fuel_logs;
 
 create policy "Users can manage own profile"
@@ -72,15 +78,27 @@ create policy "Users can manage own profile"
   using (owner_id = auth.uid()::text)
   with check (owner_id = auth.uid()::text);
 
+create policy "Admin can read profiles"
+  on profiles for select
+  using (auth.jwt() ->> 'email' = 'ericgomes@gmail.com');
+
 create policy "Users can manage own cars"
   on cars for all
   using (owner_id = auth.uid()::text)
   with check (owner_id = auth.uid()::text);
 
+create policy "Admin can read cars"
+  on cars for select
+  using (auth.jwt() ->> 'email' = 'ericgomes@gmail.com');
+
 create policy "Users can manage own stations"
   on stations for all
   using (owner_id = auth.uid()::text)
   with check (owner_id = auth.uid()::text);
+
+create policy "Admin can read stations"
+  on stations for select
+  using (auth.jwt() ->> 'email' = 'ericgomes@gmail.com');
 
 create policy "Users can manage own fuel logs"
   on fuel_logs for all

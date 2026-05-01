@@ -1,12 +1,15 @@
 export type FuelType = "Gasolina comum" | "Gasolina aditivada" | "Etanol" | "Diesel";
+export type VehicleType = "Carro" | "Moto" | "Caminhonete" | "Caminhão" | "Van";
 
 export type User = {
   name: string;
+  email?: string;
 };
 
 export type Car = {
   id: string;
   plate: string;
+  vehicleType: VehicleType;
   nickname: string;
   brand: string;
   model: string;
@@ -47,10 +50,21 @@ export type AppState = {
   stations: Station[];
   logs: FuelLog[];
   themeMode?: ThemeMode;
+  themePalette?: ThemePalette;
   demoDataLoaded?: boolean;
 };
 
 export type ThemeMode = "light" | "dark";
+export type ThemePalette = "green" | "pink" | "blue";
+
+export type UserSummary = {
+  ownerId: string;
+  name: string;
+  email: string;
+  vehicles: number;
+  stations: number;
+  updatedAt: string;
+};
 
 export type StationRankingItem = Station & {
   average: number;
@@ -80,6 +94,7 @@ export type DashboardMetrics = {
 };
 
 export const fuels: FuelType[] = ["Gasolina comum", "Gasolina aditivada", "Etanol", "Diesel"];
+export const vehicleTypes: VehicleType[] = ["Carro", "Moto", "Caminhonete", "Caminhão", "Van"];
 
 export class IdFactory {
   static create(prefix: string) {
@@ -200,6 +215,7 @@ export class FuelLogFactory {
 export class CarFactory {
   static create(input: {
     plate: string;
+    vehicleType?: VehicleType;
     nickname: string;
     brand: string;
     model: string;
@@ -211,6 +227,7 @@ export class CarFactory {
     return {
       id: IdFactory.create("carro"),
       plate: BrazilianPlate.normalize(input.plate),
+      vehicleType: input.vehicleType ?? "Carro",
       nickname: input.nickname.trim(),
       brand: input.brand.trim(),
       model: input.model.trim(),
@@ -224,6 +241,7 @@ export class CarFactory {
     car: Car,
     input: {
       plate: string;
+      vehicleType: VehicleType;
       nickname: string;
       brand: string;
       model: string;
@@ -236,6 +254,7 @@ export class CarFactory {
     return {
       ...car,
       plate: BrazilianPlate.normalize(input.plate),
+      vehicleType: input.vehicleType,
       nickname: input.nickname.trim(),
       brand: input.brand.trim(),
       model: input.model.trim(),

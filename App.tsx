@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -32,14 +33,19 @@ import {
   Station,
   StationRankingItem,
   StationSuggestionService,
+  ThemePalette,
   ThemeMode,
   User,
-  fuels
+  UserSummary,
+  VehicleType,
+  fuels,
+  vehicleTypes
 } from "./src/domain";
 import { SupabaseAppRepository } from "./src/repositories/SupabaseAppRepository";
 import { supabase } from "./src/supabaseClient";
 
-type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Carros";
+type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos";
+type UtilityScreen = "help" | "privacy" | "users" | null;
 const storageKey = "litro-certo:v1";
 const appRepository = new SupabaseAppRepository();
 
@@ -118,6 +124,7 @@ const demoCars: Car[] = [
   {
     id: "demo-compass",
     plate: "BRA2E19",
+    vehicleType: "Carro",
     nickname: "Compass",
     brand: "Jeep",
     model: "Compass",
@@ -128,6 +135,7 @@ const demoCars: Car[] = [
   {
     id: "demo-onix",
     plate: "QWE8R44",
+    vehicleType: "Carro",
     nickname: "Onix",
     brand: "Chevrolet",
     model: "Onix Plus",
@@ -138,6 +146,7 @@ const demoCars: Car[] = [
   {
     id: "demo-hilux",
     plate: "HIL7X10",
+    vehicleType: "Caminhonete",
     nickname: "Hilux",
     brand: "Toyota",
     model: "Hilux",
@@ -196,6 +205,7 @@ const demoState: AppState = {
   stations: initialStations,
   logs: demoLogs,
   themeMode: "light",
+  themePalette: "green",
   demoDataLoaded: true
 };
 
@@ -299,6 +309,7 @@ const starterState: AppState = {
   stations: initialStations,
   logs: [],
   themeMode: "light",
+  themePalette: "green",
   demoDataLoaded: false
 };
 
@@ -310,6 +321,7 @@ const currency = new Intl.NumberFormat("pt-BR", {
 type Theme = ReturnType<typeof buildTheme>;
 type ThemeContextValue = {
   mode: ThemeMode;
+  palette: ThemePalette;
   theme: Theme;
   styles: ReturnType<typeof createStyles>;
 };
@@ -325,39 +337,121 @@ function useThemeStyles() {
   return value;
 }
 
-function buildTheme(mode: ThemeMode) {
-  if (mode === "dark") {
-    return {
-      mode,
-      background: "#071B16",
-      surface: "#102A23",
-      surfaceAlt: "#16382F",
-      border: "#285244",
-      text: "#F2FFF9",
-      muted: "#A9C6BA",
-      primary: "#1FA463",
-      primaryDark: "#0E6F46",
-      primarySoft: "#1A4436",
-      accent: "#7DDC9D",
-      input: "#0B211B",
-      map: "#14382E"
-    };
-  }
+function buildTheme(mode: ThemeMode, palette: ThemePalette) {
+  const greenFont = Platform.select({ ios: "Avenir", android: "sans-serif", default: "Arial" }) ?? "sans-serif";
+  const pinkFont = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia" }) ?? "serif";
+  const blueFont = Platform.select({ ios: "Avenir", android: "sans-serif", default: "Verdana" }) ?? "sans-serif";
 
+  const palettes = {
+    green: {
+      light: {
+        background: "#EEF7F0",
+        surface: "#FFFFFF",
+        surfaceAlt: "#F2FAF4",
+        border: "#CFE4D5",
+        text: "#102018",
+        muted: "#627568",
+        primary: "#178A4A",
+        primaryDark: "#0D5F36",
+        primarySoft: "#DDF3E5",
+        accent: "#2DBE71",
+        input: "#FFFFFF",
+        map: "#D7EDDE",
+        fontFamily: greenFont,
+        headingFontFamily: greenFont
+      },
+      dark: {
+        background: "#071B16",
+        surface: "#102A23",
+        surfaceAlt: "#16382F",
+        border: "#285244",
+        text: "#F2FFF9",
+        muted: "#A9C6BA",
+        primary: "#1FA463",
+        primaryDark: "#0E6F46",
+        primarySoft: "#1A4436",
+        accent: "#7DDC9D",
+        input: "#0B211B",
+        map: "#14382E",
+        fontFamily: greenFont,
+        headingFontFamily: greenFont
+      }
+    },
+    pink: {
+      light: {
+        background: "#FFF0F7",
+        surface: "#FFFFFF",
+        surfaceAlt: "#FFF6FA",
+        border: "#F5B8D2",
+        text: "#2A1020",
+        muted: "#8D5F73",
+        primary: "#D63384",
+        primaryDark: "#9F1F61",
+        primarySoft: "#FAD7E8",
+        accent: "#FF7AB8",
+        input: "#FFFFFF",
+        map: "#FBE2EE",
+        fontFamily: pinkFont,
+        headingFontFamily: pinkFont
+      },
+      dark: {
+        background: "#210817",
+        surface: "#351126",
+        surfaceAlt: "#461632",
+        border: "#743052",
+        text: "#FFF4FA",
+        muted: "#E8AFCB",
+        primary: "#FF66A8",
+        primaryDark: "#C72C78",
+        primarySoft: "#5A1D3C",
+        accent: "#FF9FCA",
+        input: "#2A0C1D",
+        map: "#44152F",
+        fontFamily: pinkFont,
+        headingFontFamily: pinkFont
+      }
+    },
+    blue: {
+      light: {
+        background: "#EEF6FF",
+        surface: "#FFFFFF",
+        surfaceAlt: "#F4F9FF",
+        border: "#B9D7F5",
+        text: "#0B1F33",
+        muted: "#5B7188",
+        primary: "#1D6FD6",
+        primaryDark: "#124A93",
+        primarySoft: "#D8EAFE",
+        accent: "#4AA3FF",
+        input: "#FFFFFF",
+        map: "#DDEEFF",
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
+      },
+      dark: {
+        background: "#071527",
+        surface: "#10233A",
+        surfaceAlt: "#15304F",
+        border: "#2C547C",
+        text: "#F2F8FF",
+        muted: "#A9C4E0",
+        primary: "#4A9BFF",
+        primaryDark: "#1D63B9",
+        primarySoft: "#183E66",
+        accent: "#84C2FF",
+        input: "#0B1D31",
+        map: "#143052",
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
+      }
+    }
+  };
+
+  const selected = palettes[palette][mode];
   return {
-    mode,
-    background: "#EEF7F0",
-    surface: "#FFFFFF",
-    surfaceAlt: "#F2FAF4",
-    border: "#CFE4D5",
-    text: "#102018",
-    muted: "#627568",
-    primary: "#178A4A",
-    primaryDark: "#0D5F36",
-    primarySoft: "#DDF3E5",
-    accent: "#2DBE71",
-    input: "#FFFFFF",
-    map: "#D7EDDE"
+      mode,
+      palette,
+      ...selected
   };
 }
 
@@ -367,6 +461,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authName, setAuthName] = useState<string | null>(null);
   const [authScreenOpen, setAuthScreenOpen] = useState(false);
+  const [utilityScreen, setUtilityScreen] = useState<UtilityScreen>(null);
   const [tab, setTab] = useState<Tab>("Resumo");
   const [fuelFormMode, setFuelFormMode] = useState<"closed" | "new" | "edit">("closed");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
@@ -374,15 +469,17 @@ export default function App() {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const scrollRef = useRef<ScrollView>(null);
   const themeMode = state.themeMode ?? "light";
-  const theme = useMemo(() => buildTheme(themeMode), [themeMode]);
+  const themePalette = state.themePalette ?? "green";
+  const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
     return {
       ...starterState,
-      user: { name: name ?? email?.split("@")[0] ?? "Usuário" },
+      user: { name: name ?? email?.split("@")[0] ?? "Usuário", email: email ?? undefined },
       stations: [],
-      themeMode
+      themeMode,
+      themePalette
     };
   }
 
@@ -399,7 +496,9 @@ export default function App() {
         const mergedRemoteState = { ...starterState, ...remoteState } as AppState;
         setState({
           ...mergedRemoteState,
-          user: mergedRemoteState.user ?? fallbackState.user,
+          user: mergedRemoteState.user
+            ? { ...mergedRemoteState.user, email: mergedRemoteState.user.email ?? fallbackState.user?.email }
+            : fallbackState.user,
           stations: mergedRemoteState.stations ?? [],
           logs: sortFuelLogs(withStableLogSequences(mergedRemoteState.logs))
         });
@@ -520,6 +619,10 @@ export default function App() {
     updateState({ themeMode: themeMode === "light" ? "dark" : "light" });
   }
 
+  function selectThemePalette(nextPalette: ThemePalette) {
+    updateState({ themePalette: nextPalette });
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     setOwnerId(null);
@@ -540,6 +643,7 @@ export default function App() {
     setEditingLogId(null);
     setFuelFormMode("new");
     setTab("Resumo");
+    setUtilityScreen(null);
     setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
   }
 
@@ -556,13 +660,185 @@ export default function App() {
 
   function changeTab(nextTab: Tab) {
     closeFuelForm();
+    setUtilityScreen(null);
     setTab(nextTab);
+  }
+
+  function renderContent() {
+    if (utilityScreen === "help") {
+      return <HelpScreen onClose={() => setUtilityScreen(null)} />;
+    }
+
+    if (utilityScreen === "privacy") {
+      return <PrivacyScreen onClose={() => setUtilityScreen(null)} />;
+    }
+
+    if (utilityScreen === "users") {
+      return <UsersAdmin onClose={() => setUtilityScreen(null)} />;
+    }
+
+    if (fuelFormMode === "new") {
+      return (
+        <RegisterFuel
+          cars={state.cars}
+          selectedCar={selectedCar}
+          editingLog={undefined}
+          stations={state.stations}
+          onCancel={closeFuelForm}
+          onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
+          onSave={(log) =>
+            setState((current) => ({
+              ...current,
+              logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
+              selectedCarId: log.carId,
+              filteredCarIds: current.filteredCarIds?.includes(log.carId)
+                ? current.filteredCarIds
+                : [...(current.filteredCarIds ?? []), log.carId]
+            }))
+          }
+          onUpdate={(log) =>
+            setState((current) => ({
+              ...current,
+              logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
+              selectedCarId: log.carId,
+              filteredCarIds: current.filteredCarIds?.includes(log.carId)
+                ? current.filteredCarIds
+                : [...(current.filteredCarIds ?? []), log.carId]
+            }))
+          }
+        />
+      );
+    }
+
+    if (tab === "Veículos") {
+      return (
+        <Cars
+          cars={state.cars}
+          logs={state.logs}
+          selectedCarId={state.selectedCarId}
+          onSelect={(selectedCarId) => updateState({ selectedCarId })}
+          onSave={(car) =>
+            setState((current) => ({
+              ...current,
+              cars: [...current.cars, car],
+              selectedCarId: current.selectedCarId ?? car.id,
+              filteredCarIds: [...(current.filteredCarIds ?? []), car.id]
+            }))
+          }
+          onUpdate={(car) =>
+            setState((current) => ({
+              ...current,
+              cars: current.cars.map((item) => (item.id === car.id ? car : item)),
+              selectedCarId: car.id
+            }))
+          }
+          onDeleteCar={(carId) =>
+            setState((current) => {
+              const cars = current.cars.filter((car) => car.id !== carId);
+              const logs = current.logs.filter((log) => log.carId !== carId);
+              const filteredCarIds = (current.filteredCarIds ?? []).filter((id) => id !== carId);
+              return {
+                ...current,
+                cars,
+                logs,
+                filteredCarIds,
+                selectedCarId: current.selectedCarId === carId ? cars[0]?.id ?? null : current.selectedCarId
+              };
+            })
+          }
+        />
+      );
+    }
+
+    if (tab === "Postos") {
+      return (
+        <Stations
+          stations={state.stations}
+          logs={filteredLogs}
+          allLogs={state.logs}
+          cars={state.cars}
+          metrics={metrics}
+          onEditLog={openEditFuelForm}
+          onSave={(station) =>
+            setState((current) => ({
+              ...current,
+              stations: [...current.stations, station]
+            }))
+          }
+          onUpdate={(station) =>
+            setState((current) => ({
+              ...current,
+              stations: current.stations.map((item) => (item.id === station.id ? station : item))
+            }))
+          }
+          onDeleteStation={(stationId) =>
+            setState((current) => ({
+              ...current,
+              stations: current.stations.filter((station) => station.id !== stationId),
+              logs: current.logs.filter((log) => log.stationId !== stationId)
+            }))
+          }
+        />
+      );
+    }
+
+    if (fuelFormMode === "closed" && tab === "Resumo") {
+      return (
+        <Home
+          logs={filteredLogs}
+          cars={state.cars}
+          stations={state.stations}
+          metrics={metrics}
+          visibleMonth={visibleMonth}
+          onPreviousMonth={() => moveMonth(-1)}
+          onNextMonth={() => moveMonth(1)}
+          onEditLog={openEditFuelForm}
+        />
+      );
+    }
+
+    if (tab === "Abastecimentos") {
+      return (
+        <StationMap
+          logs={filteredLogs}
+          cars={state.cars}
+          stations={state.stations}
+          editingLogId={editingLogId}
+          allLogs={state.logs}
+          onEdit={openEditFuelForm}
+          onCancelEdit={closeFuelForm}
+          onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
+          onSave={(log) =>
+            setState((current) => ({
+              ...current,
+              logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
+              selectedCarId: log.carId,
+              filteredCarIds: current.filteredCarIds?.includes(log.carId)
+                ? current.filteredCarIds
+                : [...(current.filteredCarIds ?? []), log.carId]
+            }))
+          }
+          onUpdate={(log) =>
+            setState((current) => ({
+              ...current,
+              logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
+              selectedCarId: log.carId,
+              filteredCarIds: current.filteredCarIds?.includes(log.carId)
+                ? current.filteredCarIds
+                : [...(current.filteredCarIds ?? []), log.carId]
+            }))
+          }
+        />
+      );
+    }
+
+    return null;
   }
 
   if (!ready) {
     return (
       <SafeAreaProvider>
-        <ThemeContext.Provider value={{ mode: themeMode, theme, styles }}>
+        <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
           <SafeAreaView style={styles.loading}>
             <Text style={styles.brand}>Litro Certo</Text>
             <Text style={styles.muted}>Carregando seu histórico...</Text>
@@ -575,10 +851,10 @@ export default function App() {
   if (authScreenOpen) {
     return (
       <SafeAreaProvider>
-        <ThemeContext.Provider value={{ mode: themeMode, theme, styles }}>
+        <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
           <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
           <SafeAreaView style={styles.shell}>
-            <AuthScreen onToggleTheme={toggleTheme} onCancel={() => setAuthScreenOpen(false)} />
+            <AuthScreen onToggleTheme={toggleTheme} onThemePaletteSelect={selectThemePalette} onCancel={() => setAuthScreenOpen(false)} />
           </SafeAreaView>
         </ThemeContext.Provider>
       </SafeAreaProvider>
@@ -587,7 +863,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeContext.Provider value={{ mode: themeMode, theme, styles }}>
+      <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
         <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
         <SafeAreaView style={styles.shell}>
           <KeyboardAvoidingView
@@ -598,8 +874,21 @@ export default function App() {
               user={state.user}
               onSave={(user) => updateState({ user })}
               onToggleTheme={toggleTheme}
+              onThemePaletteSelect={selectThemePalette}
               onNewFuel={openNewFuelForm}
               onOpenAuth={() => setAuthScreenOpen(true)}
+              onOpenHelp={() => {
+                closeFuelForm();
+                setUtilityScreen("help");
+              }}
+              onOpenPrivacy={() => {
+                closeFuelForm();
+                setUtilityScreen("privacy");
+              }}
+              onOpenUsers={() => {
+                closeFuelForm();
+                setUtilityScreen("users");
+              }}
               onSignOut={signOut}
               authEmail={authEmail}
               authName={authName}
@@ -607,7 +896,7 @@ export default function App() {
             {!ownerId ? (
               <DemoBanner onOpenAuth={() => setAuthScreenOpen(true)} />
             ) : null}
-            {state.user && state.cars.length > 1 && tab !== "Carros" && fuelFormMode !== "new" ? (
+            {state.user && state.cars.length > 1 && tab !== "Veículos" && fuelFormMode !== "new" && !utilityScreen ? (
               <CarFilter
                 cars={state.cars}
                 activeCarIds={activeCarIds}
@@ -615,146 +904,9 @@ export default function App() {
               />
             ) : null}
             <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-              {fuelFormMode === "new" ? (
-                <RegisterFuel
-                  cars={state.cars}
-                  selectedCar={selectedCar}
-                  editingLog={undefined}
-                  stations={state.stations}
-                  onCancel={closeFuelForm}
-                  onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
-                  onSave={(log) =>
-                    setState((current) => ({
-                      ...current,
-                      logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
-                      selectedCarId: log.carId,
-                      filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                        ? current.filteredCarIds
-                        : [...(current.filteredCarIds ?? []), log.carId]
-                    }))
-                  }
-                  onUpdate={(log) =>
-                    setState((current) => ({
-                      ...current,
-                      logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
-                      selectedCarId: log.carId,
-                      filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                        ? current.filteredCarIds
-                        : [...(current.filteredCarIds ?? []), log.carId]
-                    }))
-                  }
-                />
-              ) : tab === "Carros" ? (
-                <Cars
-                  cars={state.cars}
-                  logs={state.logs}
-                  selectedCarId={state.selectedCarId}
-                  onSelect={(selectedCarId) => updateState({ selectedCarId })}
-                  onSave={(car) =>
-                    setState((current) => ({
-                      ...current,
-                      cars: [...current.cars, car],
-                      selectedCarId: current.selectedCarId ?? car.id,
-                      filteredCarIds: [...(current.filteredCarIds ?? []), car.id]
-                    }))
-                  }
-                  onUpdate={(car) =>
-                    setState((current) => ({
-                      ...current,
-                      cars: current.cars.map((item) => (item.id === car.id ? car : item)),
-                      selectedCarId: car.id
-                    }))
-                  }
-                  onDeleteCar={(carId) =>
-                    setState((current) => {
-                      const cars = current.cars.filter((car) => car.id !== carId);
-                      const logs = current.logs.filter((log) => log.carId !== carId);
-                      const filteredCarIds = (current.filteredCarIds ?? []).filter((id) => id !== carId);
-                      return {
-                        ...current,
-                        cars,
-                        logs,
-                        filteredCarIds,
-                        selectedCarId: current.selectedCarId === carId ? cars[0]?.id ?? null : current.selectedCarId
-                      };
-                    })
-                  }
-                />
-              ) : tab === "Postos" ? (
-                <Stations
-                  stations={state.stations}
-                  logs={filteredLogs}
-                  allLogs={state.logs}
-                  cars={state.cars}
-                  metrics={metrics}
-                  onEditLog={openEditFuelForm}
-                  onSave={(station) =>
-                    setState((current) => ({
-                      ...current,
-                      stations: [...current.stations, station]
-                    }))
-                  }
-                  onUpdate={(station) =>
-                    setState((current) => ({
-                      ...current,
-                      stations: current.stations.map((item) => (item.id === station.id ? station : item))
-                    }))
-                  }
-                  onDeleteStation={(stationId) =>
-                    setState((current) => ({
-                      ...current,
-                      stations: current.stations.filter((station) => station.id !== stationId),
-                      logs: current.logs.filter((log) => log.stationId !== stationId)
-                    }))
-                  }
-                />
-              ) : null}
-              {fuelFormMode === "closed" && tab === "Resumo" && (
-                <Home
-                  logs={filteredLogs}
-                  cars={state.cars}
-                  stations={state.stations}
-                  metrics={metrics}
-                  visibleMonth={visibleMonth}
-                  onPreviousMonth={() => moveMonth(-1)}
-                  onNextMonth={() => moveMonth(1)}
-                  onEditLog={openEditFuelForm}
-                />
-              )}
-              {fuelFormMode !== "new" && tab === "Abastecimentos" && (
-                <StationMap
-                  logs={filteredLogs}
-                  cars={state.cars}
-                  stations={state.stations}
-                  editingLogId={editingLogId}
-                  allLogs={state.logs}
-                  onEdit={openEditFuelForm}
-                  onCancelEdit={closeFuelForm}
-                  onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
-                  onSave={(log) =>
-                    setState((current) => ({
-                      ...current,
-                      logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
-                      selectedCarId: log.carId,
-                      filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                        ? current.filteredCarIds
-                        : [...(current.filteredCarIds ?? []), log.carId]
-                    }))
-                  }
-                  onUpdate={(log) =>
-                    setState((current) => ({
-                      ...current,
-                      logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
-                      selectedCarId: log.carId,
-                      filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                        ? current.filteredCarIds
-                        : [...(current.filteredCarIds ?? []), log.carId]
-                    }))
-                  }
-                />
-              )}
+              {renderContent()}
             </ScrollView>
-            <Tabs active={tab} onChange={changeTab} />
+            <Tabs active={utilityScreen ? null : tab} onChange={changeTab} />
           </KeyboardAvoidingView>
         </SafeAreaView>
       </ThemeContext.Provider>
@@ -762,8 +914,16 @@ export default function App() {
   );
 }
 
-function AuthScreen({ onToggleTheme, onCancel }: { onToggleTheme: () => void; onCancel: () => void }) {
-  const { mode, styles, theme } = useThemeStyles();
+function AuthScreen({
+  onToggleTheme,
+  onThemePaletteSelect,
+  onCancel
+}: {
+  onToggleTheme: () => void;
+  onThemePaletteSelect: (palette: ThemePalette) => void;
+  onCancel: () => void;
+}) {
+  const { mode, palette, styles, theme } = useThemeStyles();
   const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -846,11 +1006,23 @@ function AuthScreen({ onToggleTheme, onCancel }: { onToggleTheme: () => void; on
           <Pressable style={styles.themeButton} onPress={onToggleTheme}>
             <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
           </Pressable>
+          <ThemePalettePicker onSelect={onThemePaletteSelect} />
         </View>
       </View>
       <View style={styles.authCard}>
         <Text style={styles.title}>Entre para manter seus abastecimentos salvos</Text>
-        <Text style={styles.muted}>Use email e senha ou continue com Google.</Text>
+        <Text style={styles.muted}>Use Google para entrar mais rápido ou continue com email e senha.</Text>
+        <Text style={styles.privacyText}>O app não rastreia seus trajetos. A localização só ajuda a sugerir o posto no momento do registro.</Text>
+        <Pressable style={[styles.googleButton, styles.authButton]} onPress={signInWithGoogle} disabled={loading}>
+          <Text style={styles.googleButtonText}>
+            {isSignIn ? "Login com Google" : "Criar conta com Google"}
+          </Text>
+        </Pressable>
+        <View style={styles.authDivider}>
+          <View style={styles.authDividerLine} />
+          <Text style={styles.authDividerText}>ou use email e senha</Text>
+          <View style={styles.authDividerLine} />
+        </View>
         <View style={styles.authTabs}>
           <Pressable
             style={[styles.authTab, isSignIn && styles.authTabActive]}
@@ -883,14 +1055,17 @@ function AuthScreen({ onToggleTheme, onCancel }: { onToggleTheme: () => void; on
           style={styles.input}
         />
         {!isSignIn ? (
-          <TextInput
-            value={passwordConfirmation}
-            onChangeText={setPasswordConfirmation}
-            placeholder="Confirmar senha"
-            secureTextEntry
-            placeholderTextColor={theme.muted}
-            style={styles.input}
-          />
+          <>
+            <TextInput
+              value={passwordConfirmation}
+              onChangeText={setPasswordConfirmation}
+              placeholder="Confirmar senha"
+              secureTextEntry
+              placeholderTextColor={theme.muted}
+              style={styles.input}
+            />
+            <Text style={styles.privacyText}>Depois de criar a conta, confirme o email que chegar na sua caixa de entrada antes de fazer login.</Text>
+          </>
         ) : null}
         {formError ? (
           <View style={styles.formErrorBox}>
@@ -902,16 +1077,6 @@ function AuthScreen({ onToggleTheme, onCancel }: { onToggleTheme: () => void; on
             {loading ? "Aguarde..." : isSignIn ? "Login" : "Criar conta"}
           </Text>
         </Pressable>
-        <View style={styles.authDivider}>
-          <View style={styles.authDividerLine} />
-          <Text style={styles.authDividerText}>ou</Text>
-          <View style={styles.authDividerLine} />
-        </View>
-        <Pressable style={[styles.googleButton, styles.authButton]} onPress={signInWithGoogle} disabled={loading}>
-          <Text style={styles.googleButtonText}>
-            {isSignIn ? "Login com Google" : "Criar conta com Google"}
-          </Text>
-        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
@@ -921,8 +1086,12 @@ function Header({
   user,
   onSave,
   onToggleTheme,
+  onThemePaletteSelect,
   onNewFuel,
   onOpenAuth,
+  onOpenHelp,
+  onOpenPrivacy,
+  onOpenUsers,
   onSignOut,
   authEmail,
   authName
@@ -930,8 +1099,12 @@ function Header({
   user: User | null;
   onSave: (user: User) => void;
   onToggleTheme: () => void;
+  onThemePaletteSelect: (palette: ThemePalette) => void;
   onNewFuel: () => void;
   onOpenAuth: () => void;
+  onOpenHelp: () => void;
+  onOpenPrivacy: () => void;
+  onOpenUsers: () => void;
   onSignOut: () => void;
   authEmail: string | null;
   authName: string | null;
@@ -939,6 +1112,7 @@ function Header({
   const [name, setName] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
   const { mode, styles, theme } = useThemeStyles();
+  const isAdmin = authEmail?.toLowerCase() === "ericgomes@gmail.com";
 
   if (user) {
     return (
@@ -948,6 +1122,10 @@ function Header({
             <Text style={styles.brand}>Litro Certo</Text>
           </View>
           <View style={styles.headerSecondaryActions}>
+            <ThemePalettePicker onSelect={onThemePaletteSelect} />
+            <Pressable style={styles.themeButton} onPress={onToggleTheme}>
+              <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
+            </Pressable>
             <View style={styles.accountBox}>
               <Pressable style={styles.accountButton} onPress={() => setAccountOpen((current) => !current)}>
                 <View style={styles.accountIcon}>
@@ -965,6 +1143,35 @@ function Header({
                   ) : (
                     <Text style={styles.accountEmail}>Faça login para salvar seus dados.</Text>
                   )}
+                  <Pressable
+                    style={styles.accountMenuItem}
+                    onPress={() => {
+                      setAccountOpen(false);
+                      onOpenHelp();
+                    }}
+                  >
+                    <Text style={styles.accountMenuText}>Ajuda</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.accountMenuItem}
+                    onPress={() => {
+                      setAccountOpen(false);
+                      onOpenPrivacy();
+                    }}
+                  >
+                    <Text style={styles.accountMenuText}>Privacidade</Text>
+                  </Pressable>
+                  {isAdmin ? (
+                    <Pressable
+                      style={styles.accountMenuItem}
+                      onPress={() => {
+                        setAccountOpen(false);
+                        onOpenUsers();
+                      }}
+                    >
+                      <Text style={styles.accountMenuText}>Usuários</Text>
+                    </Pressable>
+                  ) : null}
                   {authEmail ? (
                     <Pressable
                       style={styles.accountMenuItem}
@@ -989,9 +1196,6 @@ function Header({
                 </View>
               ) : null}
             </View>
-            <Pressable style={styles.themeButton} onPress={onToggleTheme}>
-              <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
-            </Pressable>
           </View>
       </View>
       <Pressable style={styles.headerPrimaryButton} onPress={onNewFuel}>
@@ -1021,6 +1225,142 @@ function Header({
       >
         <Text style={styles.primaryButtonText}>Começar</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function ThemePalettePicker({ onSelect }: { onSelect: (palette: ThemePalette) => void }) {
+  const { palette, styles } = useThemeStyles();
+  const options: Array<{ value: ThemePalette; color: string; label: string }> = [
+    { value: "green", color: "#178A4A", label: "Verde" },
+    { value: "pink", color: "#D63384", label: "Rosa" },
+    { value: "blue", color: "#1D6FD6", label: "Azul" }
+  ];
+
+  return (
+    <View style={styles.paletteInline}>
+      {options.map((option) => (
+        <Pressable
+          key={option.value}
+          accessibilityLabel={`Tema ${option.label}`}
+          style={[
+            styles.paletteDot,
+            { backgroundColor: option.color },
+            option.value === palette && styles.paletteDotActive
+          ]}
+          onPress={() => onSelect(option.value)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function HelpScreen({ onClose }: { onClose: () => void }) {
+  const { styles } = useThemeStyles();
+
+  return (
+    <View style={styles.stack}>
+      <Section title="Ajuda" rightAction={<Pressable style={styles.closeButton} onPress={onClose}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
+        <View style={styles.helpBlock}>
+          <Text style={styles.itemTitle}>O que é?</Text>
+          <Text style={styles.helpText}>Um app simples para registrar abastecimentos, descobrir o preço real por litro e entender quais postos valem mais a pena para você.</Text>
+        </View>
+        <View style={styles.helpBlock}>
+          <Text style={styles.itemTitle}>Como usar?</Text>
+          <Text style={styles.helpText}>Cadastre seus veículos, registre cada abastecimento e confirme o posto sugerido pelo app. O Litro Certo calcula preço por litro, gasto mensal, rankings e histórico.</Text>
+        </View>
+        <View style={styles.helpBlock}>
+          <Text style={styles.itemTitle}>Quando usar?</Text>
+          <Text style={styles.helpText}>Use logo depois de abastecer, enquanto o valor pago, os litros e o posto ainda estão fáceis de conferir. Também dá para registrar em outra data se você esqueceu.</Text>
+        </View>
+        <View style={styles.helpBlock}>
+          <Text style={styles.itemTitle}>Por quê?</Text>
+          <Text style={styles.helpText}>Porque o preço anunciado nem sempre mostra o seu custo real ao longo do mês. Seu histórico pessoal ajuda a decidir onde abastecer melhor.</Text>
+        </View>
+      </Section>
+    </View>
+  );
+}
+
+function PrivacyScreen({ onClose }: { onClose: () => void }) {
+  const { styles } = useThemeStyles();
+
+  return (
+    <View style={styles.stack}>
+      <Section title="Privacidade" rightAction={<Pressable style={styles.closeButton} onPress={onClose}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
+        <Text style={styles.helpText}>O Litro Certo não rastreia seus trajetos. A localização é usada no momento do registro para sugerir o posto próximo, e seus abastecimentos não aparecem para outros usuários do app.</Text>
+        <Text style={styles.helpText}>Você não fica sendo acompanhado em segundo plano. A ideia é registrar combustível, não vigiar onde você anda.</Text>
+      </Section>
+    </View>
+  );
+}
+
+function UsersAdmin({ onClose }: { onClose: () => void }) {
+  const { styles } = useThemeStyles();
+  const [summaries, setSummaries] = useState<UserSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    appRepository.listUserSummaries()
+      .then((items) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSummaries(items);
+        setError(null);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setError("Não foi possível carregar usuários. Confira as policies de admin no Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const totalVehicles = summaries.reduce((sum, item) => sum + item.vehicles, 0);
+  const totalStations = summaries.reduce((sum, item) => sum + item.stations, 0);
+
+  return (
+    <View style={styles.stack}>
+      <Section title="Usuários" rightAction={<Pressable style={styles.closeButton} onPress={onClose}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
+        <View style={styles.grid}>
+          <MetricCard label="Usuários" value={String(summaries.length)} />
+          <MetricCard label="Postos" value={String(totalStations)} />
+          <MetricCard label="Veículos" value={String(totalVehicles)} />
+        </View>
+        {loading ? <Text style={styles.muted}>Carregando usuários...</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {!loading && !error && summaries.length === 0 ? (
+          <Empty text="Nenhum usuário encontrado." />
+        ) : null}
+        {summaries.map((summary) => (
+          <View key={summary.ownerId} style={styles.listItem}>
+            <View style={styles.logInfo}>
+              <Text style={styles.itemTitle}>{summary.name}</Text>
+              <Text style={styles.muted}>{summary.email}</Text>
+              <Text style={styles.muted}>{DateFormatter.compact(summary.updatedAt)}</Text>
+            </View>
+            <View style={styles.right}>
+              <Text style={styles.itemTitle}>{summary.vehicles} veículos</Text>
+              <Text style={styles.muted}>{summary.stations} postos</Text>
+            </View>
+          </View>
+        ))}
+      </Section>
     </View>
   );
 }
@@ -1163,7 +1503,9 @@ function RegisterFuel({
   const [stationId, setStationId] = useState(stations[0]?.id ?? "");
   const [location, setLocation] = useState(fakeCurrentLocation);
   const [draftLog, setDraftLog] = useState<FuelLog | null>(null);
-  const [saveStatus, setSaveStatus] = useState("Preencha valor e litros para salvar automaticamente.");
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<ToastNotice | null>(null);
+  const [activeField, setActiveField] = useState("paid");
   const currentCar = cars.find((car) => car.id === carId) ?? selectedCar;
 
   useEffect(() => {
@@ -1188,7 +1530,7 @@ function RegisterFuel({
     setDate(DateFormatter.inputDate(editingLog.createdAt));
     setStationId(editingLog.stationId);
     setDraftLog(null);
-    setSaveStatus("Alterações salvas automaticamente.");
+    setSaveStatus(null);
   }, [editingLog?.id]);
 
   useEffect(() => {
@@ -1215,7 +1557,7 @@ function RegisterFuel({
 
   function buildPayload() {
     if (!currentCar) {
-      setSaveStatus("Cadastre um carro antes de registrar abastecimentos.");
+      setSaveStatus("Cadastre um veículo antes de registrar abastecimentos.");
       return undefined;
     }
 
@@ -1255,7 +1597,7 @@ function RegisterFuel({
 
       if (editingLog) {
         onUpdate(FuelLogFactory.update(editingLog, payload));
-        setSaveStatus("Alterações salvas automaticamente.");
+        showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
         return;
       }
 
@@ -1263,14 +1605,14 @@ function RegisterFuel({
         const updatedDraft = FuelLogFactory.update(draftLog, payload);
         setDraftLog(updatedDraft);
         onUpdate(updatedDraft);
-        setSaveStatus("Abastecimento salvo automaticamente.");
+        showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
         return;
       }
 
       const newLog = FuelLogFactory.create(payload);
       setDraftLog(newLog);
       onSave(newLog);
-      setSaveStatus("Abastecimento salvo automaticamente.");
+      showFieldNotice(setNotice, "Abastecimento criado.", activeField);
     }, 450);
 
     return () => clearTimeout(timeout);
@@ -1286,53 +1628,110 @@ function RegisterFuel({
           </Pressable>
         }
       >
+        <SideToast notice={notice} />
         {cars.length === 0 ? (
-          <Empty text="Cadastre um carro pelo botão Carros no topo para liberar o registro." />
+          <Empty text="Cadastre um veículo pela tela Veículos para liberar o registro." />
         ) : (
           <>
-            <View style={styles.inlineField}>
-              <Text style={styles.inlineLabel}>Carro</Text>
-              <View style={styles.choiceFieldWrap}>
-                {cars.map((car) => (
-                  <Choice
-                    key={car.id}
-                    label={`${car.nickname} - ${car.plate}`}
-                    active={car.id === currentCar?.id}
-                    onPress={() => {
-                      setCarId(car.id);
-                      onCarSelect(car.id);
-                    }}
-                  />
-                ))}
+            <View style={styles.fieldToastAnchor}>
+              <View style={styles.inlineField}>
+                <Text style={styles.inlineLabel}>Veículo</Text>
+                <View style={styles.choiceFieldWrap}>
+                  {cars.map((car) => (
+                    <Choice
+                      key={car.id}
+                      label={`${car.nickname} - ${car.plate}`}
+                      active={car.id === currentCar?.id}
+                      onPress={() => {
+                        setActiveField("car");
+                        setCarId(car.id);
+                        onCarSelect(car.id);
+                      }}
+                    />
+                  ))}
+                </View>
               </View>
+              <FieldToast notice={notice} anchor="car" />
             </View>
 
-            <View style={styles.inlineField}>
-              <Text style={styles.inlineLabel}>Combustível</Text>
-              <View style={styles.choiceFieldWrap}>
-                {fuels.map((item) => (
-                  <Choice key={item} label={item} active={item === fuel} onPress={() => setFuel(item)} />
-                ))}
+            <View style={styles.fieldToastAnchor}>
+              <View style={styles.inlineField}>
+                <Text style={styles.inlineLabel}>Combustível</Text>
+                <View style={styles.choiceFieldWrap}>
+                  {fuels.map((item) => (
+                    <Choice
+                      key={item}
+                      label={item}
+                      active={item === fuel}
+                      onPress={() => {
+                        setActiveField("fuel");
+                        setFuel(item);
+                      }}
+                    />
+                  ))}
+                </View>
               </View>
+              <FieldToast notice={notice} anchor="fuel" />
             </View>
 
-            <Field label="Valor pago" value={paid} onChangeText={setPaid} keyboardType="decimal-pad" />
-            <Field label="Litros" value={liters} onChangeText={setLiters} keyboardType="decimal-pad" />
+            <View style={styles.fieldToastAnchor}>
+              <Field
+                label="Valor pago"
+                value={paid}
+                onFocus={() => setActiveField("paid")}
+                onChangeText={(value) => {
+                  setActiveField("paid");
+                  setPaid(value);
+                }}
+                keyboardType="decimal-pad"
+              />
+              <FieldToast notice={notice} anchor="paid" />
+            </View>
+            <View style={styles.fieldToastAnchor}>
+              <Field
+                label="Litros"
+                value={liters}
+                onFocus={() => setActiveField("liters")}
+                onChangeText={(value) => {
+                  setActiveField("liters");
+                  setLiters(value);
+                }}
+                keyboardType="decimal-pad"
+              />
+              <FieldToast notice={notice} anchor="liters" />
+            </View>
 
-            <DateSelector label="Data" value={date} onChange={setDate} />
+            <View style={styles.fieldToastAnchor}>
+              <DateSelector
+                label="Data"
+                value={date}
+                onFocus={() => setActiveField("date")}
+                onChange={(value) => {
+                  setActiveField("date");
+                  setDate(value);
+                }}
+              />
+              <FieldToast notice={notice} anchor="date" />
+            </View>
 
-            <View style={styles.inlineField}>
-              <Text style={styles.inlineLabel}>Posto</Text>
-              <View style={styles.choiceFieldWrap}>
-                {stations.map((station) => (
-                  <Choice
-                    key={station.id}
-                    label={station.name}
-                    active={station.id === stationId}
-                    onPress={() => setStationId(station.id)}
-                  />
-                ))}
+            <View style={styles.fieldToastAnchor}>
+              <View style={styles.inlineField}>
+                <Text style={styles.inlineLabel}>Posto</Text>
+                <View style={styles.choiceFieldWrap}>
+                  {stations.map((station) => (
+                    <Choice
+                      key={station.id}
+                      label={station.name}
+                      active={station.id === stationId}
+                      onPress={() => {
+                        setActiveField("station");
+                        setStationId(station.id);
+                      }}
+                    />
+                  ))}
+                </View>
               </View>
+              <FieldToast notice={notice} anchor="station" />
             </View>
             <Text style={styles.muted}>Localização fake de teste: posto mais próximo selecionado pelo app.</Text>
 
@@ -1400,7 +1799,7 @@ function StationMap({
                   <View style={styles.logInfo}>
                     <Text style={styles.itemTitle}>{DateFormatter.compact(log.createdAt)}</Text>
                     <Text style={styles.muted}>
-                      {station?.name ?? "Posto"} - {car?.nickname ?? "Carro"} - {log.fuel}
+                      {station?.name ?? "Posto"} - {car?.nickname ?? "Veículo"} - {log.fuel}
                     </Text>
                   </View>
                   <View style={styles.right}>
@@ -1630,21 +2029,21 @@ function Cars({
   return (
     <View style={styles.stack}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Meus carros</Text>
+        <Text style={styles.sectionTitle}>Meus veículos</Text>
         <Pressable style={styles.addButton} onPress={openNewForm}>
           <Text style={styles.addButtonText}>+</Text>
         </Pressable>
       </View>
 
       {editingCarId === "new" ? (
-        <Section title="Adicionar carro" rightAction={<Pressable style={styles.closeButton} onPress={closeForm}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
+        <Section title="Adicionar veículo" rightAction={<Pressable style={styles.closeButton} onPress={closeForm}><Text style={styles.closeButtonText}>×</Text></Pressable>}>
           <CarEditor onSave={onSave} onUpdate={onUpdate} onDelete={onDeleteCar} onCancel={closeForm} />
         </Section>
       ) : null}
 
       <Section title="">
         {cars.length === 0 ? (
-          <Empty text="Cadastre seu primeiro carro pela placa." />
+          <Empty text="Cadastre seu primeiro veículo pela placa." />
         ) : (
           cars.map((car) => (
             <View key={car.id} style={styles.inlineEditGroup}>
@@ -1659,7 +2058,7 @@ function Cars({
                 <View>
                   <Text style={styles.itemTitle}>{car.nickname}</Text>
                   <Text style={styles.muted}>
-                    {car.plate} - {car.brand} {car.model} {car.year}
+                    {car.vehicleType ?? "Carro"} - {car.plate} - {car.brand} {car.model} {car.year}
                   </Text>
                 </View>
                 <Text style={styles.pill}>{car.defaultFuel}</Text>
@@ -1680,29 +2079,31 @@ function Cars({
         )}
       </Section>
 
-      <Section title="Ranking de carros">
+      <Section title="Veículos que mais gastaram">
         {carRanking.length === 0 ? (
           <Empty text="O ranking nasce a partir dos abastecimentos registrados." />
         ) : (
-          carRanking.map((item, index) => (
-            <Pressable
-              key={item.car.id}
-              style={(state) => [
-                styles.listItem,
-                item.car.id === selectedCarId && styles.selectedItem,
-                isHovered(state) && styles.listItemHover
-              ]}
-              onPress={() => openEditForm(item.car)}
-            >
-              <View style={styles.rankingInfo}>
-                <Text style={styles.itemTitle}>
-                  {index + 1}. {item.car.nickname}
-                </Text>
-                <Text style={styles.muted}>{item.count} abastecimentos</Text>
-              </View>
-              <Text style={styles.rankingPrice}>{currency.format(item.total)}</Text>
-            </Pressable>
-          ))
+          <>
+            {carRanking.map((item, index) => (
+              <Pressable
+                key={item.car.id}
+                style={(state) => [
+                  styles.listItem,
+                  item.car.id === selectedCarId && styles.selectedItem,
+                  isHovered(state) && styles.listItemHover
+                ]}
+                onPress={() => openEditForm(item.car)}
+              >
+                <View style={styles.rankingInfo}>
+                  <Text style={styles.itemTitle}>
+                    {index + 1}. {item.car.nickname}
+                  </Text>
+                  <Text style={styles.muted}>{item.count} abastecimentos</Text>
+                </View>
+                <Text style={styles.rankingPrice}>{currency.format(item.total)}</Text>
+              </Pressable>
+            ))}
+          </>
         )}
       </Section>
     </View>
@@ -1725,13 +2126,16 @@ function CarEditor({
   const { styles } = useThemeStyles();
   const [draftCar, setDraftCar] = useState<Car | null>(null);
   const [plate, setPlate] = useState(car?.plate ?? "");
+  const [vehicleType, setVehicleType] = useState<VehicleType>(car?.vehicleType ?? "Carro");
   const [nickname, setNickname] = useState(car?.nickname ?? "");
   const [brand, setBrand] = useState(car?.brand ?? "");
   const [model, setModel] = useState(car?.model ?? "");
   const [year, setYear] = useState(car?.year || String(new Date().getFullYear()));
   const [acceptedFuel, setAcceptedFuel] = useState<FuelType[]>(car?.acceptedFuel?.length ? car.acceptedFuel : [car?.defaultFuel ?? "Gasolina comum"]);
   const [defaultFuel, setDefaultFuel] = useState<FuelType>(car?.defaultFuel ?? "Gasolina comum");
-  const [status, setStatus] = useState(car ? "Alterações salvas automaticamente." : "Preencha placa e apelido para salvar.");
+  const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<ToastNotice | null>(null);
+  const [activeField, setActiveField] = useState("plate");
   const plateIsInvalid = plate.trim().length > 0 && !BrazilianPlate.isValid(plate);
 
   useEffect(() => {
@@ -1740,6 +2144,7 @@ function CarEditor({
     }
 
     setPlate(car.plate);
+    setVehicleType(car.vehicleType ?? "Carro");
     setNickname(car.nickname);
     setBrand(car.brand);
     setModel(car.model);
@@ -1762,27 +2167,27 @@ function CarEditor({
       }
 
       if (car) {
-        onUpdate(CarFactory.update(car, { plate, nickname, brand, model, year, acceptedFuel, defaultFuel }));
-        setStatus("Alterações salvas automaticamente.");
+        onUpdate(CarFactory.update(car, { plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel }));
+        showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
       if (draftCar) {
-        const updated = CarFactory.update(draftCar, { plate, nickname, brand, model, year, acceptedFuel, defaultFuel });
+        const updated = CarFactory.update(draftCar, { plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel });
         setDraftCar(updated);
         onUpdate(updated);
-        setStatus("Carro salvo automaticamente.");
+        showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
-      const created = CarFactory.create({ plate, nickname, brand, model, year, acceptedFuel, defaultFuel });
+      const created = CarFactory.create({ plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel });
       setDraftCar(created);
       onSave(created);
-      setStatus("Carro salvo automaticamente.");
+      showFieldNotice(setNotice, "Veículo criado.", activeField);
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [plate, nickname, brand, model, year, acceptedFuel, defaultFuel, car?.id, draftCar?.id]);
+  }, [plate, vehicleType, nickname, brand, model, year, acceptedFuel, defaultFuel, car?.id, draftCar?.id]);
 
   useEffect(() => {
     if (acceptedFuel.includes(defaultFuel)) {
@@ -1798,6 +2203,7 @@ function CarEditor({
   }
 
   function updateYear(nextYear: string) {
+    setActiveField("year");
     const normalizedYear = nextYear.replace(/\D/g, "").slice(0, 4);
     setYear(normalizedYear);
 
@@ -1806,19 +2212,29 @@ function CarEditor({
     }
 
     if (car) {
-      onUpdate(CarFactory.update(car, { plate, nickname, brand, model, year: normalizedYear, acceptedFuel, defaultFuel }));
+      onUpdate(CarFactory.update(car, { plate, vehicleType, nickname, brand, model, year: normalizedYear, acceptedFuel, defaultFuel }));
+      showFieldNotice(setNotice, "Veículo atualizado.", "year");
       return;
     }
 
     if (draftCar) {
-      const updated = CarFactory.update(draftCar, { plate, nickname, brand, model, year: normalizedYear, acceptedFuel, defaultFuel });
+      const updated = CarFactory.update(draftCar, { plate, vehicleType, nickname, brand, model, year: normalizedYear, acceptedFuel, defaultFuel });
       setDraftCar(updated);
       onUpdate(updated);
+      showFieldNotice(setNotice, "Veículo atualizado.", "year");
     }
   }
 
   function updatePlate(nextPlate: string) {
+    setActiveField("plate");
     setPlate(BrazilianPlate.normalize(nextPlate));
+  }
+
+  function updateCarField(anchor: string, update: (value: string) => void) {
+    return (value: string) => {
+      setActiveField(anchor);
+      update(value);
+    };
   }
 
   function toggleAcceptedFuel(fuel: FuelType) {
@@ -1848,29 +2264,64 @@ function CarEditor({
 
   return (
     <View style={styles.formStack}>
-      <Field label="Placa" value={plate} onChangeText={updatePlate} autoCapitalize="characters" maxLength={8} />
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Placa" value={plate} onFocus={() => setActiveField("plate")} onChangeText={updatePlate} autoCapitalize="characters" maxLength={8} />
+        <FieldToast notice={notice} anchor="plate" />
+      </View>
       {plateIsInvalid ? (
         <Text style={styles.errorText}>Placa inválida. Use ABC-1234 ou ABC1D23.</Text>
       ) : null}
-      <Field label="Apelido" value={nickname} onChangeText={setNickname} />
-      <Field label="Marca" value={brand} onChangeText={setBrand} />
-      <Field label="Modelo" value={model} onChangeText={setModel} />
-      <View style={styles.inlineField}>
-        <Text style={styles.inlineLabel}>Ano</Text>
-        <View style={styles.stepper}>
-          <Pressable style={styles.stepperButton} onPress={() => changeYear(-1)}>
-            <Text style={styles.stepperButtonText}>−</Text>
-          </Pressable>
-          <TextInput
-            value={year}
-            onChangeText={updateYear}
-            keyboardType="number-pad"
-            style={styles.stepperInput}
-          />
-          <Pressable style={styles.stepperButton} onPress={() => changeYear(1)}>
-            <Text style={styles.stepperButtonText}>+</Text>
-          </Pressable>
+      <View style={styles.fieldToastAnchor}>
+        <View style={styles.inlineField}>
+          <Text style={styles.inlineLabel}>Tipo</Text>
+          <View style={styles.choiceFieldWrap}>
+            {vehicleTypes.map((type) => (
+              <Choice
+                key={type}
+                label={type}
+                active={vehicleType === type}
+                onPress={() => {
+                  setActiveField("vehicleType");
+                  setVehicleType(type);
+                }}
+              />
+            ))}
+          </View>
         </View>
+        <FieldToast notice={notice} anchor="vehicleType" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Apelido" value={nickname} onFocus={() => setActiveField("nickname")} onChangeText={updateCarField("nickname", setNickname)} />
+        <FieldToast notice={notice} anchor="nickname" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Marca" value={brand} onFocus={() => setActiveField("brand")} onChangeText={updateCarField("brand", setBrand)} />
+        <FieldToast notice={notice} anchor="brand" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Modelo" value={model} onFocus={() => setActiveField("model")} onChangeText={updateCarField("model", setModel)} />
+        <FieldToast notice={notice} anchor="model" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <View style={styles.inlineField}>
+          <Text style={styles.inlineLabel}>Ano</Text>
+          <View style={styles.stepper}>
+            <Pressable style={styles.stepperButton} onPress={() => changeYear(-1)}>
+              <Text style={styles.stepperButtonText}>−</Text>
+            </Pressable>
+            <TextInput
+              value={year}
+              onFocus={() => setActiveField("year")}
+              onChangeText={updateYear}
+              keyboardType="number-pad"
+              style={styles.stepperInput}
+            />
+            <Pressable style={styles.stepperButton} onPress={() => changeYear(1)}>
+              <Text style={styles.stepperButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+        <FieldToast notice={notice} anchor="year" />
       </View>
       <View style={styles.inlineField}>
         <Text style={styles.inlineLabel}>Combustíveis</Text>
@@ -1881,7 +2332,7 @@ function CarEditor({
         </View>
       </View>
       <Pressable style={styles.deleteButton} onPress={confirmDelete}>
-        <Text style={styles.deleteButtonText}>Apagar carro</Text>
+        <Text style={styles.deleteButtonText}>Apagar veículo</Text>
       </Pressable>
     </View>
   );
@@ -1953,35 +2404,39 @@ function Stations({
       ) : null}
 
       <Section title="">
-        {stations.map((station) => (
-          <View key={station.id} style={styles.inlineEditGroup}>
-            <Pressable
-              style={(state) => [styles.listItem, isHovered(state) && styles.listItemHover]}
-              onPress={() => openEditForm(station)}
-            >
-              <View style={styles.logInfo}>
-                <Text style={styles.itemTitle}>{station.name}</Text>
-                <Text style={styles.muted}>
-                  {[station.address, station.city, station.state].filter(Boolean).join(" - ")}
-                </Text>
-              </View>
-            </Pressable>
-            {editingStationId === station.id ? (
-              <View style={styles.inlineForm}>
-                <StationEditor
-                  station={station}
-                  onSave={onSave}
-                  onUpdate={onUpdate}
-                  onDelete={onDeleteStation}
-                  onCancel={() => setEditingStationId(null)}
-                />
-              </View>
-            ) : null}
-          </View>
-        ))}
+        {stations.length === 0 ? (
+          <Empty text="Cadastre seu primeiro posto." />
+        ) : (
+          stations.map((station) => (
+            <View key={station.id} style={styles.inlineEditGroup}>
+              <Pressable
+                style={(state) => [styles.listItem, isHovered(state) && styles.listItemHover]}
+                onPress={() => openEditForm(station)}
+              >
+                <View style={styles.logInfo}>
+                  <Text style={styles.itemTitle}>{station.name}</Text>
+                  <Text style={styles.muted}>
+                    {[station.address, station.city, station.state].filter(Boolean).join(" - ")}
+                  </Text>
+                </View>
+              </Pressable>
+              {editingStationId === station.id ? (
+                <View style={styles.inlineForm}>
+                  <StationEditor
+                    station={station}
+                    onSave={onSave}
+                    onUpdate={onUpdate}
+                    onDelete={onDeleteStation}
+                    onCancel={() => setEditingStationId(null)}
+                  />
+                </View>
+              ) : null}
+            </View>
+          ))
+        )}
       </Section>
 
-      <Section title="Ranking de postos">
+      <Section title="Postos mais baratos">
         <Ranking
           rows={metrics.stationRanking}
           selectedStationId={selectedStationId}
@@ -2020,7 +2475,9 @@ function StationEditor({
   const [stateName, setStateName] = useState(station?.state ?? "");
   const [latitude, setLatitude] = useState(station?.latitude ?? fakeCurrentLocation.latitude);
   const [longitude, setLongitude] = useState(station?.longitude ?? fakeCurrentLocation.longitude);
-  const [status, setStatus] = useState(station ? "Alterações salvas automaticamente." : "Preencha o nome para salvar.");
+  const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<ToastNotice | null>(null);
+  const [activeField, setActiveField] = useState("name");
 
   useEffect(() => {
     if (!station) {
@@ -2068,20 +2525,20 @@ function StationEditor({
 
       if (station) {
         onUpdate(payload);
-        setStatus("Alterações salvas automaticamente.");
+        showFieldNotice(setNotice, "Posto atualizado.", activeField);
         return;
       }
 
       if (draftStation) {
         setDraftStation(payload);
         onUpdate(payload);
-        setStatus("Posto salvo automaticamente.");
+        showFieldNotice(setNotice, "Posto atualizado.", activeField);
         return;
       }
 
       setDraftStation(payload);
       onSave(payload);
-      setStatus("Posto salvo automaticamente.");
+      showFieldNotice(setNotice, "Posto criado.", activeField);
     }, 800);
 
     return () => {
@@ -2101,12 +2558,31 @@ function StationEditor({
     onCancel();
   }
 
+  function updateStationField(anchor: string, update: (value: string) => void) {
+    return (value: string) => {
+      setActiveField(anchor);
+      update(value);
+    };
+  }
+
   return (
     <View style={styles.formStack}>
-      <Field label="Nome" value={name} onChangeText={setName} />
-      <Field label="Endereço" value={address} onChangeText={setAddress} />
-      <Field label="Cidade" value={city} onChangeText={setCity} />
-      <Field label="Estado" value={stateName} onChangeText={setStateName} autoCapitalize="characters" maxLength={2} />
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Nome" value={name} onFocus={() => setActiveField("name")} onChangeText={updateStationField("name", setName)} />
+        <FieldToast notice={notice} anchor="name" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Endereço" value={address} onFocus={() => setActiveField("address")} onChangeText={updateStationField("address", setAddress)} />
+        <FieldToast notice={notice} anchor="address" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Cidade" value={city} onFocus={() => setActiveField("city")} onChangeText={updateStationField("city", setCity)} />
+        <FieldToast notice={notice} anchor="city" />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field label="Estado" value={stateName} onFocus={() => setActiveField("state")} onChangeText={updateStationField("state", setStateName)} autoCapitalize="characters" maxLength={2} />
+        <FieldToast notice={notice} anchor="state" />
+      </View>
       <Pressable style={styles.deleteButton} onPress={confirmDelete}>
         <Text style={styles.deleteButtonText}>Apagar posto</Text>
       </Pressable>
@@ -2114,9 +2590,9 @@ function StationEditor({
   );
 }
 
-function Tabs({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) {
+function Tabs({ active, onChange }: { active: Tab | null; onChange: (tab: Tab) => void }) {
   const { styles } = useThemeStyles();
-  const tabs: Tab[] = ["Resumo", "Abastecimentos", "Postos", "Carros"];
+  const tabs: Tab[] = ["Resumo", "Abastecimentos", "Postos", "Veículos"];
   return (
     <View style={styles.tabsBar}>
       <View style={styles.tabs}>
@@ -2263,7 +2739,7 @@ function StationDetails({
           >
             <View>
               <Text style={styles.itemTitle}>#{logNumbers.get(log.id)} - {DateFormatter.compact(log.createdAt)}</Text>
-              <Text style={styles.muted}>{car?.nickname ?? "Carro"} - {log.fuel}</Text>
+              <Text style={styles.muted}>{car?.nickname ?? "Veículo"} - {log.fuel}</Text>
             </View>
             <Text style={styles.itemTitle}>{currency.format(log.pricePerLiter)}/L</Text>
           </Pressable>
@@ -2305,7 +2781,17 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
   );
 }
 
-function DateSelector({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateSelector({
+  label,
+  value,
+  onChange,
+  onFocus
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+}) {
   const { styles, theme } = useThemeStyles();
   const [day = "", month = "", year = ""] = value.split("-");
 
@@ -2323,6 +2809,7 @@ function DateSelector({ label, value, onChange }: { label: string; value: string
       <View style={styles.dateSelector}>
         <TextInput
           value={day}
+          onFocus={onFocus}
           onChangeText={(text) => updatePart("day", text)}
           placeholder="DD"
           placeholderTextColor={theme.muted}
@@ -2332,6 +2819,7 @@ function DateSelector({ label, value, onChange }: { label: string; value: string
         />
         <TextInput
           value={month}
+          onFocus={onFocus}
           onChangeText={(text) => updatePart("month", text)}
           placeholder="MM"
           placeholderTextColor={theme.muted}
@@ -2341,6 +2829,7 @@ function DateSelector({ label, value, onChange }: { label: string; value: string
         />
         <TextInput
           value={year}
+          onFocus={onFocus}
           onChangeText={(text) => updatePart("year", text)}
           placeholder="YYYY"
           placeholderTextColor={theme.muted}
@@ -2373,6 +2862,67 @@ function Empty({ text }: { text: string }) {
   const { styles } = useThemeStyles();
 
   return <Text style={styles.empty}>{text}</Text>;
+}
+
+type ToastNotice = {
+  id: number;
+  message: string;
+  anchor: string;
+};
+
+function showFieldNotice(
+  setNotice: React.Dispatch<React.SetStateAction<ToastNotice | null>>,
+  message: string,
+  anchor = "form"
+) {
+  setNotice({ id: Date.now(), message, anchor });
+}
+
+function FieldToast({ notice, anchor }: { notice: ToastNotice | null; anchor: string }) {
+  if (notice?.anchor !== anchor) {
+    return null;
+  }
+
+  return <SideToast notice={notice} />;
+}
+
+function SideToast({ notice }: { notice: ToastNotice | null }) {
+  const { styles } = useThemeStyles();
+  const translateX = useRef(new Animated.Value(36)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+
+    translateX.setValue(36);
+    opacity.setValue(0);
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(translateX, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 140, useNativeDriver: true })
+      ]),
+      Animated.delay(1100),
+      Animated.parallel([
+        Animated.timing(translateX, { toValue: 36, duration: 220, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true })
+      ])
+    ]).start();
+  }, [notice?.id]);
+
+  if (!notice) {
+    return null;
+  }
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.sideToast, { opacity, transform: [{ translateX }] }]}
+    >
+      <Text style={styles.sideToastText}>{notice.message}</Text>
+    </Animated.View>
+  );
 }
 
 function createStyles(theme: Theme) {
@@ -2436,7 +2986,8 @@ function createStyles(theme: Theme) {
   authTabText: {
     color: theme.muted,
     fontSize: 14,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   authTabTextActive: {
     color: "#FFFFFF"
@@ -2444,7 +2995,9 @@ function createStyles(theme: Theme) {
   authDivider: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 4
   },
   authDividerLine: {
     flex: 1,
@@ -2481,7 +3034,8 @@ function createStyles(theme: Theme) {
   googleButtonText: {
     color: theme.text,
     fontSize: 16,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   header: {
     paddingHorizontal: 20,
@@ -2536,7 +3090,8 @@ function createStyles(theme: Theme) {
     color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "800",
-    lineHeight: 14
+    lineHeight: 14,
+    fontFamily: theme.fontFamily
   },
   headerSecondaryButton: {
     minHeight: 30,
@@ -2551,7 +3106,8 @@ function createStyles(theme: Theme) {
   headerSecondaryButtonText: {
     color: theme.muted,
     fontSize: 11,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   demoBanner: {
     marginHorizontal: 16,
@@ -2574,12 +3130,14 @@ function createStyles(theme: Theme) {
   demoBannerTitle: {
     color: theme.text,
     fontSize: 13,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   demoBannerText: {
     color: theme.muted,
     fontSize: 12,
-    lineHeight: 16
+    lineHeight: 16,
+    fontFamily: theme.fontFamily
   },
   demoBannerButton: {
     minHeight: 34,
@@ -2592,7 +3150,8 @@ function createStyles(theme: Theme) {
   demoBannerButtonText: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   accountBox: {
     position: "relative",
@@ -2649,13 +3208,15 @@ function createStyles(theme: Theme) {
     color: theme.muted,
     fontSize: 12,
     fontWeight: "700",
-    lineHeight: 18
+    lineHeight: 18,
+    fontFamily: theme.fontFamily
   },
   accountName: {
     color: theme.text,
     fontSize: 14,
     fontWeight: "900",
-    lineHeight: 20
+    lineHeight: 20,
+    fontFamily: theme.headingFontFamily
   },
   accountMenuItem: {
     minHeight: 34,
@@ -2667,49 +3228,8 @@ function createStyles(theme: Theme) {
   accountMenuText: {
     color: theme.primary,
     fontSize: 13,
-    fontWeight: "900"
-  },
-  settingsBox: {
-    position: "relative",
-    zIndex: 1000
-  },
-  configButton: {
-    width: 34,
-    height: 30,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.surface
-  },
-  configButtonText: {
-    color: theme.muted,
-    fontSize: 17,
-    fontWeight: "900"
-  },
-  settingsMenu: {
-    position: "absolute",
-    top: 36,
-    right: 0,
-    minWidth: 116,
-    borderRadius: 8,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: 6,
-    gap: 4,
-    zIndex: 1001,
-    elevation: 20
-  },
-  settingsMenuItem: {
-    minHeight: 34,
-    borderRadius: 6,
-    justifyContent: "center",
-    paddingHorizontal: 10
-  },
-  settingsMenuText: {
-    color: theme.text,
-    fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   filterBar: {
     paddingHorizontal: 16,
@@ -2740,7 +3260,8 @@ function createStyles(theme: Theme) {
   filterChipText: {
     color: theme.text,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   filterChipTextActive: {
     color: "#FFFFFF"
@@ -2753,12 +3274,14 @@ function createStyles(theme: Theme) {
   brand: {
     fontSize: 26,
     fontWeight: "800",
-    color: theme.text
+    color: theme.text,
+    fontFamily: theme.headingFontFamily
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: theme.text
+    color: theme.text,
+    fontFamily: theme.headingFontFamily
   },
   signal: {
     width: 38,
@@ -2779,7 +3302,43 @@ function createStyles(theme: Theme) {
     color: theme.primary,
     fontWeight: "900",
     fontSize: 18,
-    lineHeight: 22
+    lineHeight: 22,
+    fontFamily: theme.fontFamily
+  },
+  paletteInline: {
+    minHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5
+  },
+  paletteDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.72)"
+  },
+  paletteDotActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.text
+  },
+  privacyText: {
+    color: theme.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: theme.fontFamily
+  },
+  helpBlock: {
+    gap: 5
+  },
+  helpText: {
+    color: theme.text,
+    fontSize: 14,
+    lineHeight: 21,
+    fontFamily: theme.fontFamily
   },
   content: {
     padding: 16,
@@ -2789,6 +3348,7 @@ function createStyles(theme: Theme) {
     gap: 14
   },
   section: {
+    position: "relative",
     backgroundColor: theme.surface,
     borderRadius: 8,
     padding: 14,
@@ -2799,7 +3359,14 @@ function createStyles(theme: Theme) {
   sectionTitle: {
     fontSize: 17,
     fontWeight: "800",
-    color: theme.text
+    color: theme.text,
+    fontFamily: theme.headingFontFamily
+  },
+  sectionHint: {
+    color: theme.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: theme.fontFamily
   },
   sectionTitleRow: {
     minHeight: 36,
@@ -2820,7 +3387,8 @@ function createStyles(theme: Theme) {
     color: theme.primary,
     fontSize: 26,
     lineHeight: 28,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   sectionHeaderRow: {
     flexDirection: "row",
@@ -2840,7 +3408,8 @@ function createStyles(theme: Theme) {
     color: "#FFFFFF",
     fontSize: 28,
     lineHeight: 30,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   cta: {
     minHeight: 58,
@@ -2875,7 +3444,8 @@ function createStyles(theme: Theme) {
     color: theme.text,
     fontSize: 16,
     fontWeight: "900",
-    textTransform: "capitalize"
+    textTransform: "capitalize",
+    fontFamily: theme.headingFontFamily
   },
   iconButton: {
     width: 38,
@@ -2889,7 +3459,8 @@ function createStyles(theme: Theme) {
     color: theme.primary,
     fontSize: 28,
     lineHeight: 30,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   metricCard: {
     flex: 1,
@@ -2904,12 +3475,14 @@ function createStyles(theme: Theme) {
   metricLabel: {
     color: theme.muted,
     fontSize: 13,
-    fontWeight: "700"
+    fontWeight: "700",
+    fontFamily: theme.fontFamily
   },
   metricValue: {
     color: theme.text,
     fontSize: 23,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   metricValueSmall: {
     fontSize: 18
@@ -2917,14 +3490,16 @@ function createStyles(theme: Theme) {
   bigValue: {
     color: theme.text,
     fontSize: 32,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   detailBlock: {
     gap: 4
   },
   muted: {
     color: theme.muted,
-    fontSize: 13
+    fontSize: 13,
+    fontFamily: theme.fontFamily
   },
   input: {
     flex: 1,
@@ -2936,19 +3511,25 @@ function createStyles(theme: Theme) {
     paddingHorizontal: 12,
     backgroundColor: theme.input,
     color: theme.text,
-    fontSize: 16
+    fontSize: 16,
+    fontFamily: theme.fontFamily
   },
   label: {
     color: theme.text,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   field: {
     flex: 1,
     gap: 6
   },
   formStack: {
+    position: "relative",
     gap: 10
+  },
+  fieldToastAnchor: {
+    position: "relative"
   },
   inlineField: {
     flexDirection: "row",
@@ -2957,10 +3538,11 @@ function createStyles(theme: Theme) {
     minHeight: 48
   },
   inlineLabel: {
-    width: 86,
+    width: 96,
     color: theme.text,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   stepper: {
     flex: 1,
@@ -2988,7 +3570,8 @@ function createStyles(theme: Theme) {
     color: theme.text,
     textAlign: "center",
     fontSize: 16,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   datePartInput: {
     width: 54,
@@ -3000,7 +3583,8 @@ function createStyles(theme: Theme) {
     color: theme.text,
     textAlign: "center",
     fontSize: 16,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   dateYearInput: {
     flex: 1,
@@ -3017,7 +3601,8 @@ function createStyles(theme: Theme) {
   stepperButtonText: {
     color: theme.primary,
     fontSize: 22,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   stepperInput: {
     width: 92,
@@ -3029,7 +3614,8 @@ function createStyles(theme: Theme) {
     color: theme.text,
     textAlign: "center",
     fontSize: 16,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   deleteButton: {
     minHeight: 42,
@@ -3042,7 +3628,8 @@ function createStyles(theme: Theme) {
   deleteButtonText: {
     color: "#D95D5D",
     fontSize: 14,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   row: {
     flexDirection: "row",
@@ -3076,7 +3663,8 @@ function createStyles(theme: Theme) {
   choiceText: {
     color: theme.text,
     fontWeight: "700",
-    fontSize: 13
+    fontSize: 13,
+    fontFamily: theme.fontFamily
   },
   choiceTextActive: {
     color: "#FFFFFF"
@@ -3093,7 +3681,8 @@ function createStyles(theme: Theme) {
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   secondaryButton: {
     flex: 1,
@@ -3108,7 +3697,8 @@ function createStyles(theme: Theme) {
   secondaryButtonText: {
     color: theme.primary,
     fontSize: 16,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   ghostButton: {
     minHeight: 44,
@@ -3119,7 +3709,8 @@ function createStyles(theme: Theme) {
   ghostButtonText: {
     color: theme.muted,
     fontSize: 14,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   result: {
     backgroundColor: theme.primarySoft,
@@ -3129,12 +3720,14 @@ function createStyles(theme: Theme) {
   autosaveText: {
     color: theme.muted,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   errorText: {
     color: "#D94A4A",
     fontSize: 13,
-    lineHeight: 18
+    lineHeight: 18,
+    fontFamily: theme.fontFamily
   },
   listItem: {
     minHeight: 68,
@@ -3224,6 +3817,7 @@ function createStyles(theme: Theme) {
     color: theme.text,
     fontSize: 14,
     fontWeight: "900",
+    fontFamily: theme.headingFontFamily,
     flexShrink: 0
   },
   historyMeta: {
@@ -3244,12 +3838,14 @@ function createStyles(theme: Theme) {
   numberBadgeText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   itemTitle: {
     color: theme.text,
     fontSize: 15,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.headingFontFamily
   },
   rankingInfo: {
     flex: 1,
@@ -3262,6 +3858,7 @@ function createStyles(theme: Theme) {
     color: theme.text,
     fontSize: 15,
     fontWeight: "900",
+    fontFamily: theme.headingFontFamily,
     flexShrink: 0
   },
   right: {
@@ -3272,11 +3869,13 @@ function createStyles(theme: Theme) {
     maxWidth: 112,
     color: theme.primary,
     fontWeight: "800",
-    fontSize: 12
+    fontSize: 12,
+    fontFamily: theme.fontFamily
   },
   empty: {
     color: theme.muted,
-    lineHeight: 20
+    lineHeight: 20,
+    fontFamily: theme.fontFamily
   },
   bars: {
     height: 170,
@@ -3305,7 +3904,8 @@ function createStyles(theme: Theme) {
   barLabel: {
     color: theme.muted,
     fontSize: 11,
-    fontWeight: "700"
+    fontWeight: "700",
+    fontFamily: theme.fontFamily
   },
   mapPanel: {
     height: 260,
@@ -3340,13 +3940,15 @@ function createStyles(theme: Theme) {
   },
   pinText: {
     color: "#FFFFFF",
-    fontWeight: "900"
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   insight: {
     color: theme.text,
     lineHeight: 22,
     fontSize: 15,
-    fontWeight: "600"
+    fontWeight: "600",
+    fontFamily: theme.fontFamily
   },
   tabsBar: {
     position: "absolute",
@@ -3382,10 +3984,34 @@ function createStyles(theme: Theme) {
   tabText: {
     color: theme.muted,
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   activeTabText: {
     color: "#FFFFFF"
+  },
+  sideToast: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    maxWidth: 240,
+    borderRadius: 999,
+    backgroundColor: theme.mode === "dark" ? "#DDF3E5" : "#102018",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    shadowColor: "#000000",
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    zIndex: 30
+  },
+  sideToastText: {
+    color: theme.mode === "dark" ? "#102018" : "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    fontFamily: theme.fontFamily
   }
   });
 }
