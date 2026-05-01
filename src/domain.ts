@@ -1,4 +1,10 @@
-export type FuelType = "Gasolina comum" | "Gasolina aditivada" | "Etanol" | "Diesel";
+export type FuelType =
+  | "Gasolina comum"
+  | "Gasolina aditivada"
+  | "Etanol"
+  | "Diesel"
+  | "Gás Natural"
+  | "Eletricidade";
 export type VehicleType = "Carro" | "Moto" | "Caminhonete" | "Caminhão" | "Van";
 
 export type User = {
@@ -94,7 +100,14 @@ export type DashboardMetrics = {
   insight: string;
 };
 
-export const fuels: FuelType[] = ["Gasolina comum", "Gasolina aditivada", "Etanol", "Diesel"];
+export const fuels: FuelType[] = [
+  "Gasolina comum",
+  "Gasolina aditivada",
+  "Etanol",
+  "Diesel",
+  "Gás Natural",
+  "Eletricidade"
+];
 export const vehicleTypes: VehicleType[] = ["Carro", "Moto", "Caminhonete", "Caminhão", "Van"];
 
 export class IdFactory {
@@ -371,17 +384,18 @@ export class DateFormatter {
     const parsed = new Date(date);
     const hour = String(parsed.getHours()).padStart(2, "0");
     const minute = String(parsed.getMinutes()).padStart(2, "0");
-    return `${hour}:${minute}`;
+    const second = String(parsed.getSeconds()).padStart(2, "0");
+    return `${hour}:${minute}:${second}`;
   }
 }
 
 export class DateInputParser {
-  static toIso(value: string, time = "12:00") {
+  static toIso(value: string, time = "12:00:00") {
     const trimmed = value.trim();
     const normalizedTime = DateInputParser.normalizedTime(time);
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      return DateInputParser.safeIso(`${trimmed}T${normalizedTime}:00`);
+      return DateInputParser.safeIso(`${trimmed}T${normalizedTime}`);
     }
 
     const match = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
@@ -389,18 +403,19 @@ export class DateInputParser {
       return undefined;
     }
 
-    return DateInputParser.safeIso(`${match[3]}-${match[2]}-${match[1]}T${normalizedTime}:00`);
+    return DateInputParser.safeIso(`${match[3]}-${match[2]}-${match[1]}T${normalizedTime}`);
   }
 
   private static normalizedTime(value: string) {
-    const match = value.trim().match(/^(\d{1,2}):?(\d{2})$/);
+    const match = value.trim().match(/^(\d{1,2}):?(\d{2})(?::?(\d{2}))?$/);
     if (!match) {
-      return "12:00";
+      return "12:00:00";
     }
 
     const hour = Math.min(23, Math.max(0, Number(match[1])));
     const minute = Math.min(59, Math.max(0, Number(match[2])));
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const second = Math.min(59, Math.max(0, Number(match[3] ?? 0)));
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
   }
 
   private static safeIso(value: string) {
@@ -480,11 +495,24 @@ export class DashboardCalculator {
 
   private averageKmPerLiter() {
     const entries = FuelEfficiencyCalculator.calculate(this.state.logs);
-    if (entries.length === 0) {
+    const monthlyEntries = entries.filter((entry) => {
+      const log = this.state.logs.find((item) => item.id === entry.logId);
+      return log ? this.isReferenceMonth(log.createdAt) : false;
+    });
+
+    if (monthlyEntries.length === 0) {
       return undefined;
     }
 
-    return entries.reduce((sum, entry) => sum + entry.kmPerLiter, 0) / entries.length;
+    return monthlyEntries.reduce((sum, entry) => sum + entry.kmPerLiter, 0) / monthlyEntries.length;
+  }
+
+  private isReferenceMonth(value: string) {
+    const date = new Date(value);
+    return (
+      date.getMonth() === this.referenceDate.getMonth() &&
+      date.getFullYear() === this.referenceDate.getFullYear()
+    );
   }
 
   private monthlyTotals(): MonthlyTotal[] {

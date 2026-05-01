@@ -49,6 +49,59 @@ type UtilityScreen = "help" | "privacy" | "users" | null;
 const storageKey = "litro-certo:v1";
 const guestStorageKey = "litro-certo:guest:v1";
 const appRepository = new SupabaseAppRepository();
+const brazilVehicleBrands = [
+  "Chevrolet",
+  "Fiat",
+  "Volkswagen",
+  "Toyota",
+  "Hyundai",
+  "Honda",
+  "Renault",
+  "Nissan",
+  "Jeep",
+  "Peugeot",
+  "Citroën",
+  "Mitsubishi",
+  "Ford",
+  "Kia",
+  "BYD",
+  "GWM",
+  "Caoa Chery",
+  "Mercedes-Benz",
+  "BMW",
+  "Audi",
+  "Volvo",
+  "Ram"
+];
+const brazilStates = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO"
+];
 
 const initialStations: Station[] = [
   {
@@ -337,12 +390,16 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function transparentColor(hexColor: string, alpha: number) {
-  const normalized = hexColor.replace("#", "");
-  const red = parseInt(normalized.slice(0, 2), 16);
-  const green = parseInt(normalized.slice(2, 4), 16);
-  const blue = parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+function vehicleTypeIcon(type: VehicleType) {
+  const icons: Record<VehicleType, string> = {
+    Carro: "🚗",
+    Moto: "🏍",
+    Caminhonete: "▰",
+    Caminhão: "▣",
+    Van: "▥"
+  };
+
+  return icons[type] ?? icons.Carro;
 }
 
 type Theme = ReturnType<typeof buildTheme>;
@@ -950,6 +1007,7 @@ export default function App() {
           stations={state.stations}
           editingLogId={editingLogId}
           allLogs={state.logs}
+          onNew={openNewFuelForm}
           onEdit={openEditFuelForm}
           onCancelEdit={closeFuelForm}
           onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
@@ -1638,6 +1696,9 @@ function CarFilter({
               style={[styles.filterChip, active && styles.filterChipActive]}
               onPress={() => onToggleCar(car.id)}
             >
+              <Text style={[styles.filterChipIcon, active && styles.filterChipTextActive]}>
+                {vehicleTypeIcon(car.vehicleType)}
+              </Text>
               <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{car.nickname}</Text>
             </Pressable>
           );
@@ -1667,7 +1728,22 @@ function Home({
   onEditLog: (logId: string) => void;
 }) {
   const { styles } = useThemeStyles();
-  const last = logs[0];
+  const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+  const currentMonthLogs = logsForMonth(logs, visibleMonth);
+  const previousMonthLogs = logsForMonth(logs, previousMonth);
+  const last = currentMonthLogs[0];
+  const previousMetrics = new DashboardCalculator({ user: null, cars, stations, logs, selectedCarId: null }, previousMonth).calculate();
+  const previousLast = previousMonthLogs[0];
+  const hasPreviousMonth = previousMonthLogs.length > 0;
+  const monthTrend = hasPreviousMonth
+    ? metricTrend(metrics.monthTotal, previousMetrics.monthTotal, "lower")
+    : undefined;
+  const priceTrend = hasPreviousMonth && last && previousLast
+    ? metricTrend(last.pricePerLiter, previousLast.pricePerLiter, "lower")
+    : undefined;
+  const efficiencyTrend = hasPreviousMonth && metrics.averageKmPerLiter && previousMetrics.averageKmPerLiter
+    ? metricTrend(metrics.averageKmPerLiter, previousMetrics.averageKmPerLiter, "higher")
+    : undefined;
   const monthLabel = visibleMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
@@ -1684,9 +1760,9 @@ function Home({
         </View>
 
         <View style={styles.grid}>
-          <MetricCard label="Gasto mês" value={formatCurrency(metrics.monthTotal)} small={metrics.monthTotal >= 100} />
-          <MetricCard label="Último R$/L" value={last ? formatCurrency(last.pricePerLiter) : ""} small />
-          <MetricCard label="Média km/L" value={metrics.averageKmPerLiter ? metrics.averageKmPerLiter.toFixed(1) : ""} small />
+          <MetricCard label="Gasto mês" value={formatCurrency(metrics.monthTotal)} small={metrics.monthTotal >= 100} trend={monthTrend} />
+          <MetricCard label="Último R$/L" value={last ? formatCurrency(last.pricePerLiter) : ""} small trend={priceTrend} />
+          <MetricCard label="Média km/L" value={metrics.averageKmPerLiter ? metrics.averageKmPerLiter.toFixed(1) : ""} small trend={efficiencyTrend} />
         </View>
 
         <View style={styles.mapListDivider} />
@@ -1837,7 +1913,7 @@ function RegisterFuel({
 
     const createdAt = DateInputParser.toIso(date, time);
     if (!createdAt) {
-      setSaveStatus("Data inválida. Use DD-MM-AAAA e HH:MM.");
+      setSaveStatus("Data inválida. Use DD-MM-AAAA e HH:MM:SS.");
       return undefined;
     }
 
@@ -2058,6 +2134,7 @@ function StationMap({
   cars,
   stations,
   editingLogId,
+  onNew,
   onEdit,
   onCancelEdit,
   onCarSelect,
@@ -2069,6 +2146,7 @@ function StationMap({
   cars: Car[];
   stations: Station[];
   editingLogId: string | null;
+  onNew: () => void;
   onEdit: (logId: string) => void;
   onCancelEdit: () => void;
   onCarSelect: (id: string) => void;
@@ -2085,17 +2163,20 @@ function StationMap({
       <Section
         title="Abastecimentos"
         rightAction={
-          <Pressable
-            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
-            style={styles.mapHeaderIconButton}
-            onPress={() => setMapExpanded((current) => !current)}
-          >
-            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
+          <Pressable style={styles.addButton} onPress={onNew}>
+            <Text style={styles.addButtonText}>+</Text>
           </Pressable>
         }
       >
         <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
           <FuelMap numberedLogs={numberedLogs} stations={stations} />
+          <Pressable
+            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
+            style={styles.mapExpandButton}
+            onPress={() => setMapExpanded((current) => !current)}
+          >
+            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
+          </Pressable>
         </View>
 
         <View style={styles.mapListDivider} />
@@ -2385,7 +2466,7 @@ function Cars({
   return (
     <View style={styles.stack}>
       <Section
-        title="Meus veículos"
+        title="Veículos"
         rightAction={
           <Pressable style={styles.addButton} onPress={openNewForm}>
             <Text style={styles.addButtonText}>+</Text>
@@ -2617,6 +2698,22 @@ function CarEditor({
       </View>
       <View style={styles.fieldToastAnchor}>
         <Field label="Marca" value={brand} onFocus={() => setActiveField("brand")} onChangeText={updateCarField("brand", setBrand)} />
+        <View style={styles.inlineField}>
+          <Text style={styles.inlineLabel} />
+          <View style={styles.choiceFieldWrap}>
+            {brazilVehicleBrands.map((item) => (
+              <Choice
+                key={item}
+                label={item}
+                active={brand.trim().toLowerCase() === item.toLowerCase()}
+                onPress={() => {
+                  setActiveField("brand");
+                  setBrand(item);
+                }}
+              />
+            ))}
+          </View>
+        </View>
         <FieldToast notice={notice} anchor="brand" />
       </View>
       <View style={styles.fieldToastAnchor}>
@@ -2718,18 +2815,15 @@ function Stations({
           </View>
         ) : null}
 
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Mapa de postos</Text>
+        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
+          <StationOverviewMap stations={stations} />
           <Pressable
             accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
-            style={styles.mapHeaderIconButton}
+            style={styles.mapExpandButton}
             onPress={() => setMapExpanded((current) => !current)}
           >
             <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
           </Pressable>
-        </View>
-        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
-          <StationOverviewMap stations={stations} />
         </View>
 
         <View style={styles.mapListDivider} />
@@ -2910,6 +3004,22 @@ function StationEditor({
       </View>
       <View style={styles.fieldToastAnchor}>
         <Field label="Estado" value={stateName} onFocus={() => setActiveField("state")} onChangeText={updateStationField("state", setStateName)} autoCapitalize="characters" maxLength={2} />
+        <View style={styles.inlineField}>
+          <Text style={styles.inlineLabel} />
+          <View style={styles.choiceFieldWrap}>
+            {brazilStates.map((item) => (
+              <Choice
+                key={item}
+                label={item}
+                active={stateName.trim().toUpperCase() === item}
+                onPress={() => {
+                  setActiveField("state");
+                  setStateName(item);
+                }}
+              />
+            ))}
+          </View>
+        </View>
         <FieldToast notice={notice} anchor="state" />
       </View>
       <Pressable style={styles.deleteButton} onPress={confirmDelete}>
@@ -2970,15 +3080,67 @@ function Section({
   );
 }
 
-function MetricCard({ label, value, small }: { label: string; value: string; small?: boolean }) {
+type MetricTrend = {
+  label: string;
+  status: "good" | "bad" | "neutral";
+};
+
+function MetricCard({
+  label,
+  value,
+  small,
+  trend
+}: {
+  label: string;
+  value: string;
+  small?: boolean;
+  trend?: MetricTrend;
+}) {
   const { styles } = useThemeStyles();
 
   return (
     <View style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, small && styles.metricValueSmall]}>{value}</Text>
+      {trend ? (
+        <Text
+          style={[
+            styles.metricTrend,
+            trend.status === "good" && styles.metricTrendGood,
+            trend.status === "bad" && styles.metricTrendBad
+          ]}
+        >
+          {trend.label}
+        </Text>
+      ) : null}
     </View>
   );
+}
+
+function logsForMonth(logs: FuelLog[], referenceDate: Date) {
+  return logs.filter((log) => {
+    const date = new Date(log.createdAt);
+    return date.getMonth() === referenceDate.getMonth() && date.getFullYear() === referenceDate.getFullYear();
+  });
+}
+
+function metricTrend(current: number, previous: number, betterWhen: "higher" | "lower"): MetricTrend | undefined {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) {
+    return undefined;
+  }
+
+  const change = ((current - previous) / previous) * 100;
+  const rounded = Math.abs(change).toLocaleString("pt-BR", {
+    maximumFractionDigits: 0
+  });
+  const improved = betterWhen === "higher" ? change > 0 : change < 0;
+  const status = Math.abs(change) < 0.5 ? "neutral" : improved ? "good" : "bad";
+  const prefix = change > 0 ? "+" : change < 0 ? "-" : "";
+
+  return {
+    label: `${prefix}${rounded}% vs mês anterior`,
+    status
+  };
 }
 
 function Ranking({
@@ -3181,50 +3343,49 @@ function DateSelector({
   onChange: (value: string) => void;
   onFocus?: () => void;
 }) {
-  const { styles, theme } = useThemeStyles();
+  const { styles } = useThemeStyles();
   const [day = "", month = "", year = ""] = value.split("-");
+  const now = new Date();
+  const parsedDay = clampNumber(day, 1, 31, now.getDate());
+  const parsedMonth = clampNumber(month, 1, 12, now.getMonth() + 1);
+  const parsedYear = clampNumber(year, 1970, 2100, now.getFullYear());
+  const maxDay = new Date(parsedYear, parsedMonth, 0).getDate();
 
-  function updatePart(part: "day" | "month" | "year", nextValue: string) {
-    const onlyNumbers = nextValue.replace(/\D/g, "");
-    const nextDay = part === "day" ? onlyNumbers.slice(0, 2) : day;
-    const nextMonth = part === "month" ? onlyNumbers.slice(0, 2) : month;
-    const nextYear = part === "year" ? onlyNumbers.slice(0, 4) : year;
-    onChange(`${nextDay}-${nextMonth}-${nextYear}`);
+  function updateDate(nextDay: number, nextMonth: number, nextYear: number) {
+    const safeMonth = clamp(nextMonth, 1, 12);
+    const safeYear = clamp(nextYear, 1970, 2100);
+    const safeDay = clamp(nextDay, 1, new Date(safeYear, safeMonth, 0).getDate());
+    onChange(`${pad2(safeDay)}-${pad2(safeMonth)}-${safeYear}`);
   }
 
   return (
     <View style={styles.inlineField}>
       <Text style={styles.inlineLabel}>{label}</Text>
       <View style={styles.dateSelector}>
-        <TextInput
-          value={day}
+        <NumberSelect
+          value={parsedDay}
+          min={1}
+          max={maxDay}
+          digits={2}
           onFocus={onFocus}
-          onChangeText={(text) => updatePart("day", text)}
-          placeholder="DD"
-          placeholderTextColor={theme.muted}
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.datePartInput}
+          onChange={(nextDay) => updateDate(nextDay, parsedMonth, parsedYear)}
         />
-        <TextInput
-          value={month}
+        <NumberSelect
+          value={parsedMonth}
+          min={1}
+          max={12}
+          digits={2}
           onFocus={onFocus}
-          onChangeText={(text) => updatePart("month", text)}
-          placeholder="MM"
-          placeholderTextColor={theme.muted}
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.datePartInput}
+          onChange={(nextMonth) => updateDate(parsedDay, nextMonth, parsedYear)}
         />
-        <TextInput
-          value={year}
+        <NumberSelect
+          value={parsedYear}
+          min={1970}
+          max={2100}
+          digits={4}
+          wide
           onFocus={onFocus}
-          onChangeText={(text) => updatePart("year", text)}
-          placeholder="YYYY"
-          placeholderTextColor={theme.muted}
-          keyboardType="number-pad"
-          maxLength={4}
-          style={[styles.datePartInput, styles.dateYearInput]}
+          onChange={(nextYear) => updateDate(parsedDay, parsedMonth, nextYear)}
         />
       </View>
     </View>
@@ -3242,43 +3403,125 @@ function TimeSelector({
   onChange: (value: string) => void;
   onFocus?: () => void;
 }) {
-  const { styles, theme } = useThemeStyles();
-  const [hour = "", minute = ""] = value.split(":");
+  const { styles } = useThemeStyles();
+  const [hour = "", minute = "", second = ""] = value.split(":");
+  const parsedHour = clampNumber(hour, 0, 23, new Date().getHours());
+  const parsedMinute = clampNumber(minute, 0, 59, new Date().getMinutes());
+  const parsedSecond = clampNumber(second, 0, 59, 0);
 
-  function updatePart(part: "hour" | "minute", nextValue: string) {
-    const onlyNumbers = nextValue.replace(/\D/g, "").slice(0, 2);
-    const nextHour = part === "hour" ? onlyNumbers : hour;
-    const nextMinute = part === "minute" ? onlyNumbers : minute;
-    onChange(`${nextHour}:${nextMinute}`);
+  function updateTime(nextHour: number, nextMinute: number) {
+    onChange(`${pad2(clamp(nextHour, 0, 23))}:${pad2(clamp(nextMinute, 0, 59))}:${pad2(parsedSecond)}`);
   }
 
   return (
     <View style={styles.inlineField}>
       <Text style={styles.inlineLabel}>{label}</Text>
       <View style={styles.timeSelector}>
-        <TextInput
-          value={hour}
+        <NumberSelect
+          value={parsedHour}
+          min={0}
+          max={23}
+          digits={2}
           onFocus={onFocus}
-          onChangeText={(text) => updatePart("hour", text)}
-          placeholder="HH"
-          placeholderTextColor={theme.muted}
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.datePartInput}
+          onChange={(nextHour) => updateTime(nextHour, parsedMinute)}
         />
-        <TextInput
-          value={minute}
+        <NumberSelect
+          value={parsedMinute}
+          min={0}
+          max={59}
+          digits={2}
           onFocus={onFocus}
-          onChangeText={(text) => updatePart("minute", text)}
-          placeholder="MM"
-          placeholderTextColor={theme.muted}
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.datePartInput}
+          onChange={(nextMinute) => updateTime(parsedHour, nextMinute)}
         />
       </View>
     </View>
   );
+}
+
+function NumberSelect({
+  value,
+  min,
+  max,
+  digits,
+  wide,
+  onChange,
+  onFocus
+}: {
+  value: number;
+  min: number;
+  max: number;
+  digits: number;
+  wide?: boolean;
+  onChange: (value: number) => void;
+  onFocus?: () => void;
+}) {
+  const { styles, theme } = useThemeStyles();
+  const options = range(min, max);
+
+  function selectValue(nextValue: number) {
+    onFocus?.();
+    onChange(clamp(nextValue, min, max));
+  }
+
+  if (Platform.OS === "web") {
+    return React.createElement(
+      "select",
+      {
+        value: String(value),
+        onFocus,
+        onChange: (event: { target: { value: string } }) => selectValue(Number(event.target.value)),
+        style: StyleSheet.flatten([styles.numberSelect, wide && styles.numberSelectWide]) as never
+      },
+      options.map((item) =>
+        React.createElement(
+          "option",
+          { key: item, value: String(item) },
+          String(item).padStart(digits, "0")
+        )
+      )
+    );
+  }
+
+  return (
+    <TextInput
+      value={String(value).padStart(digits, "0")}
+      onFocus={onFocus}
+      onChangeText={(text) => {
+        const parsed = Number(text.replace(/\D/g, ""));
+        if (!Number.isFinite(parsed)) {
+          return;
+        }
+
+        selectValue(parsed);
+      }}
+      placeholder={digits === 4 ? "AAAA" : "00"}
+      placeholderTextColor={theme.muted}
+      keyboardType="number-pad"
+      maxLength={digits}
+      style={[styles.numberSelect, wide && styles.numberSelectWide]}
+    />
+  );
+}
+
+function range(min: number, max: number) {
+  return Array.from({ length: max - min + 1 }, (_item, index) => min + index);
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampNumber(value: string, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed === 0 && value.trim() === "") {
+    return clamp(fallback, min, max);
+  }
+
+  return clamp(parsed, min, max);
 }
 
 function Choice({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -3666,8 +3909,9 @@ function createStyles(theme: Theme) {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
-    padding: 8,
-    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 2,
     zIndex: 1001,
     elevation: 20
   },
@@ -3682,6 +3926,7 @@ function createStyles(theme: Theme) {
   },
   accountEmail: {
     color: theme.muted,
+    textAlign: "right",
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
@@ -3689,11 +3934,13 @@ function createStyles(theme: Theme) {
   },
   accountIdentity: {
     gap: 3,
+    alignItems: "flex-end",
     paddingHorizontal: 2,
     paddingBottom: 2
   },
   accountName: {
     color: theme.text,
+    textAlign: "right",
     fontSize: 14,
     fontWeight: "900",
     lineHeight: 20,
@@ -3701,27 +3948,31 @@ function createStyles(theme: Theme) {
   },
   accountNameInput: {
     minHeight: 34,
+    alignSelf: "stretch",
     borderRadius: 6,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.input,
     color: theme.text,
+    textAlign: "right",
     paddingHorizontal: 9,
     fontSize: 14,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
   accountMenuItem: {
-    minHeight: 34,
-    borderRadius: 6,
+    minHeight: 32,
     justifyContent: "center",
-    backgroundColor: theme.primarySoft,
-    paddingHorizontal: 10
+    alignItems: "flex-end",
+    backgroundColor: "transparent",
+    paddingVertical: 6,
+    paddingHorizontal: 2
   },
   accountMenuText: {
-    color: theme.primary,
+    color: theme.text,
+    textAlign: "right",
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   filterBar: {
@@ -3751,6 +4002,12 @@ function createStyles(theme: Theme) {
     borderColor: theme.primary
   },
   filterChipText: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
+  },
+  filterChipIcon: {
     color: theme.text,
     fontSize: 13,
     fontWeight: "800",
@@ -3834,7 +4091,7 @@ function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   content: {
-    padding: 16,
+    padding: 10,
     paddingBottom: 112
   },
   stack: {
@@ -3842,12 +4099,12 @@ function createStyles(theme: Theme) {
   },
   section: {
     position: "relative",
-    backgroundColor: transparentColor(theme.surface, theme.mode === "dark" ? 0.9 : 0.78),
+    backgroundColor: "transparent",
     borderRadius: 8,
-    padding: 14,
+    padding: 0,
     gap: 12,
-    borderWidth: 1,
-    borderColor: theme.border
+    borderWidth: 0,
+    borderColor: "transparent"
   },
   sectionTitle: {
     fontSize: 17,
@@ -3867,6 +4124,11 @@ function createStyles(theme: Theme) {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10
+  },
+  sectionActionGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   closeButton: {
     width: 34,
@@ -3987,6 +4249,20 @@ function createStyles(theme: Theme) {
     fontSize: 14,
     lineHeight: 17
   },
+  metricTrend: {
+    color: theme.muted,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily,
+    textAlign: "center"
+  },
+  metricTrendGood: {
+    color: "#178A4A"
+  },
+  metricTrendBad: {
+    color: "#D94A4A"
+  },
   bigValue: {
     color: theme.text,
     fontSize: 32,
@@ -4066,6 +4342,22 @@ function createStyles(theme: Theme) {
     gap: 6,
     minWidth: 0,
     justifyContent: "flex-start"
+  },
+  numberSelect: {
+    width: 56,
+    minHeight: 38,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 8,
+    backgroundColor: theme.input,
+    color: theme.text,
+    textAlign: "center",
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
+  },
+  numberSelectWide: {
+    width: 76
   },
   dateInput: {
     flex: 1,
@@ -4452,16 +4744,18 @@ function createStyles(theme: Theme) {
   },
   mapExpandButton: {
     position: "absolute",
-    right: 10,
-    top: 10,
-    zIndex: 5,
-    minHeight: 32,
-    borderRadius: 8,
+    right: 8,
+    top: 8,
+    zIndex: 2000,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10
+    elevation: 3
   },
   mapExpandButtonText: {
     color: theme.primary,
