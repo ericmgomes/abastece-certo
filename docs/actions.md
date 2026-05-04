@@ -42,8 +42,8 @@ Todos exigem `Authorization: Bearer <access_token_supabase>`.
 
 Campos sugeridos:
 
-- Authorization URL: `https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/authorize`
-- Token URL: `https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/token`
+- Authorization URL: `https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/authorize`
+- Token URL: `https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/token`
 - Scope: `openid email profile`
 
 Depois que o GPT Builder mostrar a callback URL da Action, adicione essa URL no Supabase em `Authentication` > `URL Configuration` > `Redirect URLs`.

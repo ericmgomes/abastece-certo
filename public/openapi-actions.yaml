@@ -52,7 +52,12 @@ paths:
       description: Edita um veículo da conta logada.
       x-openai-isConsequential: true
       parameters:
-        - $ref: "#/components/parameters/Id"
+        - name: id
+          in: path
+          required: true
+          description: ID do veículo.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -106,7 +111,12 @@ paths:
       description: Edita um posto da conta logada.
       x-openai-isConsequential: true
       parameters:
-        - $ref: "#/components/parameters/Id"
+        - name: id
+          in: path
+          required: true
+          description: ID do posto.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -170,7 +180,12 @@ paths:
       description: Edita um abastecimento da conta logada.
       x-openai-isConsequential: true
       parameters:
-        - $ref: "#/components/parameters/Id"
+        - name: id
+          in: path
+          required: true
+          description: ID do abastecimento.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -211,20 +226,12 @@ components:
       type: oauth2
       flows:
         authorizationCode:
-          authorizationUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/authorize
-          tokenUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/token
+          authorizationUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/authorize
+          tokenUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/token
           scopes:
             openid: Identificar a pessoa logada.
             email: Ler email da pessoa logada.
             profile: Ler perfil básico da pessoa logada.
-  parameters:
-    Id:
-      name: id
-      in: path
-      required: true
-      description: ID do registro.
-      schema:
-        type: string
   schemas:
     FuelType:
       type: string
@@ -441,6 +448,42 @@ components:
     Metrics:
       type: object
       description: Métricas e rankings calculados para a conta logada.
+      properties:
+        monthTotal:
+          type: number
+          description: Total gasto no mês.
+        averageKmPerLiter:
+          type: number
+          description: Média geral de km por litro quando houver quilometragem.
+        lastFuelLog:
+          $ref: "#/components/schemas/FuelLog"
+        cheapestStation:
+          type: object
+          additionalProperties: true
+        stationRanking:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        vehicleRanking:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        fuelAverages:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        monthlyTotals:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        potentialSavings:
+          type: number
+        insight:
+          type: string
       additionalProperties: true
     Error:
       type: object
