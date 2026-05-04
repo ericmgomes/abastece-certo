@@ -1422,7 +1422,7 @@ function OAuthConsentScreen({
   useEffect(() => {
     if (!request) {
       setDetails(null);
-      setError("Autorização inválida ou expirada. Volte ao ChatGPT e tente iniciar sessão novamente.");
+      setError("Autorização inválida ou expirada. Volte ao app que solicitou o acesso e tente iniciar sessão novamente.");
       return;
     }
 
@@ -1437,7 +1437,7 @@ function OAuthConsentScreen({
       redirect_uri: request.redirect_uri,
       scope: request.scope,
       client: {
-        name: "ChatGPT"
+        name: oauthClientName(request.redirect_uri)
       },
       user: {
         email: userEmail
@@ -1448,7 +1448,7 @@ function OAuthConsentScreen({
 
   async function decide(decision: "approve" | "deny") {
     if (!request) {
-      setError("Autorização inválida ou expirada. Volte ao ChatGPT e tente iniciar sessão novamente.");
+      setError("Autorização inválida ou expirada. Volte ao app que solicitou o acesso e tente iniciar sessão novamente.");
       return;
     }
 
@@ -1501,7 +1501,7 @@ function OAuthConsentScreen({
         {!authenticated ? (
           <>
             <Text style={styles.helpText}>
-              Faça login no LitroCerto para autorizar o ChatGPT a consultar e registrar dados na sua conta.
+              Faça login no LitroCerto para autorizar este app a consultar e registrar dados na sua conta.
             </Text>
             <Text style={styles.privacyText}>
               Cada autorização vale apenas para a sua conta. Outros usuários não conseguem acessar seus veículos, postos ou abastecimentos.
@@ -1524,7 +1524,7 @@ function OAuthConsentScreen({
               <Text style={styles.privacyText}>Retorno: {details.redirect_uri}</Text>
             </View>
             <Text style={styles.privacyText}>
-              Ao autorizar, o ChatGPT poderá executar as Actions configuradas para consultar métricas e criar ou editar registros quando você pedir.
+              Ao autorizar, este app poderá consultar métricas e criar ou editar registros quando você pedir.
             </Text>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
             <View style={styles.row}>
@@ -1547,6 +1547,22 @@ function OAuthConsentScreen({
       </View>
     </View>
   );
+}
+
+function oauthClientName(redirectUri: string) {
+  try {
+    const host = new URL(redirectUri).hostname;
+    if (host === "claude.ai") {
+      return "Claude";
+    }
+    if (host === "chat.openai.com" || host === "chatgpt.com") {
+      return "ChatGPT";
+    }
+  } catch {
+    return "App conectado";
+  }
+
+  return "App conectado";
 }
 
 function Header({

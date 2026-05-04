@@ -20,15 +20,33 @@ Health check:
 http://127.0.0.1:3333/health
 ```
 
+## Claude Custom Connector
+
+Depois de publicar na Vercel, preencha no Claude:
+
+```text
+Nome: LitroCerto
+URL do servidor MCP remoto: https://abastece-certo.vercel.app/mcp
+ID do Cliente OAuth: lc_8F3kP2vX9rM4Q1tW6yZ
+Client Secret OAuth: Y7nD4sL0pQ9xV2kF6cR1wT8mH3Z
+```
+
+O endpoint remoto usa Streamable HTTP e também publica discovery OAuth em:
+
+```text
+https://abastece-certo.vercel.app/.well-known/oauth-protected-resource/mcp
+https://abastece-certo.vercel.app/.well-known/oauth-authorization-server
+```
+
 ## Autenticação
 
 O MCP Server exige:
 
 ```http
-Authorization: Bearer <supabase_access_token>
+Authorization: Bearer <litrocerto_oauth_access_token>
 ```
 
-Esse token deve ser obtido pelo login OAuth do Supabase Auth, por exemplo Google OAuth. O servidor valida o token com Supabase e executa todas as queries usando o próprio Bearer token recebido. Assim:
+Esse token é emitido pelo OAuth do LitroCerto e carrega, internamente, o token Supabase da pessoa logada. O servidor valida o token com Supabase e executa todas as queries usando a sessão da própria pessoa. Assim:
 
 - não usa `service_role`;
 - respeita RLS;
@@ -40,7 +58,7 @@ Também existe metadata básica em:
 /.well-known/oauth-protected-resource
 ```
 
-Ela aponta o Supabase Auth como authorization server.
+Ela aponta o OAuth do LitroCerto como authorization server.
 
 ## Tools
 
@@ -57,4 +75,4 @@ Ela aponta o Supabase Auth como authorization server.
 
 ## Observações
 
-O MCP Client precisa conseguir fazer OAuth com Supabase e enviar o `access_token` no header `Authorization`. Se o cliente MCP não suportar OAuth direto com Supabase, o caminho mais simples é criar uma pequena tela/rota de conexão que faz login e entrega o token ao client conforme o fluxo que ele suportar.
+O MCP Client precisa conseguir fazer OAuth authorization code e enviar o `access_token` no header `Authorization`. Claude Custom Connector faz esse fluxo usando os campos de OAuth configurados na tela.

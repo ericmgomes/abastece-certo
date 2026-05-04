@@ -106,7 +106,7 @@ export async function handleOAuthToken(request: VercelRequest, response: VercelR
       throw new Error("client_id inválido.");
     }
 
-    if (body.redirect_uri && body.redirect_uri !== code.redirectUri && !sameChatGptCallback(body.redirect_uri, code.redirectUri)) {
+    if (body.redirect_uri && body.redirect_uri !== code.redirectUri && !sameAllowedCallback(body.redirect_uri, code.redirectUri)) {
       throw new Error("redirect_uri inválida.");
     }
 
@@ -160,7 +160,7 @@ function validateAuthorizeRequest(body: OAuthParams) {
     throw new Error("client_id inválido.");
   }
 
-  if (!body.redirect_uri || !isAllowedChatGptRedirect(body.redirect_uri)) {
+  if (!body.redirect_uri || !isAllowedRedirect(body.redirect_uri)) {
     throw new Error("redirect_uri inválida.");
   }
 }
@@ -180,9 +180,13 @@ function validateClient(request: VercelRequest, body: Record<string, string>) {
   }
 }
 
-function isAllowedChatGptRedirect(value: string) {
+function isAllowedRedirect(value: string) {
   try {
     const url = new URL(value);
+    if (url.hostname === "claude.ai" && url.pathname === "/api/mcp/auth_callback") {
+      return true;
+    }
+
     return (
       (url.hostname === "chat.openai.com" || url.hostname === "chatgpt.com") &&
       url.pathname.startsWith("/aip/") &&
@@ -193,13 +197,14 @@ function isAllowedChatGptRedirect(value: string) {
   }
 }
 
-function sameChatGptCallback(left: string, right: string) {
+function sameAllowedCallback(left: string, right: string) {
   try {
     const leftUrl = new URL(left);
     const rightUrl = new URL(right);
     return (
-      isAllowedChatGptRedirect(left) &&
-      isAllowedChatGptRedirect(right) &&
+      isAllowedRedirect(left) &&
+      isAllowedRedirect(right) &&
+      leftUrl.hostname === rightUrl.hostname &&
       leftUrl.pathname === rightUrl.pathname
     );
   } catch {
