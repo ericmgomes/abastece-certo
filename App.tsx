@@ -15,6 +15,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   AppState,
@@ -1137,6 +1138,7 @@ export default function App() {
       <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
         <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
         <SafeAreaView style={styles.shell}>
+          {Platform.OS === "web" && <SpeedInsights />}
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.keyboard}
