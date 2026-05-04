@@ -43,6 +43,7 @@ import {
 } from "./src/domain";
 import { SupabaseAppRepository } from "./src/repositories/SupabaseAppRepository";
 import { supabase } from "./src/supabaseClient";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos";
 type UtilityScreen = "help" | "privacy" | "users" | null;
@@ -1176,6 +1177,7 @@ export default function App() {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </ThemeContext.Provider>
+      {Platform.OS === "web" && <SpeedInsights />}
     </SafeAreaProvider>
   );
 }
