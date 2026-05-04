@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/actions/:path*",
+      "destination": "/api/actions/:path*"
+    },
+    {
       "source": "/oauth/consent",
       "destination": "/"
     }
