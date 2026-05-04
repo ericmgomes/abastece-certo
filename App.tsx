@@ -630,6 +630,12 @@ export default function App() {
   const oauthConsentRoute = isOAuthConsentRoute();
   const oauthAuthorizationId = oauthAuthorizationIdFromUrl();
 
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      document.title = "LitroCerto";
+    }
+  }, []);
+
   function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
     return {
       ...starterState,
@@ -1580,7 +1586,24 @@ function Header({
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.brandBlock}>
-            <Text style={styles.brand}>LitroCerto</Text>
+            <Image
+              source={
+                mode === "dark"
+                  ? (
+                      Platform.OS === "web"
+                        ? { uri: "/assets/litrocerto-logo-header-dark-mode.png" }
+                        : require("./assets/litrocerto-logo-header-dark-mode.png")
+                    )
+                  : (
+                      Platform.OS === "web"
+                        ? { uri: "/assets/litrocerto-header.svg" }
+                        : require("./assets/litrocerto-logo-header.png")
+                    )
+              }
+              style={styles.headerLogo}
+              resizeMode="contain"
+              accessibilityLabel="LitroCerto"
+            />
           </View>
           <View style={styles.headerTools}>
             <View style={styles.colorControlCluster}>
@@ -3999,7 +4022,12 @@ function createStyles(theme: Theme) {
   },
   brandBlock: {
     flex: 1,
-    minWidth: 0
+    minWidth: 0,
+    justifyContent: "center"
+  },
+  headerLogo: {
+    width: 178,
+    height: 40
   },
   headerSecondaryActions: {
     position: "relative",

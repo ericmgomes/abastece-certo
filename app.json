@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Litro Certo",
+    "name": "LitroCerto",
     "slug": "litro-certo",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -20,7 +20,8 @@
       "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/litrocerto-logo-favicon.png"
     }
   }
 }
