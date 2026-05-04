@@ -106,7 +106,7 @@ export async function handleOAuthToken(request: VercelRequest, response: VercelR
       throw new Error("client_id inválido.");
     }
 
-    if (body.redirect_uri && body.redirect_uri !== code.redirectUri) {
+    if (body.redirect_uri && body.redirect_uri !== code.redirectUri && !sameChatGptCallback(body.redirect_uri, code.redirectUri)) {
       throw new Error("redirect_uri inválida.");
     }
 
@@ -187,6 +187,20 @@ function isAllowedChatGptRedirect(value: string) {
       (url.hostname === "chat.openai.com" || url.hostname === "chatgpt.com") &&
       url.pathname.startsWith("/aip/") &&
       url.pathname.endsWith("/oauth/callback")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function sameChatGptCallback(left: string, right: string) {
+  try {
+    const leftUrl = new URL(left);
+    const rightUrl = new URL(right);
+    return (
+      isAllowedChatGptRedirect(left) &&
+      isAllowedChatGptRedirect(right) &&
+      leftUrl.pathname === rightUrl.pathname
     );
   } catch {
     return false;
