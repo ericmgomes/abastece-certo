@@ -6,7 +6,9 @@ GPT Actions acessam APIs REST descritas por OpenAPI. Elas nao chamam um MCP Serv
 
 - `docs/openapi-actions.yaml`: schema para colar na Action do Custom GPT.
 - `public/openapi-actions.yaml`: schema publico servido pelo deploy.
-- `src/mcp/server.ts`: endpoints REST e endpoint MCP usando a mesma autorizacao Supabase.
+- `api/actions/*`: endpoints REST publicos no Vercel usando a mesma autorizacao Supabase.
+- `api/oauth/*`: proxy OAuth no dominio do app para compatibilidade com GPT Actions.
+- `src/mcp/server.ts`: endpoints REST locais e endpoint MCP usando a mesma autorizacao Supabase.
 
 ## URL publica do schema
 
@@ -20,16 +22,16 @@ https://abastece-certo.vercel.app/openapi-actions.yaml
 
 Todos exigem `Authorization: Bearer <access_token_supabase>`.
 
-- `GET /actions/vehicles`
-- `POST /actions/vehicles`
-- `PATCH /actions/vehicles/{id}`
-- `GET /actions/stations`
-- `POST /actions/stations`
-- `PATCH /actions/stations/{id}`
-- `GET /actions/fuel-logs`
-- `POST /actions/fuel-logs`
-- `PATCH /actions/fuel-logs/{id}`
-- `GET /actions/metrics?month=YYYY-MM`
+- `GET /api/actions/vehicles`
+- `POST /api/actions/vehicles`
+- `PATCH /api/actions/vehicles/{id}`
+- `GET /api/actions/stations`
+- `POST /api/actions/stations`
+- `PATCH /api/actions/stations/{id}`
+- `GET /api/actions/fuel-logs`
+- `POST /api/actions/fuel-logs`
+- `PATCH /api/actions/fuel-logs/{id}`
+- `GET /api/actions/metrics?month=YYYY-MM`
 
 ## Configuracao no Custom GPT
 
@@ -42,20 +44,20 @@ Todos exigem `Authorization: Bearer <access_token_supabase>`.
 
 Campos sugeridos:
 
-- Authorization URL: `https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/authorize`
-- Token URL: `https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/token`
+- Authorization URL: `https://abastece-certo.vercel.app/api/oauth/authorize`
+- Token URL: `https://abastece-certo.vercel.app/api/oauth/token`
 - Scope: `openid email profile`
 
 Depois que o GPT Builder mostrar a callback URL da Action, adicione essa URL no Supabase em `Authentication` > `URL Configuration` > `Redirect URLs`.
 
 ## Observacao importante sobre dominio
 
-As notas oficiais de producao de GPT Actions dizem que, com excecao de alguns provedores grandes, os dominios do OAuth devem ser os mesmos dominios dos endpoints principais da API. Como os endpoints do Litro Certo ficam no Vercel e o OAuth hoje fica no dominio do Supabase, pode ser necessario criar endpoints proxy no proprio dominio do app, por exemplo:
+As notas oficiais de producao de GPT Actions dizem que, com excecao de alguns provedores grandes, os dominios do OAuth devem ser os mesmos dominios dos endpoints principais da API. Por isso o Litro Certo expoe proxies no Vercel:
 
-- `https://abastece-certo.vercel.app/oauth/authorize`
-- `https://abastece-certo.vercel.app/oauth/token`
+- `https://abastece-certo.vercel.app/api/oauth/authorize`
+- `https://abastece-certo.vercel.app/api/oauth/token`
 
-Esses endpoints apenas encaminhariam o fluxo para o Supabase. O schema atual ja deixa as Actions prontas; se o Builder recusar o dominio do Supabase no OAuth, esse proxy e o proximo passo.
+Esses endpoints encaminham o fluxo para o OAuth Server do Supabase, mas mantem o dominio raiz igual ao dominio da API.
 
 ## Testes rapidos
 

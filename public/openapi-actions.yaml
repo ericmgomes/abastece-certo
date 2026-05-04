@@ -4,7 +4,7 @@ info:
   description: Consulta e altera veículos, postos, abastecimentos e métricas da conta logada no Litro Certo.
   version: 0.1.0
 servers:
-  - url: https://abastece-certo.vercel.app
+  - url: https://abastece-certo.vercel.app/api
     description: Produção
 security:
   - SupabaseOAuth:
@@ -226,8 +226,8 @@ components:
       type: oauth2
       flows:
         authorizationCode:
-          authorizationUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/authorize
-          tokenUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/token
+          authorizationUrl: https://abastece-certo.vercel.app/api/oauth/authorize
+          tokenUrl: https://abastece-certo.vercel.app/api/oauth/token
           scopes:
             openid: Identificar a pessoa logada.
             email: Ler email da pessoa logada.
