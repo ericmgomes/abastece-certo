@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { verifyOAuthPayload } from "./customOAuthToken";
 
 const fallbackSupabaseUrl = "https://ffqykwpkzofkbnvtbfsn.supabase.co";
 const fallbackSupabaseKey = "sb_publishable_MARbgY52A-tYXaVqupaxqA_rMWAJZhu";
@@ -36,8 +37,10 @@ export function supabaseForToken(token: string) {
 }
 
 export async function contextFromBearerToken(token: string): Promise<McpUserContext> {
-  const supabase = supabaseForToken(token);
-  const { data, error } = await supabase.auth.getUser(token);
+  const customToken = verifyOAuthPayload(token, "access");
+  const supabaseToken = customToken?.supabaseAccessToken ?? token;
+  const supabase = supabaseForToken(supabaseToken);
+  const { data, error } = await supabase.auth.getUser(supabaseToken);
 
   if (error || !data.user?.id || !data.user.email) {
     throw new Error("Token OAuth inválido ou expirado.");
@@ -50,7 +53,7 @@ export async function contextFromBearerToken(token: string): Promise<McpUserCont
     data.user.email;
 
   return {
-    token,
+    token: supabaseToken,
     ownerId: data.user.id,
     email: data.user.email,
     name,

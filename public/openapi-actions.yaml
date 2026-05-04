@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
-  title: Litro Certo Actions API
-  description: Consulta e altera veículos, postos, abastecimentos e métricas da conta logada no Litro Certo.
+  title: LitroCerto Actions API
+  description: Consulta e altera veículos, postos, abastecimentos e métricas da conta logada no LitroCerto.
   version: 0.1.0
 servers:
   - url: https://abastece-certo.vercel.app/api
     description: Produção
 security:
-  - SupabaseOAuth:
+  - LitroCertoOAuth:
       - openid
       - email
       - profile
@@ -222,7 +222,7 @@ paths:
                 $ref: "#/components/schemas/Metrics"
 components:
   securitySchemes:
-    SupabaseOAuth:
+    LitroCertoOAuth:
       type: oauth2
       flows:
         authorizationCode:

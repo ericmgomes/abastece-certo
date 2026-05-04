@@ -1,14 +1,14 @@
-# Litro Certo no Custom GPT via Actions
+# LitroCerto no Custom GPT via Actions
 
-GPT Actions acessam APIs REST descritas por OpenAPI. Elas nao chamam um MCP Server diretamente, entao o servidor do Litro Certo tambem expoe endpoints REST em `/actions/*`.
+GPT Actions acessam APIs REST descritas por OpenAPI. Elas nao chamam um MCP Server diretamente, entao o LitroCerto expoe endpoints REST em `/api/actions/*`.
 
 ## Arquivos
 
 - `docs/openapi-actions.yaml`: schema para colar na Action do Custom GPT.
 - `public/openapi-actions.yaml`: schema publico servido pelo deploy.
-- `api/actions/*`: endpoints REST publicos no Vercel usando a mesma autorizacao Supabase.
-- `api/oauth/*`: proxy OAuth no dominio do app para compatibilidade com GPT Actions.
-- `src/mcp/server.ts`: endpoints REST locais e endpoint MCP usando a mesma autorizacao Supabase.
+- `api/actions/*`: endpoints REST publicos no Vercel.
+- `api/oauth/*`: OAuth proprio do LitroCerto para compatibilidade com GPT Actions.
+- `src/mcp/customOAuthToken.ts`: tokens assinados usados pelo OAuth proprio.
 
 ## URL publica do schema
 
@@ -20,7 +20,7 @@ https://abastece-certo.vercel.app/openapi-actions.yaml
 
 ## Endpoints
 
-Todos exigem `Authorization: Bearer <access_token_supabase>`.
+Todos exigem `Authorization: Bearer <access_token_litrocerto>`.
 
 - `GET /api/actions/vehicles`
 - `POST /api/actions/vehicles`
@@ -37,53 +37,49 @@ Todos exigem `Authorization: Bearer <access_token_supabase>`.
 
 1. Abra o Builder do Custom GPT.
 2. Va em `Configure` > `Actions`.
-3. Crie uma nova Action.
-4. Cole o conteudo de `docs/openapi-actions.yaml`.
+3. Crie ou edite uma Action.
+4. Importe `https://abastece-certo.vercel.app/openapi-actions.yaml`.
 5. Em `Authentication`, escolha `OAuth`.
-6. Use as credenciais OAuth do projeto Supabase.
 
-Campos sugeridos:
+Campos:
 
+- Client ID: mesmo valor de `LITROCERTO_OAUTH_CLIENT_ID`.
+- Client Secret: mesmo valor de `LITROCERTO_OAUTH_CLIENT_SECRET`.
 - Authorization URL: `https://abastece-certo.vercel.app/api/oauth/authorize`
 - Token URL: `https://abastece-certo.vercel.app/api/oauth/token`
 - Scope: `openid email profile`
+- Token Exchange Method: `Basic authorization header`
 
-Depois que o GPT Builder mostrar a callback URL da Action, adicione essa URL no Supabase em `Authentication` > `URL Configuration` > `Redirect URLs`.
+## Variaveis no Vercel
 
-## Configuracao no Supabase OAuth Server
+Configure no projeto Vercel:
 
-Em `Authentication` > `URL Configuration`:
+```text
+LITROCERTO_OAUTH_CLIENT_ID=5a45d985-763b-4da3-a25e-0af69af1a09f
+LITROCERTO_OAUTH_CLIENT_SECRET=<um segredo forte igual ao usado no Custom GPT>
+LITROCERTO_OAUTH_SECRET=<segredo forte para assinar tokens do LitroCerto>
+```
 
-- Site URL: `https://abastece-certo.vercel.app`
+O `LITROCERTO_OAUTH_SECRET` nao aparece no Custom GPT. Ele serve apenas para o backend assinar e validar os tokens emitidos pelo LitroCerto.
 
-Em `Authentication` > `OAuth Server`:
+## Fluxo OAuth proprio
 
-- Authorization Path: `/oauth/consent`
-
-O app implementa essa tela em `/oauth/consent?authorization_id=...`. Ela mostra o consentimento, chama `supabase.auth.oauth.approveAuthorization(...)` ou `denyAuthorization(...)` e devolve a pessoa para o ChatGPT.
-
-## Observacao importante sobre dominio
-
-As notas oficiais de producao de GPT Actions dizem que, com excecao de alguns provedores grandes, os dominios do OAuth devem ser os mesmos dominios dos endpoints principais da API. Por isso o Litro Certo expoe proxies no Vercel:
-
-- `https://abastece-certo.vercel.app/api/oauth/authorize`
-- `https://abastece-certo.vercel.app/api/oauth/token`
-
-Esses endpoints encaminham o fluxo para o OAuth Server do Supabase, mas mantem o dominio raiz igual ao dominio da API.
+1. ChatGPT abre `/api/oauth/authorize`.
+2. O endpoint redireciona para `/oauth/consent` preservando `client_id`, `redirect_uri`, `state` e `scope`.
+3. O app pede login com Supabase se a pessoa ainda nao estiver logada.
+4. A pessoa clica em `Autorizar`.
+5. O app chama `/api/oauth/approve` com o access token Supabase da sessao.
+6. O backend valida o usuario no Supabase e gera um `code` curto.
+7. ChatGPT chama `/api/oauth/token`.
+8. O backend troca o `code` por um bearer token LitroCerto.
+9. As Actions usam esse bearer token, que internamente e mapeado para a conta Supabase da pessoa.
 
 ## Testes rapidos
 
-Com o servidor local rodando:
+Abra:
 
-```bash
-npm run mcp
+```text
+https://abastece-certo.vercel.app/api/oauth/authorize?response_type=code&client_id=5a45d985-763b-4da3-a25e-0af69af1a09f&redirect_uri=https%3A%2F%2Fchat.openai.com%2Faip%2Fg-9461ce0926db2c332be7b7d233b1d2e4320f42c9%2Foauth%2Fcallback&state=teste&scope=openid%20email%20profile
 ```
 
-Teste a API REST com um token Supabase real:
-
-```bash
-curl http://127.0.0.1:3333/actions/vehicles \
-  -H "Authorization: Bearer SEU_ACCESS_TOKEN"
-```
-
-Para validar autorizacao, teste com dois usuarios diferentes. Cada token deve listar apenas veiculos, postos e abastecimentos do proprio usuario.
+O esperado e abrir `/oauth/consent`, pedir login se necessario e depois mostrar `Autorizar acesso`.

@@ -1,7 +1,5 @@
 import { setCors } from "../_actions";
 
-const supabaseAuthorizeUrl = "https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/oauth/authorize";
-
 export default async function handler(request: any, response: any) {
   setCors(response);
 
@@ -16,5 +14,5 @@ export default async function handler(request: any, response: any) {
   }
 
   const currentUrl = new URL(request.url ?? "", `https://${request.headers.host}`);
-  response.redirect(302, `${supabaseAuthorizeUrl}${currentUrl.search}`);
+  response.redirect(302, `/oauth/consent${currentUrl.search}`);
 }

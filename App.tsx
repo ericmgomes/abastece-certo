@@ -58,6 +58,13 @@ type OAuthConsentDetails = {
     email?: string | null;
   };
 };
+type OAuthAuthorizeRequest = {
+  response_type: string;
+  client_id: string;
+  redirect_uri: string;
+  state?: string;
+  scope: string;
+};
 const storageKey = "litro-certo:v1";
 const guestStorageKey = "litro-certo:guest:v1";
 const appRepository = new SupabaseAppRepository();
@@ -378,13 +385,27 @@ function currentBrowserUrl() {
   return location?.href;
 }
 
-function oauthAuthorizationIdFromUrl() {
+function oauthAuthorizeRequestFromUrl(): OAuthAuthorizeRequest | null {
   const location = (globalThis as unknown as { location?: Location }).location;
   if (!location || location.pathname !== "/oauth/consent") {
     return null;
   }
 
-  return new URLSearchParams(location.search).get("authorization_id");
+  const params = new URLSearchParams(location.search);
+  const responseType = params.get("response_type");
+  const clientId = params.get("client_id");
+  const redirectUri = params.get("redirect_uri");
+  if (!responseType || !clientId || !redirectUri) {
+    return null;
+  }
+
+  return {
+    response_type: responseType,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    state: params.get("state") ?? undefined,
+    scope: params.get("scope") ?? "openid email profile"
+  };
 }
 
 function isOAuthConsentRoute() {
@@ -628,7 +649,7 @@ export default function App() {
   const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const oauthConsentRoute = isOAuthConsentRoute();
-  const oauthAuthorizationId = oauthAuthorizationIdFromUrl();
+  const oauthRequest = oauthAuthorizeRequestFromUrl();
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -1122,9 +1143,10 @@ export default function App() {
           <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
           <SafeAreaView style={styles.shell}>
             <OAuthConsentScreen
-              authorizationId={oauthAuthorizationId}
+              request={oauthRequest}
               authenticated={Boolean(ownerId)}
               onOpenAuth={() => setAuthScreenOpen(true)}
+              userEmail={authEmail}
             />
           </SafeAreaView>
         </ThemeContext.Provider>
@@ -1382,13 +1404,15 @@ function AuthScreen({
 }
 
 function OAuthConsentScreen({
-  authorizationId,
+  request,
   authenticated,
-  onOpenAuth
+  onOpenAuth,
+  userEmail
 }: {
-  authorizationId: string | null;
+  request: OAuthAuthorizeRequest | null;
   authenticated: boolean;
   onOpenAuth: () => void;
+  userEmail: string | null;
 }) {
   const { styles } = useThemeStyles();
   const [details, setDetails] = useState<OAuthConsentDetails | null>(null);
@@ -1396,7 +1420,7 @@ function OAuthConsentScreen({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!authorizationId) {
+    if (!request) {
       setDetails(null);
       setError("Autorização inválida ou expirada. Volte ao ChatGPT e tente iniciar sessão novamente.");
       return;
@@ -1408,63 +1432,65 @@ function OAuthConsentScreen({
       return;
     }
 
-    const currentAuthorizationId = authorizationId;
-    let cancelled = false;
-    async function loadAuthorization() {
-      setLoading(true);
-      setError(null);
-      const result = await supabase.auth.oauth.getAuthorizationDetails(currentAuthorizationId);
-      setLoading(false);
-
-      if (cancelled) {
-        return;
+    setDetails({
+      authorization_id: "litrocerto-custom-oauth",
+      redirect_uri: request.redirect_uri,
+      scope: request.scope,
+      client: {
+        name: "ChatGPT"
+      },
+      user: {
+        email: userEmail
       }
-
-      if (result.error) {
-        setError(result.error.message);
-        return;
-      }
-
-      if (!result.data) {
-        setError("Não foi possível carregar esta autorização.");
-        return;
-      }
-
-      if ("redirect_url" in result.data) {
-        redirectBrowserTo(result.data.redirect_url);
-        return;
-      }
-
-      setDetails(result.data);
-    }
-
-    void loadAuthorization();
-    return () => {
-      cancelled = true;
-    };
-  }, [authorizationId, authenticated]);
+    });
+    setError(null);
+  }, [request, authenticated, userEmail]);
 
   async function decide(decision: "approve" | "deny") {
-    if (!authorizationId) {
+    if (!request) {
       setError("Autorização inválida ou expirada. Volte ao ChatGPT e tente iniciar sessão novamente.");
+      return;
+    }
+
+    if (decision === "deny") {
+      const redirectUrl = new URL(request.redirect_uri);
+      redirectUrl.searchParams.set("error", "access_denied");
+      if (request.state) {
+        redirectUrl.searchParams.set("state", request.state);
+      }
+      redirectBrowserTo(redirectUrl.toString());
       return;
     }
 
     setLoading(true);
     setError(null);
-    const result = decision === "approve"
-      ? await supabase.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
-      : await supabase.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
-    setLoading(false);
-
-    if (result.error) {
-      setError(result.error.message);
+    const sessionResult = await supabase.auth.getSession();
+    const supabaseAccessToken = sessionResult.data.session?.access_token;
+    if (!supabaseAccessToken) {
+      setLoading(false);
+      setError("Sua sessão expirou. Faça login novamente.");
       return;
     }
 
-    if (result.data?.redirect_url) {
-      redirectBrowserTo(result.data.redirect_url);
+    const result = await fetch("/api/oauth/approve", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        ...request,
+        supabase_access_token: supabaseAccessToken
+      })
+    });
+    const data = await result.json() as { redirect_url?: string; message?: string };
+    setLoading(false);
+
+    if (!result.ok || !data.redirect_url) {
+      setError(data.message ?? "Não foi possível autorizar o acesso.");
+      return;
     }
+
+    redirectBrowserTo(data.redirect_url);
   }
 
   return (
