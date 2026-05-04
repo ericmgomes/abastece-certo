@@ -387,6 +387,11 @@ function oauthAuthorizationIdFromUrl() {
   return new URLSearchParams(location.search).get("authorization_id");
 }
 
+function isOAuthConsentRoute() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  return location?.pathname === "/oauth/consent";
+}
+
 function redirectBrowserTo(url: string) {
   const location = (globalThis as unknown as { location?: Location }).location;
   if (location) {
@@ -622,6 +627,7 @@ export default function App() {
   const themePalette = state.themePalette ?? "green";
   const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const oauthConsentRoute = isOAuthConsentRoute();
   const oauthAuthorizationId = oauthAuthorizationIdFromUrl();
 
   function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
@@ -1095,7 +1101,7 @@ export default function App() {
               onToggleTheme={toggleTheme}
               onThemePaletteSelect={selectThemePalette}
               onCancel={() => setAuthScreenOpen(false)}
-              authRedirectTo={oauthAuthorizationId ? currentBrowserUrl() : undefined}
+              authRedirectTo={oauthConsentRoute ? currentBrowserUrl() : undefined}
             />
           </SafeAreaView>
         </ThemeContext.Provider>
@@ -1103,7 +1109,7 @@ export default function App() {
     );
   }
 
-  if (oauthAuthorizationId) {
+  if (oauthConsentRoute) {
     return (
       <SafeAreaProvider>
         <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
@@ -1374,7 +1380,7 @@ function OAuthConsentScreen({
   authenticated,
   onOpenAuth
 }: {
-  authorizationId: string;
+  authorizationId: string | null;
   authenticated: boolean;
   onOpenAuth: () => void;
 }) {
@@ -1384,17 +1390,24 @@ function OAuthConsentScreen({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!authorizationId) {
+      setDetails(null);
+      setError("Autorização inválida ou expirada. Volte ao ChatGPT e tente iniciar sessão novamente.");
+      return;
+    }
+
     if (!authenticated) {
       setDetails(null);
       setError(null);
       return;
     }
 
+    const currentAuthorizationId = authorizationId;
     let cancelled = false;
     async function loadAuthorization() {
       setLoading(true);
       setError(null);
-      const result = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+      const result = await supabase.auth.oauth.getAuthorizationDetails(currentAuthorizationId);
       setLoading(false);
 
       if (cancelled) {
@@ -1426,6 +1439,11 @@ function OAuthConsentScreen({
   }, [authorizationId, authenticated]);
 
   async function decide(decision: "approve" | "deny") {
+    if (!authorizationId) {
+      setError("Autorização inválida ou expirada. Volte ao ChatGPT e tente iniciar sessão novamente.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const result = decision === "approve"
