@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/oauth/consent",
+      "destination": "/"
+    }
+  ]
+}

@@ -46,6 +46,18 @@ import { supabase } from "./src/supabaseClient";
 
 type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos";
 type UtilityScreen = "help" | "privacy" | "users" | null;
+type OAuthConsentDetails = {
+  authorization_id: string;
+  redirect_uri: string;
+  scope: string;
+  client: {
+    name: string;
+    logo_uri?: string | null;
+  };
+  user: {
+    email?: string | null;
+  };
+};
 const storageKey = "litro-certo:v1";
 const guestStorageKey = "litro-certo:guest:v1";
 const appRepository = new SupabaseAppRepository();
@@ -361,6 +373,27 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function currentBrowserUrl() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  return location?.href;
+}
+
+function oauthAuthorizationIdFromUrl() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  if (!location || location.pathname !== "/oauth/consent") {
+    return null;
+  }
+
+  return new URLSearchParams(location.search).get("authorization_id");
+}
+
+function redirectBrowserTo(url: string) {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  if (location) {
+    location.href = url;
+  }
+}
+
 function authErrorMessage(message: string) {
   if (message === "Invalid login credentials") {
     return "Senha errada ou usuário não existe.";
@@ -589,6 +622,7 @@ export default function App() {
   const themePalette = state.themePalette ?? "green";
   const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const oauthAuthorizationId = oauthAuthorizationIdFromUrl();
 
   function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
     return {
@@ -1043,7 +1077,7 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
           <SafeAreaView style={styles.loading}>
-            <Text style={styles.brand}>Litro Certo</Text>
+            <Text style={styles.brand}>LitroCerto</Text>
             <Text style={styles.muted}>Carregando seu histórico...</Text>
           </SafeAreaView>
         </ThemeContext.Provider>
@@ -1061,6 +1095,24 @@ export default function App() {
               onToggleTheme={toggleTheme}
               onThemePaletteSelect={selectThemePalette}
               onCancel={() => setAuthScreenOpen(false)}
+              authRedirectTo={oauthAuthorizationId ? currentBrowserUrl() : undefined}
+            />
+          </SafeAreaView>
+        </ThemeContext.Provider>
+      </SafeAreaProvider>
+    );
+  }
+
+  if (oauthAuthorizationId) {
+    return (
+      <SafeAreaProvider>
+        <ThemeContext.Provider value={{ mode: themeMode, palette: themePalette, theme, styles }}>
+          <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
+          <SafeAreaView style={styles.shell}>
+            <OAuthConsentScreen
+              authorizationId={oauthAuthorizationId}
+              authenticated={Boolean(ownerId)}
+              onOpenAuth={() => setAuthScreenOpen(true)}
             />
           </SafeAreaView>
         </ThemeContext.Provider>
@@ -1099,6 +1151,7 @@ export default function App() {
               onSignOut={confirmSignOut}
               authEmail={authEmail}
               authName={authName}
+              showNewFuelButton={fuelFormMode !== "new"}
             />
             {!ownerId ? (
               <DemoBanner onOpenAuth={() => setAuthScreenOpen(true)} />
@@ -1124,11 +1177,13 @@ export default function App() {
 function AuthScreen({
   onToggleTheme,
   onThemePaletteSelect,
-  onCancel
+  onCancel,
+  authRedirectTo
 }: {
   onToggleTheme: () => void;
   onThemePaletteSelect: (palette: ThemePalette) => void;
   onCancel: () => void;
+  authRedirectTo?: string;
 }) {
   const { mode, palette, styles, theme } = useThemeStyles();
   const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
@@ -1142,7 +1197,7 @@ function AuthScreen({
 
   function authRedirectUrl() {
     const location = (globalThis as unknown as { location?: { origin?: string } }).location;
-    return location?.origin ?? "http://localhost:8086";
+    return authRedirectTo ?? location?.origin ?? "http://localhost:8086";
   }
 
   async function submit(mode: "signIn" | "signUp") {
@@ -1220,7 +1275,7 @@ function AuthScreen({
       style={styles.authScreen}
     >
       <View style={styles.authTop}>
-        <Text style={styles.brand}>Litro Certo</Text>
+        <Text style={styles.brand}>LitroCerto</Text>
         <View style={styles.headerSecondaryActions}>
           <Pressable style={styles.headerSecondaryButton} onPress={onCancel}>
             <Text style={styles.headerSecondaryButtonText}>Agora não</Text>
@@ -1314,6 +1369,136 @@ function AuthScreen({
   );
 }
 
+function OAuthConsentScreen({
+  authorizationId,
+  authenticated,
+  onOpenAuth
+}: {
+  authorizationId: string;
+  authenticated: boolean;
+  onOpenAuth: () => void;
+}) {
+  const { styles } = useThemeStyles();
+  const [details, setDetails] = useState<OAuthConsentDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authenticated) {
+      setDetails(null);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadAuthorization() {
+      setLoading(true);
+      setError(null);
+      const result = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+      setLoading(false);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+
+      if (!result.data) {
+        setError("Não foi possível carregar esta autorização.");
+        return;
+      }
+
+      if ("redirect_url" in result.data) {
+        redirectBrowserTo(result.data.redirect_url);
+        return;
+      }
+
+      setDetails(result.data);
+    }
+
+    void loadAuthorization();
+    return () => {
+      cancelled = true;
+    };
+  }, [authorizationId, authenticated]);
+
+  async function decide(decision: "approve" | "deny") {
+    setLoading(true);
+    setError(null);
+    const result = decision === "approve"
+      ? await supabase.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
+      : await supabase.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+
+    if (result.data?.redirect_url) {
+      redirectBrowserTo(result.data.redirect_url);
+    }
+  }
+
+  return (
+    <View style={styles.authScreen}>
+      <View style={styles.authCard}>
+        <Text style={styles.brand}>LitroCerto</Text>
+        <Text style={styles.title}>Autorizar acesso</Text>
+        {!authenticated ? (
+          <>
+            <Text style={styles.helpText}>
+              Faça login no LitroCerto para autorizar o ChatGPT a consultar e registrar dados na sua conta.
+            </Text>
+            <Text style={styles.privacyText}>
+              Cada autorização vale apenas para a sua conta. Outros usuários não conseguem acessar seus veículos, postos ou abastecimentos.
+            </Text>
+            <Pressable style={styles.primaryButton} onPress={onOpenAuth}>
+              <Text style={styles.primaryButtonText}>Login</Text>
+            </Pressable>
+          </>
+        ) : loading && !details ? (
+          <Text style={styles.muted}>Carregando autorização...</Text>
+        ) : details ? (
+          <>
+            <Text style={styles.helpText}>
+              {details.client.name} quer acessar sua conta LitroCerto.
+            </Text>
+            <View style={styles.consentSummary}>
+              <Text style={styles.itemTitle}>{details.client.name}</Text>
+              <Text style={styles.muted}>{details.user.email}</Text>
+              <Text style={styles.privacyText}>Permissões solicitadas: {details.scope}</Text>
+              <Text style={styles.privacyText}>Retorno: {details.redirect_uri}</Text>
+            </View>
+            <Text style={styles.privacyText}>
+              Ao autorizar, o ChatGPT poderá executar as Actions configuradas para consultar métricas e criar ou editar registros quando você pedir.
+            </Text>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <View style={styles.row}>
+              <Pressable style={styles.secondaryButton} onPress={() => void decide("deny")} disabled={loading}>
+                <Text style={styles.secondaryButtonText}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.primaryButton} onPress={() => void decide("approve")} disabled={loading}>
+                <Text style={styles.primaryButtonText}>{loading ? "Autorizando..." : "Autorizar"}</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.errorText}>{error ?? "Não foi possível carregar esta autorização."}</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => redirectBrowserTo("/")}>
+              <Text style={styles.secondaryButtonText}>Voltar</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function Header({
   user,
   onSave,
@@ -1326,7 +1511,8 @@ function Header({
   onOpenUsers,
   onSignOut,
   authEmail,
-  authName
+  authName,
+  showNewFuelButton
 }: {
   user: User | null;
   onSave: (user: User) => void;
@@ -1340,6 +1526,7 @@ function Header({
   onSignOut: () => void;
   authEmail: string | null;
   authName: string | null;
+  showNewFuelButton: boolean;
 }) {
   const [name, setName] = useState(user?.name ?? "");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -1375,7 +1562,7 @@ function Header({
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.brandBlock}>
-            <Text style={styles.brand}>Litro Certo</Text>
+            <Text style={styles.brand}>LitroCerto</Text>
           </View>
           <View style={styles.headerTools}>
             <View style={styles.colorControlCluster}>
@@ -1490,19 +1677,20 @@ function Header({
             </View>
           </View>
       </View>
-      <Pressable style={styles.headerPrimaryButton} onPress={onNewFuel}>
-        <View style={styles.headerPrimaryButtonCircle}>
-          <Text style={styles.headerPrimaryButtonPlus}>+</Text>
-          <Text style={styles.headerPrimaryButtonText}>Abastecer</Text>
-        </View>
-      </Pressable>
+      {showNewFuelButton ? (
+        <Pressable style={styles.headerPrimaryButton} onPress={onNewFuel}>
+          <View style={styles.headerPrimaryButtonCircle}>
+            <Text style={styles.headerPrimaryButtonPlus}>+</Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
   return (
     <View style={styles.onboarding}>
-      <Text style={styles.brand}>Litro Certo</Text>
+      <Text style={styles.brand}>LitroCerto</Text>
       <Text style={styles.title}>Controle inteligente de abastecimento</Text>
       <TextInput
         value={name}
@@ -1684,26 +1872,40 @@ function CarFilter({
   onToggleCar: (carId: string) => void;
 }) {
   const { styles } = useThemeStyles();
+  const [open, setOpen] = useState(false);
+  const activeCars = cars.filter((car) => activeCarIds.includes(car.id));
+  const label = activeCars.length === cars.length
+    ? "Todos veículos"
+    : `${activeCars.length} ${activeCars.length === 1 ? "veículo" : "veículos"}`;
 
   return (
     <View style={styles.filterBar}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-        {cars.map((car) => {
-          const active = activeCarIds.includes(car.id);
-          return (
-            <Pressable
-              key={car.id}
-              style={[styles.filterChip, active && styles.filterChipActive]}
-              onPress={() => onToggleCar(car.id)}
-            >
-              <Text style={[styles.filterChipIcon, active && styles.filterChipTextActive]}>
-                {vehicleTypeIcon(car.vehicleType)}
-              </Text>
-              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{car.nickname}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <Pressable style={styles.filterCompactButton} onPress={() => setOpen((current) => !current)}>
+        <Text style={styles.filterCompactText}>
+          {activeCars.slice(0, 2).map((car) => vehicleTypeIcon(car.vehicleType)).join(" ")} {label}
+        </Text>
+        <Text style={styles.filterCompactArrow}>{open ? "▲" : "▼"}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.filterDropdown}>
+          {cars.map((car) => {
+            const active = activeCarIds.includes(car.id);
+            return (
+              <Pressable
+                key={car.id}
+                style={[styles.filterDropdownItem, active && styles.filterDropdownItemActive]}
+                onPress={() => onToggleCar(car.id)}
+              >
+                <Text style={[styles.filterChipIcon, active && styles.filterChipTextActive]}>
+                  {vehicleTypeIcon(car.vehicleType)}
+                </Text>
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{car.nickname}</Text>
+                <Text style={[styles.filterCheck, active && styles.filterChipTextActive]}>{active ? "✓" : ""}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -3667,8 +3869,8 @@ function createStyles(theme: Theme) {
   },
   authScreen: {
     flex: 1,
-    padding: 20,
-    gap: 18,
+    padding: 14,
+    gap: 14,
     backgroundColor: theme.background,
     justifyContent: "center"
   },
@@ -3680,8 +3882,8 @@ function createStyles(theme: Theme) {
   authCard: {
     backgroundColor: theme.surface,
     borderRadius: 8,
-    padding: 16,
-    gap: 12,
+    padding: 14,
+    gap: 10,
     borderWidth: 1,
     borderColor: theme.border
   },
@@ -3710,7 +3912,7 @@ function createStyles(theme: Theme) {
   },
   authTabText: {
     color: theme.muted,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -3731,7 +3933,7 @@ function createStyles(theme: Theme) {
   },
   authDividerText: {
     color: theme.muted,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800"
   },
   formErrorBox: {
@@ -3743,8 +3945,8 @@ function createStyles(theme: Theme) {
   },
   formErrorText: {
     color: "#D94A4A",
-    fontSize: 13,
-    lineHeight: 18
+    fontSize: 15,
+    lineHeight: 20
   },
   googleButton: {
     minHeight: 50,
@@ -3758,15 +3960,15 @@ function createStyles(theme: Theme) {
   },
   googleButtonText: {
     color: theme.text,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 14,
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 7,
     zIndex: 20
   },
   headerTop: {
@@ -3813,7 +4015,7 @@ function createStyles(theme: Theme) {
   headerPrimaryButton: {
     position: "relative",
     width: "100%",
-    minHeight: 94,
+    minHeight: 80,
     borderRadius: 0,
     backgroundColor: "transparent",
     alignItems: "center",
@@ -3822,9 +4024,9 @@ function createStyles(theme: Theme) {
     zIndex: 1
   },
   headerPrimaryButtonCircle: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -3832,15 +4034,15 @@ function createStyles(theme: Theme) {
   },
   headerPrimaryButtonPlus: {
     color: "#FFFFFF",
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: "800",
-    lineHeight: 32
+    lineHeight: 44
   },
   headerPrimaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: "800",
-    lineHeight: 14,
+    lineHeight: 15,
     fontFamily: theme.fontFamily
   },
   headerSecondaryButton: {
@@ -3855,18 +4057,18 @@ function createStyles(theme: Theme) {
   },
   headerSecondaryButtonText: {
     color: theme.muted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
   demoBanner: {
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 6,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: theme.primary,
     backgroundColor: theme.primarySoft,
-    padding: 12,
+    padding: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -3879,14 +4081,14 @@ function createStyles(theme: Theme) {
   },
   demoBannerTitle: {
     color: theme.text,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
   demoBannerText: {
     color: theme.text,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 19,
     fontFamily: theme.fontFamily
   },
   demoBannerButton: {
@@ -3899,7 +4101,7 @@ function createStyles(theme: Theme) {
   },
   demoBannerButtonText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
@@ -3920,7 +4122,7 @@ function createStyles(theme: Theme) {
   },
   accountButtonText: {
     color: theme.primary,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "900"
   },
   accountIcon: {
@@ -3970,9 +4172,9 @@ function createStyles(theme: Theme) {
   accountEmail: {
     color: theme.muted,
     textAlign: "right",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
-    lineHeight: 18,
+    lineHeight: 20,
     fontFamily: theme.fontFamily
   },
   accountIdentity: {
@@ -3984,7 +4186,7 @@ function createStyles(theme: Theme) {
   accountName: {
     color: theme.text,
     textAlign: "right",
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "900",
     lineHeight: 20,
     fontFamily: theme.headingFontFamily
@@ -3999,7 +4201,7 @@ function createStyles(theme: Theme) {
     color: theme.text,
     textAlign: "right",
     paddingHorizontal: 9,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
@@ -4014,14 +4216,64 @@ function createStyles(theme: Theme) {
   accountMenuText: {
     color: theme.text,
     textAlign: "right",
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   filterBar: {
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 6,
     alignItems: "center"
+  },
+  filterCompactButton: {
+    minHeight: 34,
+    minWidth: 164,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  filterCompactText: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
+  },
+  filterCompactArrow: {
+    color: theme.primary,
+    fontSize: 12,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  filterDropdown: {
+    width: "100%",
+    maxWidth: 360,
+    marginTop: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    padding: 6,
+    gap: 5,
+    zIndex: 15
+  },
+  filterDropdownItem: {
+    minHeight: 36,
+    borderRadius: 7,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: theme.surfaceAlt
+  },
+  filterDropdownItemActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary
   },
   filterScroll: {
     gap: 8,
@@ -4030,7 +4282,7 @@ function createStyles(theme: Theme) {
     flexGrow: 1
   },
   filterChip: {
-    minHeight: 36,
+    minHeight: 34,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.border,
@@ -4046,32 +4298,39 @@ function createStyles(theme: Theme) {
   },
   filterChipText: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   filterChipIcon: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   filterChipTextActive: {
     color: "#FFFFFF"
   },
+  filterCheck: {
+    marginLeft: "auto",
+    color: theme.primary,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
   onboarding: {
-    padding: 20,
-    gap: 12,
+    padding: 14,
+    gap: 10,
     backgroundColor: theme.background
   },
   brand: {
-    fontSize: 23,
+    fontSize: 24,
     fontWeight: "800",
     color: theme.text,
     fontFamily: theme.headingFontFamily
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: theme.text,
     fontFamily: theme.headingFontFamily
@@ -4094,7 +4353,7 @@ function createStyles(theme: Theme) {
   themeButtonText: {
     color: theme.primary,
     fontWeight: "900",
-    fontSize: 18,
+    fontSize: 20,
     lineHeight: 22,
     fontFamily: theme.fontFamily
   },
@@ -4120,8 +4379,8 @@ function createStyles(theme: Theme) {
   },
   privacyText: {
     color: theme.muted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: theme.fontFamily
   },
   helpBlock: {
@@ -4129,36 +4388,36 @@ function createStyles(theme: Theme) {
   },
   helpText: {
     color: theme.text,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 22,
     fontFamily: theme.fontFamily
   },
   content: {
-    padding: 10,
-    paddingBottom: 112
+    padding: 8,
+    paddingBottom: 88
   },
   stack: {
-    gap: 14
+    gap: 10
   },
   section: {
     position: "relative",
     backgroundColor: "transparent",
     borderRadius: 8,
     padding: 0,
-    gap: 12,
+    gap: 9,
     borderWidth: 0,
     borderColor: "transparent"
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
     color: theme.text,
     fontFamily: theme.headingFontFamily
   },
   sectionHint: {
     color: theme.muted,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontFamily: theme.fontFamily
   },
   sectionTitleRow: {
@@ -4218,7 +4477,7 @@ function createStyles(theme: Theme) {
   },
   ctaText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800"
   },
   grid: {
@@ -4226,7 +4485,7 @@ function createStyles(theme: Theme) {
     gap: 8
   },
   monthSwitcher: {
-    minHeight: 52,
+    minHeight: 48,
     borderRadius: 8,
     backgroundColor: theme.surface,
     borderWidth: 1,
@@ -4240,7 +4499,7 @@ function createStyles(theme: Theme) {
     flex: 1,
     textAlign: "center",
     color: theme.text,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "900",
     textTransform: "capitalize",
     fontFamily: theme.headingFontFamily
@@ -4262,40 +4521,40 @@ function createStyles(theme: Theme) {
   },
   metricCard: {
     flex: 1,
-    minHeight: 88,
+    minHeight: 82,
     backgroundColor: theme.surface,
     borderRadius: 8,
-    padding: 7,
+    padding: 6,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: theme.border,
-    gap: 5
+    gap: 4
   },
   metricLabel: {
     color: theme.muted,
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: "700",
-    lineHeight: 13,
+    lineHeight: 15,
     fontFamily: theme.fontFamily,
     textAlign: "center"
   },
   metricValue: {
     color: theme.text,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "900",
-    lineHeight: 19,
+    lineHeight: 21,
     fontFamily: theme.headingFontFamily,
     textAlign: "center"
   },
   metricValueSmall: {
-    fontSize: 14,
-    lineHeight: 17
+    fontSize: 16,
+    lineHeight: 19
   },
   metricTrend: {
     color: theme.muted,
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 13,
+    lineHeight: 15,
     fontWeight: "900",
     fontFamily: theme.fontFamily,
     textAlign: "center"
@@ -4317,25 +4576,25 @@ function createStyles(theme: Theme) {
   },
   muted: {
     color: theme.muted,
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: theme.fontFamily
   },
   input: {
     flex: 1,
     minWidth: 0,
-    minHeight: 48,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     backgroundColor: theme.input,
     color: theme.text,
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: theme.fontFamily
   },
   label: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -4345,7 +4604,7 @@ function createStyles(theme: Theme) {
   },
   formStack: {
     position: "relative",
-    gap: 10
+    gap: 8
   },
   fieldToastAnchor: {
     position: "relative"
@@ -4353,13 +4612,13 @@ function createStyles(theme: Theme) {
   inlineField: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    minHeight: 48
+    gap: 8,
+    minHeight: 44
   },
   inlineLabel: {
-    width: 96,
+    width: 88,
     color: theme.text,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -4388,14 +4647,14 @@ function createStyles(theme: Theme) {
   },
   numberSelect: {
     width: 56,
-    minHeight: 38,
+    minHeight: 36,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
     backgroundColor: theme.input,
     color: theme.text,
     textAlign: "center",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -4405,41 +4664,41 @@ function createStyles(theme: Theme) {
   stateSelect: {
     flex: 1,
     minWidth: 0,
-    minHeight: 42,
+    minHeight: 40,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
     backgroundColor: theme.input,
     color: theme.text,
     paddingHorizontal: 10,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   dateInput: {
     flex: 1,
     minWidth: 0,
-    minHeight: 42,
+    minHeight: 40,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
     backgroundColor: theme.input,
     color: theme.text,
     textAlign: "center",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   datePartInput: {
     width: 54,
-    minHeight: 42,
+    minHeight: 40,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
     backgroundColor: theme.input,
     color: theme.text,
     textAlign: "center",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -4463,7 +4722,7 @@ function createStyles(theme: Theme) {
   },
   stepperInput: {
     width: 92,
-    minHeight: 42,
+    minHeight: 40,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
@@ -4484,7 +4743,7 @@ function createStyles(theme: Theme) {
   },
   deleteButtonText: {
     color: "#D95D5D",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
@@ -4509,8 +4768,8 @@ function createStyles(theme: Theme) {
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.border,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 9,
     backgroundColor: theme.surface
   },
   choiceActive: {
@@ -4520,7 +4779,7 @@ function createStyles(theme: Theme) {
   choiceText: {
     color: theme.text,
     fontWeight: "700",
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: theme.fontFamily
   },
   choiceTextActive: {
@@ -4537,7 +4796,7 @@ function createStyles(theme: Theme) {
   },
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -4553,7 +4812,7 @@ function createStyles(theme: Theme) {
   },
   secondaryButtonText: {
     color: theme.primary,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -4565,7 +4824,7 @@ function createStyles(theme: Theme) {
   },
   ghostButtonText: {
     color: theme.muted,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
@@ -4574,28 +4833,36 @@ function createStyles(theme: Theme) {
     borderRadius: 8,
     padding: 12
   },
+  consentSummary: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+    padding: 10,
+    gap: 6
+  },
   autosaveText: {
     color: theme.muted,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
   errorText: {
     color: "#D94A4A",
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: theme.fontFamily
   },
   listItem: {
-    minHeight: 68,
+    minHeight: 64,
     borderRadius: 8,
-    padding: 12,
+    padding: 10,
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10
+    gap: 8
   },
   logInfo: {
     flex: 1,
@@ -4617,19 +4884,19 @@ function createStyles(theme: Theme) {
   fuelGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10
+    gap: 8
   },
   fuelCard: {
     width: "48%",
-    minHeight: 72,
+    minHeight: 68,
     borderRadius: 8,
-    padding: 12,
+    padding: 10,
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
     justifyContent: "center",
     alignItems: "center",
-    gap: 8
+    gap: 6
   },
   selectedItem: {
     borderColor: theme.primary,
@@ -4637,26 +4904,26 @@ function createStyles(theme: Theme) {
   },
   historyItem: {
     borderRadius: 8,
-    padding: 12,
+    padding: 10,
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
-    gap: 10
+    gap: 8
   },
   stationDetails: {
-    gap: 8,
+    gap: 6,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    paddingTop: 12,
+    paddingTop: 10,
     marginLeft: 10,
     paddingLeft: 10,
     borderLeftWidth: 2,
     borderLeftColor: theme.border
   },
   detailRow: {
-    minHeight: 58,
+    minHeight: 54,
     borderRadius: 8,
-    padding: 10,
+    padding: 9,
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
@@ -4677,7 +4944,7 @@ function createStyles(theme: Theme) {
   },
   historyPrice: {
     color: theme.text,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily,
     flexShrink: 0
@@ -4699,13 +4966,13 @@ function createStyles(theme: Theme) {
   },
   numberBadgeText: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
   itemTitle: {
     color: theme.text,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "800",
     fontFamily: theme.headingFontFamily
   },
@@ -4715,10 +4982,10 @@ function createStyles(theme: Theme) {
     gap: 2
   },
   rankingPrice: {
-    width: 108,
+    width: 112,
     textAlign: "right",
     color: theme.text,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily,
     flexShrink: 0
@@ -4731,18 +4998,19 @@ function createStyles(theme: Theme) {
     maxWidth: 112,
     color: theme.primary,
     fontWeight: "800",
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: theme.fontFamily
   },
   empty: {
     color: theme.muted,
+    fontSize: 15,
     lineHeight: 20,
     fontFamily: theme.fontFamily
   },
   bars: {
-    height: 170,
+    height: 148,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     alignItems: "flex-end"
   },
   barColumn: {
@@ -4752,7 +5020,7 @@ function createStyles(theme: Theme) {
   },
   barTrack: {
     width: "100%",
-    height: 128,
+    height: 106,
     backgroundColor: theme.primarySoft,
     borderRadius: 8,
     justifyContent: "flex-end",
@@ -4765,12 +5033,12 @@ function createStyles(theme: Theme) {
   },
   barLabel: {
     color: theme.muted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
     fontFamily: theme.fontFamily
   },
   mapPanel: {
-    height: 260,
+    height: 230,
     borderRadius: 8,
     backgroundColor: theme.map,
     borderWidth: 1,
@@ -4794,7 +5062,7 @@ function createStyles(theme: Theme) {
   },
   mapHeaderIconText: {
     color: theme.primary,
-    fontSize: 18,
+    fontSize: 20,
     lineHeight: 20,
     fontWeight: "900",
     fontFamily: theme.fontFamily
@@ -4816,7 +5084,7 @@ function createStyles(theme: Theme) {
   },
   mapExpandButtonText: {
     color: theme.primary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
@@ -4849,8 +5117,8 @@ function createStyles(theme: Theme) {
   },
   insight: {
     color: theme.text,
-    lineHeight: 22,
-    fontSize: 15,
+    lineHeight: 23,
+    fontSize: 17,
     fontWeight: "600",
     fontFamily: theme.fontFamily
   },
@@ -4859,9 +5127,9 @@ function createStyles(theme: Theme) {
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 76,
-    paddingTop: 8,
-    paddingBottom: 10,
+    minHeight: 68,
+    paddingTop: 6,
+    paddingBottom: 8,
     backgroundColor: theme.surface,
     borderTopWidth: 1,
     borderTopColor: theme.border,
@@ -4869,24 +5137,24 @@ function createStyles(theme: Theme) {
   },
   tabs: {
     width: "100%",
-    maxWidth: 430,
-    paddingHorizontal: 5,
+    maxWidth: 470,
+    paddingHorizontal: 7,
     flexDirection: "row",
-    gap: 4
+    gap: 5
   },
   tab: {
-    minHeight: 52,
+    minHeight: 48,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 5
+    paddingHorizontal: 7
   },
   activeTab: {
     backgroundColor: theme.primary
   },
   tabText: {
     color: theme.muted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
     textAlign: "center",
     fontFamily: theme.fontFamily
@@ -4912,7 +5180,7 @@ function createStyles(theme: Theme) {
   },
   sideToastText: {
     color: theme.mode === "dark" ? "#102018" : "#FFFFFF",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
     textAlign: "center",
     fontFamily: theme.fontFamily

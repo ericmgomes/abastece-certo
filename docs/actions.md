@@ -50,6 +50,18 @@ Campos sugeridos:
 
 Depois que o GPT Builder mostrar a callback URL da Action, adicione essa URL no Supabase em `Authentication` > `URL Configuration` > `Redirect URLs`.
 
+## Configuracao no Supabase OAuth Server
+
+Em `Authentication` > `URL Configuration`:
+
+- Site URL: `https://abastece-certo.vercel.app`
+
+Em `Authentication` > `OAuth Server`:
+
+- Authorization Path: `/oauth/consent`
+
+O app implementa essa tela em `/oauth/consent?authorization_id=...`. Ela mostra o consentimento, chama `supabase.auth.oauth.approveAuthorization(...)` ou `denyAuthorization(...)` e devolve a pessoa para o ChatGPT.
+
 ## Observacao importante sobre dominio
 
 As notas oficiais de producao de GPT Actions dizem que, com excecao de alguns provedores grandes, os dominios do OAuth devem ser os mesmos dominios dos endpoints principais da API. Por isso o Litro Certo expoe proxies no Vercel:
