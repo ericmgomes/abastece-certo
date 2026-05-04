@@ -3003,22 +3003,16 @@ function StationEditor({
         <FieldToast notice={notice} anchor="city" />
       </View>
       <View style={styles.fieldToastAnchor}>
-        <Field label="Estado" value={stateName} onFocus={() => setActiveField("state")} onChangeText={updateStationField("state", setStateName)} autoCapitalize="characters" maxLength={2} />
         <View style={styles.inlineField}>
-          <Text style={styles.inlineLabel} />
-          <View style={styles.choiceFieldWrap}>
-            {brazilStates.map((item) => (
-              <Choice
-                key={item}
-                label={item}
-                active={stateName.trim().toUpperCase() === item}
-                onPress={() => {
-                  setActiveField("state");
-                  setStateName(item);
-                }}
-              />
-            ))}
-          </View>
+          <Text style={styles.inlineLabel}>Estado</Text>
+          <StateSelect
+            value={stateName}
+            onFocus={() => setActiveField("state")}
+            onChange={(value) => {
+              setActiveField("state");
+              setStateName(value);
+            }}
+          />
         </View>
         <FieldToast notice={notice} anchor="state" />
       </View>
@@ -3499,6 +3493,55 @@ function NumberSelect({
       keyboardType="number-pad"
       maxLength={digits}
       style={[styles.numberSelect, wide && styles.numberSelectWide]}
+    />
+  );
+}
+
+function StateSelect({
+  value,
+  onChange,
+  onFocus
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+}) {
+  const { styles, theme } = useThemeStyles();
+  const normalizedValue = value.trim().toUpperCase();
+
+  function selectValue(nextValue: string) {
+    onFocus?.();
+    onChange(nextValue);
+  }
+
+  if (Platform.OS === "web") {
+    return React.createElement(
+      "select",
+      {
+        value: brazilStates.includes(normalizedValue) ? normalizedValue : "",
+        onFocus,
+        onChange: (event: { target: { value: string } }) => selectValue(event.target.value),
+        style: StyleSheet.flatten(styles.stateSelect) as never
+      },
+      [
+        React.createElement("option", { key: "empty", value: "" }, "UF"),
+        ...brazilStates.map((item) =>
+          React.createElement("option", { key: item, value: item }, item)
+        )
+      ]
+    );
+  }
+
+  return (
+    <TextInput
+      value={normalizedValue}
+      onFocus={onFocus}
+      onChangeText={(text) => selectValue(text.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 2))}
+      placeholder="UF"
+      placeholderTextColor={theme.muted}
+      autoCapitalize="characters"
+      maxLength={2}
+      style={styles.stateSelect}
     />
   );
 }
@@ -4358,6 +4401,20 @@ function createStyles(theme: Theme) {
   },
   numberSelectWide: {
     width: 76
+  },
+  stateSelect: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 8,
+    backgroundColor: theme.input,
+    color: theme.text,
+    paddingHorizontal: 10,
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   dateInput: {
     flex: 1,

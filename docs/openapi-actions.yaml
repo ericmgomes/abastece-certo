@@ -1,0 +1,451 @@
+openapi: 3.1.0
+info:
+  title: Litro Certo Actions API
+  description: Consulta e altera veículos, postos, abastecimentos e métricas da conta logada no Litro Certo.
+  version: 0.1.0
+servers:
+  - url: https://abastece-certo.vercel.app
+    description: Produção
+security:
+  - SupabaseOAuth:
+      - openid
+      - email
+      - profile
+paths:
+  /actions/vehicles:
+    get:
+      operationId: listVehicles
+      summary: Listar veículos
+      description: Lista os veículos da conta logada.
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Veículos encontrados.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      summary: Criar veículo
+      description: Cria um veículo na conta logada.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleCreate"
+      responses:
+        "201":
+          description: Veículo criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+  /actions/vehicles/{id}:
+    patch:
+      operationId: updateVehicle
+      summary: Editar veículo
+      description: Edita um veículo da conta logada.
+      x-openai-isConsequential: true
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleUpdate"
+      responses:
+        "200":
+          description: Veículo atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+  /actions/stations:
+    get:
+      operationId: listStations
+      summary: Listar postos
+      description: Lista os postos da conta logada.
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Postos encontrados.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Station"
+    post:
+      operationId: createStation
+      summary: Criar posto
+      description: Cria um posto na conta logada.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StationCreate"
+      responses:
+        "201":
+          description: Posto criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Station"
+  /actions/stations/{id}:
+    patch:
+      operationId: updateStation
+      summary: Editar posto
+      description: Edita um posto da conta logada.
+      x-openai-isConsequential: true
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StationUpdate"
+      responses:
+        "200":
+          description: Posto atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Station"
+  /actions/fuel-logs:
+    get:
+      operationId: listFuelLogs
+      summary: Listar abastecimentos
+      description: Lista abastecimentos recentes da conta logada.
+      x-openai-isConsequential: false
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Quantidade máxima de abastecimentos.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 30
+      responses:
+        "200":
+          description: Abastecimentos encontrados.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FuelLog"
+    post:
+      operationId: createFuelLog
+      summary: Criar abastecimento
+      description: Cria um abastecimento na conta logada.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FuelLogCreate"
+      responses:
+        "201":
+          description: Abastecimento criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FuelLog"
+  /actions/fuel-logs/{id}:
+    patch:
+      operationId: updateFuelLog
+      summary: Editar abastecimento
+      description: Edita um abastecimento da conta logada.
+      x-openai-isConsequential: true
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FuelLogUpdate"
+      responses:
+        "200":
+          description: Abastecimento atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FuelLog"
+  /actions/metrics:
+    get:
+      operationId: getMetrics
+      summary: Consultar métricas
+      description: Consulta métricas mensais e rankings da conta logada.
+      x-openai-isConsequential: false
+      parameters:
+        - name: month
+          in: query
+          required: false
+          description: Mês de referência no formato YYYY-MM.
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Métricas calculadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Metrics"
+components:
+  securitySchemes:
+    SupabaseOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/authorize
+          tokenUrl: https://ffqykwpkzofkbnvtbfsn.supabase.co/auth/v1/token
+          scopes:
+            openid: Identificar a pessoa logada.
+            email: Ler email da pessoa logada.
+            profile: Ler perfil básico da pessoa logada.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: ID do registro.
+      schema:
+        type: string
+  schemas:
+    FuelType:
+      type: string
+      enum:
+        - Gasolina comum
+        - Gasolina aditivada
+        - Etanol
+        - Diesel
+        - Gás Natural
+        - Eletricidade
+    VehicleType:
+      type: string
+      enum:
+        - Carro
+        - Moto
+        - Caminhonete
+        - Caminhão
+        - Van
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+        vehicleType:
+          $ref: "#/components/schemas/VehicleType"
+        nickname:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        acceptedFuel:
+          type: array
+          items:
+            $ref: "#/components/schemas/FuelType"
+        defaultFuel:
+          $ref: "#/components/schemas/FuelType"
+    VehicleCreate:
+      type: object
+      required:
+        - nickname
+        - defaultFuel
+      properties:
+        vehicleType:
+          $ref: "#/components/schemas/VehicleType"
+        nickname:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        acceptedFuel:
+          type: array
+          items:
+            $ref: "#/components/schemas/FuelType"
+        defaultFuel:
+          $ref: "#/components/schemas/FuelType"
+    VehicleUpdate:
+      type: object
+      properties:
+        vehicleType:
+          $ref: "#/components/schemas/VehicleType"
+        nickname:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        acceptedFuel:
+          type: array
+          items:
+            $ref: "#/components/schemas/FuelType"
+        defaultFuel:
+          $ref: "#/components/schemas/FuelType"
+    Station:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+    StationCreate:
+      type: object
+      required:
+        - name
+        - latitude
+        - longitude
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+          minLength: 2
+          maxLength: 2
+        latitude:
+          type: number
+        longitude:
+          type: number
+    StationUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+          minLength: 2
+          maxLength: 2
+        latitude:
+          type: number
+        longitude:
+          type: number
+    FuelLog:
+      type: object
+      properties:
+        id:
+          type: string
+        sequence:
+          type: integer
+        carId:
+          type: string
+        stationId:
+          type: string
+        fuel:
+          $ref: "#/components/schemas/FuelType"
+        paid:
+          type: number
+        liters:
+          type: number
+        pricePerLiter:
+          type: number
+        odometerKm:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+        longitude:
+          type: number
+    FuelLogCreate:
+      type: object
+      required:
+        - carId
+        - stationId
+        - fuel
+        - paid
+        - liters
+      properties:
+        carId:
+          type: string
+        stationId:
+          type: string
+        fuel:
+          $ref: "#/components/schemas/FuelType"
+        paid:
+          type: number
+          exclusiveMinimum: 0
+        liters:
+          type: number
+          exclusiveMinimum: 0
+        odometerKm:
+          type: number
+          exclusiveMinimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+        longitude:
+          type: number
+    FuelLogUpdate:
+      type: object
+      properties:
+        carId:
+          type: string
+        stationId:
+          type: string
+        fuel:
+          $ref: "#/components/schemas/FuelType"
+        paid:
+          type: number
+          exclusiveMinimum: 0
+        liters:
+          type: number
+          exclusiveMinimum: 0
+        odometerKm:
+          type: number
+          exclusiveMinimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+        longitude:
+          type: number
+    Metrics:
+      type: object
+      description: Métricas e rankings calculados para a conta logada.
+      additionalProperties: true
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
