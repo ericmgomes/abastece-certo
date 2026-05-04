@@ -55,7 +55,7 @@ Campos:
 Configure no projeto Vercel:
 
 ```text
-LITROCERTO_OAUTH_CLIENT_ID=Y6vZ4pR8nQ2xM9aT7sL3wF5cK1hD0jB
+LITROCERTO_OAUTH_CLIENT_ID=lc_8F3kP2vX9rM4Q1tW6yZ
 LITROCERTO_OAUTH_CLIENT_SECRET=<um segredo forte igual ao usado no Custom GPT>
 LITROCERTO_OAUTH_SECRET=<segredo forte para assinar tokens do LitroCerto>
 ```
@@ -79,7 +79,7 @@ O `LITROCERTO_OAUTH_SECRET` nao aparece no Custom GPT. Ele serve apenas para o b
 Abra:
 
 ```text
-https://abastece-certo.vercel.app/api/oauth/authorize?response_type=code&client_id=Y6vZ4pR8nQ2xM9aT7sL3wF5cK1hD0jB&redirect_uri=https%3A%2F%2Fchat.openai.com%2Faip%2Fg-9461ce0926db2c332be7b7d233b1d2e4320f42c9%2Foauth%2Fcallback&state=teste&scope=openid%20email%20profile
+https://abastece-certo.vercel.app/api/oauth/authorize?response_type=code&client_id=lc_8F3kP2vX9rM4Q1tW6yZ&redirect_uri=https%3A%2F%2Fchat.openai.com%2Faip%2Fg-9461ce0926db2c332be7b7d233b1d2e4320f42c9%2Foauth%2Fcallback&state=teste&scope=openid%20email%20profile
 ```
 
 O esperado e abrir `/oauth/consent`, pedir login se necessario e depois mostrar `Autorizar acesso`.

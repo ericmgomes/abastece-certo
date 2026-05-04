@@ -52,7 +52,7 @@ export function verifyOAuthPayload(token: string, type: LitroCertoOAuthPayload["
 export function oauthClientConfig() {
   const env = process.env as Record<string, string | undefined>;
   return {
-    clientId: env.LITROCERTO_OAUTH_CLIENT_ID ?? "Y6vZ4pR8nQ2xM9aT7sL3wF5cK1hD0jB",
+    clientId: env.LITROCERTO_OAUTH_CLIENT_ID ?? "lc_8F3kP2vX9rM4Q1tW6yZ",
     clientSecret: env.LITROCERTO_OAUTH_CLIENT_SECRET
   };
 }
