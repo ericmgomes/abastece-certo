@@ -10,7 +10,7 @@ export default async function handler(request: any, response: any) {
     return;
   }
 
-  if (request.method !== "GET") {
+  if (request.method !== "GET" && request.method !== "HEAD") {
     response.status(405).json({ error: "method_not_allowed", message: "Método não permitido." });
     return;
   }
