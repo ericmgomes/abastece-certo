@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "abastece-certo.vercel.app"
+        }
+      ],
+      "destination": "https://litrocerto.com.br/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/actions/:path*",

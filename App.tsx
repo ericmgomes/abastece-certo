@@ -1162,6 +1162,7 @@ export default function App() {
             <Header
               user={state.user}
               onSave={saveUser}
+              onOpenSummary={() => changeTab("Resumo")}
               onToggleTheme={toggleTheme}
               onThemePaletteSelect={selectThemePalette}
               onNewFuel={openNewFuelForm}
@@ -1514,7 +1515,6 @@ function OAuthConsentScreen({
               <Text style={styles.itemTitle}>{details.client.name}</Text>
               <Text style={styles.muted}>{details.user.email}</Text>
               <Text style={styles.privacyText}>Permissões solicitadas: {details.scope}</Text>
-              <Text style={styles.privacyText}>Retorno: {details.redirect_uri}</Text>
             </View>
             <Text style={styles.privacyText}>
               Ao autorizar, este app poderá consultar métricas e criar ou editar registros quando você pedir.
@@ -1561,6 +1561,7 @@ function oauthClientName(redirectUri: string) {
 function Header({
   user,
   onSave,
+  onOpenSummary,
   onToggleTheme,
   onThemePaletteSelect,
   onNewFuel,
@@ -1579,6 +1580,7 @@ function Header({
 }: {
   user: User | null;
   onSave: (user: User) => void;
+  onOpenSummary: () => void;
   onToggleTheme: () => void;
   onThemePaletteSelect: (palette: ThemePalette) => void;
   onNewFuel: () => void;
@@ -1628,7 +1630,7 @@ function Header({
     return (
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <View style={styles.brandBlock}>
+          <Pressable style={styles.brandBlock} onPress={onOpenSummary}>
             <Image
               source={
                 mode === "dark"
@@ -1647,7 +1649,7 @@ function Header({
               resizeMode="contain"
               accessibilityLabel="LitroCerto"
             />
-          </View>
+          </Pressable>
           <View style={styles.headerTools}>
             <View style={styles.colorControlCluster}>
               <ThemePalettePicker onSelect={onThemePaletteSelect} />
