@@ -29,6 +29,7 @@ import {
   FuelEfficiencyCalculator,
   FuelPrice,
   FuelType,
+  IdFactory,
   MoneyParser,
   Station,
   StationRankingItem,
@@ -45,8 +46,31 @@ import {
 import { SupabaseAppRepository } from "./src/repositories/SupabaseAppRepository";
 import { supabase } from "./src/supabaseClient";
 
-type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos";
+type Tab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos" | "IA";
 type UtilityScreen = "help" | "privacy" | "users" | null;
+type AssistantMessage = {
+  id: string;
+  role: "assistant" | "user";
+  text: string;
+  draftFuelLog?: AssistantDraftFuelLog;
+};
+type AssistantDraftFuelLog = {
+  carId?: string;
+  stationId?: string;
+  fuel?: FuelType;
+  paid?: number;
+  liters?: number;
+  odometerKm?: number;
+  createdAt?: string;
+  missingFields?: string[];
+};
+const initialAssistantMessages: AssistantMessage[] = [
+  {
+    id: "assistant-welcome",
+    role: "assistant",
+    text: "Posso consultar seus gastos, comparar postos e preparar um abastecimento para você confirmar."
+  }
+];
 type OAuthConsentDetails = {
   authorization_id: string;
   redirect_uri: string;
@@ -635,6 +659,7 @@ export default function App() {
   const [authScreenOpen, setAuthScreenOpen] = useState(false);
   const [utilityScreen, setUtilityScreen] = useState<UtilityScreen>(null);
   const [tab, setTab] = useState<Tab>("Resumo");
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>(initialAssistantMessages);
   const [fuelFormMode, setFuelFormMode] = useState<"closed" | "new" | "edit">("closed");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -653,6 +678,18 @@ export default function App() {
       document.title = "LitroCerto";
     }
   }, []);
+
+  useEffect(() => {
+    if (tab !== "IA") {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+
+    return () => clearTimeout(timeoutId);
+  }, [assistantMessages.length, tab]);
 
   function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
     return {
@@ -840,6 +877,17 @@ export default function App() {
     setState((current) => ({ ...current, ...next }));
   }
 
+  function saveFuelLog(log: FuelLog) {
+    setState((current) => ({
+      ...current,
+      logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
+      selectedCarId: log.carId,
+      filteredCarIds: current.filteredCarIds?.includes(log.carId)
+        ? current.filteredCarIds
+        : [...(current.filteredCarIds ?? []), log.carId]
+    }));
+  }
+
   function saveUser(user: User) {
     updateState({ user });
     setAuthName(user.name);
@@ -949,16 +997,7 @@ export default function App() {
           stations={state.stations}
           onCancel={closeFuelForm}
           onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
-          onSave={(log) =>
-            setState((current) => ({
-              ...current,
-              logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
-              selectedCarId: log.carId,
-              filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                ? current.filteredCarIds
-                : [...(current.filteredCarIds ?? []), log.carId]
-            }))
-          }
+          onSave={saveFuelLog}
           onUpdate={(log) =>
             setState((current) => ({
               ...current,
@@ -1010,6 +1049,18 @@ export default function App() {
               };
             })
           }
+        />
+      );
+    }
+
+    if (tab === "IA") {
+      return (
+        <AssistantScreen
+          state={state}
+          messages={assistantMessages}
+          setMessages={setAssistantMessages}
+          onOpenAuth={() => setAuthScreenOpen(true)}
+          onSaveFuelLog={saveFuelLog}
         />
       );
     }
@@ -1073,16 +1124,7 @@ export default function App() {
           onEdit={openEditFuelForm}
           onCancelEdit={closeFuelForm}
           onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
-          onSave={(log) =>
-            setState((current) => ({
-              ...current,
-              logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
-              selectedCarId: log.carId,
-              filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                ? current.filteredCarIds
-                : [...(current.filteredCarIds ?? []), log.carId]
-            }))
-          }
+          onSave={saveFuelLog}
           onUpdate={(log) =>
             setState((current) => ({
               ...current,
@@ -1407,7 +1449,7 @@ function OAuthConsentScreen({
   onOpenAuth: () => void;
   userEmail: string | null;
 }) {
-  const { styles } = useThemeStyles();
+  const { styles, theme } = useThemeStyles();
   const [details, setDetails] = useState<OAuthConsentDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1960,7 +2002,7 @@ function HeaderCarFilter({
   activeCarIds: string[];
   onToggleCar: (carId: string) => void;
 }) {
-  const { styles } = useThemeStyles();
+  const { styles, theme } = useThemeStyles();
   const [open, setOpen] = useState(false);
 
   return (
@@ -2074,6 +2116,295 @@ function Home({
       </Section>
     </View>
   );
+}
+
+function AssistantScreen({
+  state,
+  messages,
+  setMessages,
+  onOpenAuth,
+  onSaveFuelLog
+}: {
+  state: AppState;
+  messages: AssistantMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<AssistantMessage[]>>;
+  onOpenAuth: () => void;
+  onSaveFuelLog: (log: FuelLog) => void;
+}) {
+  const { styles, theme } = useThemeStyles();
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const quickPrompts = [
+    "Quanto gastei este mês?",
+    "Qual posto está mais barato?",
+    "Como está meu km/L?",
+    "Registrar abastecimento"
+  ];
+
+  async function sendMessage(text = input) {
+    const trimmed = text.trim();
+    if (!trimmed || loading) {
+      return;
+    }
+
+    const userMessage: AssistantMessage = {
+      id: IdFactory.create("msg-user"),
+      role: "user",
+      text: trimmed
+    };
+    setMessages((current) => [...current, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      const response = await fetch(assistantApiUrl(), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          message: trimmed,
+          conversation: assistantConversationSnapshot([...messages, userMessage]),
+          state: assistantStateSnapshot(state)
+        })
+      });
+      const rawPayload = await response.text();
+      const payload = parseAssistantResponse(rawPayload);
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Não foi possível falar com o assistente.");
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: IdFactory.create("msg-assistant"),
+          role: "assistant",
+          text: payload.answer ?? "Pronto.",
+          draftFuelLog: payload.draftFuelLog
+        }
+      ]);
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: IdFactory.create("msg-error"),
+          role: "assistant",
+          text: error instanceof Error ? error.message : "Não consegui responder agora."
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function confirmDraft(draft: AssistantDraftFuelLog) {
+    const validation = validateAssistantDraft(draft, state);
+    if (!validation.valid) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: IdFactory.create("msg-draft-invalid"),
+          role: "assistant",
+          text: validation.message
+        }
+      ]);
+      return;
+    }
+
+    const station = state.stations.find((item) => item.id === draft.stationId);
+    onSaveFuelLog(FuelLogFactory.create({
+      carId: draft.carId!,
+      stationId: draft.stationId!,
+      fuel: draft.fuel!,
+      paid: draft.paid!,
+      liters: draft.liters!,
+      odometerKm: draft.odometerKm,
+      createdAt: draft.createdAt ?? new Date().toISOString(),
+      latitude: station?.latitude ?? fakeCurrentLocation.latitude,
+      longitude: station?.longitude ?? fakeCurrentLocation.longitude
+    }));
+    setMessages((current) => [
+      ...current,
+      {
+        id: IdFactory.create("msg-saved"),
+        role: "assistant",
+        text: "Abastecimento registrado."
+      }
+    ]);
+  }
+
+  return (
+    <View style={styles.stack}>
+      <Section title="Assistente de IA">
+        {!state.user?.email ? (
+          <View style={styles.assistantDemoNotice}>
+            <Text style={styles.demoBannerTitle}>Você está conversando com dados de exemplo</Text>
+            <Text style={styles.demoBannerText}>Faça login para usar seus próprios veículos, postos e abastecimentos.</Text>
+            <Pressable style={styles.demoBannerButton} onPress={onOpenAuth}>
+              <Text style={styles.demoBannerButtonText}>Login</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        <View style={styles.assistantQuickRow}>
+          {quickPrompts.map((prompt) => (
+            <Pressable key={prompt} style={styles.assistantChip} onPress={() => void sendMessage(prompt)}>
+              <Text style={styles.assistantChipText}>{prompt}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.assistantMessages}>
+          {messages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.assistantBubble,
+                message.role === "user" ? styles.assistantBubbleUser : styles.assistantBubbleBot
+              ]}
+            >
+              <Text style={message.role === "user" ? styles.assistantBubbleUserText : styles.assistantBubbleText}>
+                {message.text}
+              </Text>
+              {message.draftFuelLog ? (
+                <AssistantDraftCard
+                  draft={message.draftFuelLog}
+                  cars={state.cars}
+                  stations={state.stations}
+                  onConfirm={() => confirmDraft(message.draftFuelLog!)}
+                />
+              ) : null}
+            </View>
+          ))}
+          {loading ? <Text style={styles.muted}>Pensando...</Text> : null}
+        </View>
+        <View style={styles.assistantComposer}>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder="Pergunte ou peça para registrar..."
+            placeholderTextColor={theme.muted}
+            style={styles.assistantInput}
+            onSubmitEditing={() => void sendMessage()}
+          />
+          <Pressable style={styles.assistantSendButton} onPress={() => void sendMessage()}>
+            <Text style={styles.assistantSendText}>Enviar</Text>
+          </Pressable>
+        </View>
+      </Section>
+    </View>
+  );
+}
+
+function assistantApiUrl() {
+  if (Platform.OS !== "web") {
+    return "/api/assistant";
+  }
+
+  const location = (globalThis as unknown as { location?: Location }).location;
+  if ((location?.hostname === "localhost" || location?.hostname === "127.0.0.1") && location.port === "8086") {
+    return "http://localhost:8087/api/assistant";
+  }
+
+  return "/api/assistant";
+}
+
+function parseAssistantResponse(rawPayload: string) {
+  try {
+    return JSON.parse(rawPayload) as { answer?: string; draftFuelLog?: AssistantDraftFuelLog; message?: string };
+  } catch {
+    return {
+      message: "A resposta da IA não veio no formato esperado."
+    };
+  }
+}
+
+function AssistantDraftCard({
+  draft,
+  cars,
+  stations,
+  onConfirm
+}: {
+  draft: AssistantDraftFuelLog;
+  cars: Car[];
+  stations: Station[];
+  onConfirm: () => void;
+}) {
+  const { styles } = useThemeStyles();
+  const car = cars.find((item) => item.id === draft.carId);
+  const station = stations.find((item) => item.id === draft.stationId);
+  const missingFields = getAssistantDraftMissingFields(draft);
+
+  if (missingFields.length) {
+    return null;
+  }
+
+  return (
+    <View style={styles.assistantDraftCard}>
+      <Text style={styles.itemTitle}>Confirmar abastecimento</Text>
+      <Text style={styles.muted}>Veículo: {car?.nickname ?? "não identificado"}</Text>
+      <Text style={styles.muted}>Posto: {station?.name ?? "não identificado"}</Text>
+      <Text style={styles.muted}>Combustível: {draft.fuel ?? "não informado"}</Text>
+      <Text style={styles.muted}>Valor: {draft.paid ? formatCurrency(draft.paid) : "não informado"}</Text>
+      <Text style={styles.muted}>Litros: {draft.liters ? `${draft.liters.toLocaleString("pt-BR")} L` : "não informado"}</Text>
+      <Text style={styles.muted}>Km atual: {draft.odometerKm ? `${draft.odometerKm.toLocaleString("pt-BR")} km` : "não informado"}</Text>
+      <View style={styles.actionRow}>
+        <Pressable style={styles.primaryButton} onPress={onConfirm}>
+          <Text style={styles.primaryButtonText}>Confirmar</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function getAssistantDraftMissingFields(draft: AssistantDraftFuelLog) {
+  return [
+    !draft.carId ? "veículo" : null,
+    !draft.stationId ? "posto" : null,
+    !draft.fuel ? "combustível" : null,
+    !draft.paid ? "valor pago" : null,
+    !draft.liters ? "litros" : null
+  ].filter((field): field is string => Boolean(field));
+}
+
+function validateAssistantDraft(draft: AssistantDraftFuelLog, state: AppState) {
+  const missing = getAssistantDraftMissingFields(draft);
+
+  if (missing.length) {
+    return { valid: false, message: `Ainda falta informar: ${missing.join(", ")}.` };
+  }
+
+  if (!state.cars.some((car) => car.id === draft.carId)) {
+    return { valid: false, message: "Não encontrei esse veículo na sua lista." };
+  }
+
+  if (!state.stations.some((station) => station.id === draft.stationId)) {
+    return { valid: false, message: "Não encontrei esse posto na sua lista." };
+  }
+
+  if (!visibleFuels.includes(draft.fuel!)) {
+    return { valid: false, message: "Esse combustível ainda não está habilitado no app." };
+  }
+
+  return { valid: true, message: "" };
+}
+
+function assistantStateSnapshot(state: AppState) {
+  return {
+    user: state.user,
+    cars: state.cars,
+    stations: state.stations,
+    logs: state.logs.slice(0, 120)
+  };
+}
+
+function assistantConversationSnapshot(messages: AssistantMessage[]) {
+  return messages.slice(-8).map((message) => ({
+    role: message.role,
+    text: message.text
+  }));
 }
 
 function RegisterFuel({
@@ -3247,12 +3578,13 @@ function StationEditor({
 
 function Tabs({ active, onChange }: { active: Tab | null; onChange: (tab: Tab) => void }) {
   const { styles } = useThemeStyles();
-  const tabs: Tab[] = ["Resumo", "Abastecimentos", "Postos", "Veículos"];
+  const tabs: Tab[] = ["Resumo", "IA", "Abastecimentos", "Postos", "Veículos"];
   const labels: Record<Tab, string> = {
     Resumo: "Resumo",
     Abastecimentos: "Abastecimentos",
     Postos: "Postos",
-    Veículos: "Veículos"
+    Veículos: "Veículos",
+    IA: "IA"
   };
 
   return (
@@ -4883,6 +5215,128 @@ function createStyles(theme: Theme) {
     backgroundColor: theme.primarySoft,
     borderRadius: 8,
     padding: 12
+  },
+  assistantDemoNotice: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.primarySoft,
+    padding: 10,
+    gap: 6
+  },
+  assistantQuickRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  assistantChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+    paddingHorizontal: 10,
+    minHeight: 34,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  assistantChipText: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
+  },
+  assistantMessages: {
+    gap: 8
+  },
+  assistantBubble: {
+    borderRadius: 8,
+    padding: 10,
+    gap: 8,
+    maxWidth: "94%"
+  },
+  assistantBubbleBot: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border
+  },
+  assistantBubbleUser: {
+    alignSelf: "flex-end",
+    backgroundColor: theme.primaryDark
+  },
+  assistantBubbleText: {
+    color: theme.text,
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: theme.fontFamily
+  },
+  assistantBubbleUserText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
+  },
+  assistantDraftCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    padding: 10,
+    gap: 4
+  },
+  assistantComposer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  assistantIconButton: {
+    width: 38,
+    minHeight: 42,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  assistantIconText: {
+    color: theme.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  assistantInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: theme.input,
+    color: theme.text,
+    fontSize: 16,
+    fontFamily: theme.fontFamily
+  },
+  assistantSendButton: {
+    minHeight: 42,
+    borderRadius: 8,
+    backgroundColor: theme.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  assistantSendText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4
   },
   consentSummary: {
     borderRadius: 8,
