@@ -69,7 +69,7 @@ function setMcpCors(response: VercelResponse) {
 }
 
 function publicOrigin(request: VercelRequest) {
-  const host = request.headers["x-forwarded-host"] ?? request.headers.host ?? "abastece-certo.vercel.app";
+  const host = request.headers["x-forwarded-host"] ?? request.headers.host ?? "litrocerto.com.br";
   const proto = request.headers["x-forwarded-proto"] ?? "https";
   const hostValue = Array.isArray(host) ? host[0] : host;
   const protoValue = Array.isArray(proto) ? proto[0] : proto;
