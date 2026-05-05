@@ -489,8 +489,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         border: "#CFE4D5",
         text: "#102018",
         muted: "#627568",
-        primary: "#178A4A",
-        primaryDark: "#0D5F36",
+        primary: "#0D6B38",
+        primaryDark: "#084D29",
         primarySoft: "#DDF3E5",
         accent: "#2DBE71",
         input: "#FFFFFF",
@@ -523,8 +523,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         border: "#F5B8D2",
         text: "#2A1020",
         muted: "#8D5F73",
-        primary: "#D63384",
-        primaryDark: "#9F1F61",
+        primary: "#A81963",
+        primaryDark: "#7D1049",
         primarySoft: "#FAD7E8",
         accent: "#FF7AB8",
         input: "#FFFFFF",
@@ -557,8 +557,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         border: "#B9D7F5",
         text: "#0B1F33",
         muted: "#5B7188",
-        primary: "#1D6FD6",
-        primaryDark: "#124A93",
+        primary: "#1459AE",
+        primaryDark: "#0C3E7D",
         primarySoft: "#D8EAFE",
         accent: "#4AA3FF",
         input: "#FFFFFF",
@@ -591,8 +591,8 @@ function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         border: "#F3CBA4",
         text: "#2B1A0C",
         muted: "#7C654E",
-        primary: "#D66A1D",
-        primaryDark: "#9A4710",
+        primary: "#A94D0D",
+        primaryDark: "#783607",
         primarySoft: "#FFE0C4",
         accent: "#FF9B45",
         input: "#FFFFFF",
@@ -979,7 +979,6 @@ export default function App() {
           cars={state.cars}
           logs={state.logs}
           stations={state.stations}
-          selectedCarId={state.selectedCarId}
           onEditLog={openEditFuelForm}
           onSelect={(selectedCarId) => updateState({ selectedCarId })}
           onSave={(car) =>
@@ -1812,14 +1811,15 @@ function ThemePalettePicker({ onSelect }: { onSelect: (palette: ThemePalette) =>
       {options.map((option) => (
         <Pressable
           key={option.value}
-          accessibilityLabel={`Tema ${option.label}`}
           style={[
             styles.paletteDot,
             { backgroundColor: option.color },
             option.value === palette && styles.paletteDotActive
           ]}
           onPress={() => onSelect(option.value)}
-        />
+        >
+          <Text style={styles.visuallyHidden}>Tema {option.label}</Text>
+        </Pressable>
       ))}
     </View>
   );
@@ -2453,7 +2453,11 @@ function StationMap({
             return (
               <View key={log.id} style={styles.inlineEditGroup}>
                 <Pressable
-                  style={(state) => [styles.listItem, isHovered(state) && styles.listItemHover]}
+                  style={(state) => [
+                    styles.listItem,
+                    editingLogId === log.id && styles.selectedItem,
+                    isHovered(state) && styles.listItemHover
+                  ]}
                   onPress={() => onEdit(log.id)}
                 >
                   <View style={styles.numberBadge}>
@@ -2699,7 +2703,6 @@ function Cars({
   cars,
   logs,
   stations,
-  selectedCarId,
   onEditLog,
   onSelect,
   onSave,
@@ -2709,7 +2712,6 @@ function Cars({
   cars: Car[];
   logs: FuelLog[];
   stations: Station[];
-  selectedCarId: string | null;
   onEditLog: (logId: string) => void;
   onSelect: (id: string) => void;
   onSave: (car: Car) => void;
@@ -2770,7 +2772,7 @@ function Cars({
               <Pressable
                 style={(state) => [
                   styles.listItem,
-                  (car.id === selectedCarId || car.id === selectedDetailsCarId) && styles.selectedItem,
+                  car.id === selectedDetailsCarId && styles.selectedItem,
                   isHovered(state) && styles.listItemHover
                 ]}
                 onPress={() => selectCarDetails(car)}
@@ -4409,6 +4411,13 @@ function createStyles(theme: Theme) {
     borderWidth: 2,
     borderColor: theme.text
   },
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    opacity: 0,
+    overflow: "hidden"
+  },
   privacyText: {
     color: theme.muted,
     fontSize: 15,
@@ -4594,7 +4603,7 @@ function createStyles(theme: Theme) {
     lineHeight: 19
   },
   metricTrend: {
-    color: theme.muted,
+    color: theme.text,
     fontSize: 13,
     lineHeight: 15,
     fontWeight: "900",
@@ -4602,10 +4611,10 @@ function createStyles(theme: Theme) {
     textAlign: "center"
   },
   metricTrendGood: {
-    color: "#178A4A"
+    color: theme.mode === "dark" ? "#7DDC9D" : "#075F34"
   },
   metricTrendBad: {
-    color: "#D94A4A"
+    color: theme.mode === "dark" ? "#FF9A9A" : "#A31515"
   },
   bigValue: {
     color: theme.text,
@@ -4831,7 +4840,7 @@ function createStyles(theme: Theme) {
     flex: 1,
     minHeight: 50,
     borderRadius: 8,
-    backgroundColor: theme.primary,
+    backgroundColor: theme.primaryDark,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14
@@ -5218,7 +5227,7 @@ function createStyles(theme: Theme) {
     paddingHorizontal: 7
   },
   activeTab: {
-    backgroundColor: theme.primary
+    backgroundColor: theme.primaryDark
   },
   tabText: {
     color: theme.muted,
