@@ -901,7 +901,6 @@ export default function App() {
   function openNewFuelForm() {
     setEditingLogId(null);
     setFuelFormMode("new");
-    setTab("Resumo");
     setUtilityScreen(null);
     setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
   }
@@ -1197,7 +1196,7 @@ export default function App() {
             <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
               {renderContent()}
             </ScrollView>
-            <Tabs active={utilityScreen ? null : tab} onChange={changeTab} />
+            <Tabs active={utilityScreen || fuelFormMode === "new" ? null : tab} onChange={changeTab} />
           </KeyboardAvoidingView>
         </SafeAreaView>
       </ThemeContext.Provider>

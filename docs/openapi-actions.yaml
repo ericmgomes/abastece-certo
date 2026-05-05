@@ -305,8 +305,6 @@ components:
       type: object
       required:
         - name
-        - latitude
-        - longitude
       properties:
         name:
           type: string
@@ -318,10 +316,6 @@ components:
           type: string
           minLength: 2
           maxLength: 2
-        latitude:
-          type: number
-        longitude:
-          type: number
     StationUpdate:
       type: object
       properties:
@@ -335,10 +329,6 @@ components:
           type: string
           minLength: 2
           maxLength: 2
-        latitude:
-          type: number
-        longitude:
-          type: number
     FuelLog:
       type: object
       properties:

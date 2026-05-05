@@ -78,9 +78,7 @@ export function createLitroCertoMcpServer() {
         name: z.string().min(1),
         address: z.string().optional(),
         city: z.string().optional(),
-        state: z.string().length(2).optional(),
-        latitude: z.number(),
-        longitude: z.number()
+        state: z.string().length(2).optional()
       }
     },
     async (input, extra) => json(await (await service(extra)).createStation(input))
@@ -96,9 +94,7 @@ export function createLitroCertoMcpServer() {
         name: z.string().optional(),
         address: z.string().optional(),
         city: z.string().optional(),
-        state: z.string().length(2).optional(),
-        latitude: z.number().optional(),
-        longitude: z.number().optional()
+        state: z.string().length(2).optional()
       }
     },
     async (input, extra) => json(await (await service(extra)).updateStation(input))

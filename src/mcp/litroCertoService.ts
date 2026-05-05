@@ -129,17 +129,16 @@ export class LitroCertoMcpService {
     address?: string;
     city?: string;
     state?: string;
-    latitude: number;
-    longitude: number;
   }) {
+    const coordinates = await geocodeStation(input.address, input.city, input.state);
     const station: Station = {
       id: `posto-${Date.now()}`,
       name: input.name.trim(),
       address: input.address?.trim() || "Sem endereço",
       city: input.city?.trim(),
       state: input.state?.trim().toUpperCase(),
-      latitude: input.latitude,
-      longitude: input.longitude
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude
     };
     await this.ensureProfile();
     await this.upsertStation(station);
@@ -152,18 +151,21 @@ export class LitroCertoMcpService {
     address?: string;
     city?: string;
     state?: string;
-    latitude?: number;
-    longitude?: number;
   }) {
     const current = await this.getStation(input.id);
+    const nextAddress = input.address?.trim() || current.address;
+    const nextCity = input.city?.trim() ?? current.city;
+    const nextState = input.state?.trim().toUpperCase() ?? current.state;
+    const shouldGeocode = nextAddress !== current.address || nextCity !== current.city || nextState !== current.state;
+    const coordinates = shouldGeocode ? await geocodeStation(nextAddress, nextCity, nextState, current) : current;
     const updated: Station = {
       ...current,
       name: input.name?.trim() || current.name,
-      address: input.address?.trim() || current.address,
-      city: input.city?.trim() ?? current.city,
-      state: input.state?.trim().toUpperCase() ?? current.state,
-      latitude: input.latitude ?? current.latitude,
-      longitude: input.longitude ?? current.longitude
+      address: nextAddress,
+      city: nextCity,
+      state: nextState,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude
     };
     await this.upsertStation(updated);
     return updated;
@@ -487,6 +489,39 @@ export class LitroCertoMcpService {
 function throwIfError(error: unknown) {
   if (error) {
     throw error;
+  }
+}
+
+async function geocodeStation(address?: string, city?: string, state?: string, fallback?: Pick<Station, "latitude" | "longitude">) {
+  const query = [address, city, state, "Brasil"].filter(Boolean).join(", ");
+  if (!query.trim()) {
+    return fallback ?? { latitude: -23.5614, longitude: -46.6559 };
+  }
+
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("q", query);
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("limit", "1");
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": "LitroCerto/0.1 contato@litrocerto.app"
+      }
+    });
+    if (!response.ok) {
+      return fallback ?? { latitude: -23.5614, longitude: -46.6559 };
+    }
+
+    const [result] = await response.json() as Array<{ lat?: string; lon?: string }>;
+    const latitude = Number(result?.lat);
+    const longitude = Number(result?.lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return fallback ?? { latitude: -23.5614, longitude: -46.6559 };
+    }
+
+    return { latitude, longitude };
+  } catch {
+    return fallback ?? { latitude: -23.5614, longitude: -46.6559 };
   }
 }
 
