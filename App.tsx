@@ -1182,16 +1182,13 @@ export default function App() {
               authEmail={authEmail}
               authName={authName}
               showNewFuelButton={fuelFormMode !== "new"}
+              cars={state.cars}
+              activeCarIds={activeCarIds}
+              showCarFilter={state.cars.length > 1 && tab !== "Veículos" && fuelFormMode !== "new" && !utilityScreen}
+              onToggleCar={toggleFilterCar}
             />
             {!ownerId ? (
               <DemoBanner onOpenAuth={() => setAuthScreenOpen(true)} />
-            ) : null}
-            {state.user && state.cars.length > 1 && tab !== "Veículos" && fuelFormMode !== "new" && !utilityScreen ? (
-              <CarFilter
-                cars={state.cars}
-                activeCarIds={activeCarIds}
-                onToggleCar={toggleFilterCar}
-              />
             ) : null}
             <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
               {renderContent()}
@@ -1574,7 +1571,11 @@ function Header({
   onSignOut,
   authEmail,
   authName,
-  showNewFuelButton
+  showNewFuelButton,
+  cars,
+  activeCarIds,
+  showCarFilter,
+  onToggleCar
 }: {
   user: User | null;
   onSave: (user: User) => void;
@@ -1589,6 +1590,10 @@ function Header({
   authEmail: string | null;
   authName: string | null;
   showNewFuelButton: boolean;
+  cars: Car[];
+  activeCarIds: string[];
+  showCarFilter: boolean;
+  onToggleCar: (carId: string) => void;
 }) {
   const [name, setName] = useState(user?.name ?? "");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -1657,6 +1662,9 @@ function Header({
                   <View style={styles.accountIconBody} />
                 </View>
               </Pressable>
+              {showCarFilter ? (
+                <HeaderCarFilter cars={cars} activeCarIds={activeCarIds} onToggleCar={onToggleCar} />
+              ) : null}
               {accountOpen ? (
                 <>
                   <Pressable style={styles.menuDismissLayer} onPress={() => setAccountOpen(false)} />
@@ -1932,7 +1940,7 @@ function DemoBanner({ onOpenAuth }: { onOpenAuth: () => void }) {
     <View style={styles.demoBanner}>
       <View style={styles.demoBannerTextGroup}>
         <Text style={styles.demoBannerTitle}>Você está vendo dados de exemplo</Text>
-        <Text style={styles.demoBannerText}>Estes abastecimentos não são reais. Faça login para começar com seus próprios dados.</Text>
+        <Text style={styles.demoBannerText}>Faça login para começar com seus próprios dados.</Text>
       </View>
       <Pressable style={styles.demoBannerButton} onPress={onOpenAuth}>
         <Text style={styles.demoBannerButtonText}>Login</Text>
@@ -1941,7 +1949,7 @@ function DemoBanner({ onOpenAuth }: { onOpenAuth: () => void }) {
   );
 }
 
-function CarFilter({
+function HeaderCarFilter({
   cars,
   activeCarIds,
   onToggleCar
@@ -1952,38 +1960,38 @@ function CarFilter({
 }) {
   const { styles } = useThemeStyles();
   const [open, setOpen] = useState(false);
-  const activeCars = cars.filter((car) => activeCarIds.includes(car.id));
-  const label = activeCars.length === cars.length
-    ? "Todos veículos"
-    : `${activeCars.length} ${activeCars.length === 1 ? "veículo" : "veículos"}`;
 
   return (
-    <View style={styles.filterBar}>
-      <Pressable style={styles.filterCompactButton} onPress={() => setOpen((current) => !current)}>
-        <Text style={styles.filterCompactText}>
-          {activeCars.slice(0, 2).map((car) => vehicleTypeIcon(car.vehicleType)).join(" ")} {label}
-        </Text>
-        <Text style={styles.filterCompactArrow}>{open ? "▲" : "▼"}</Text>
+    <View style={styles.headerFilterBox}>
+      <Pressable
+        accessibilityLabel="Filtrar veículos"
+        style={styles.headerFilterButton}
+        onPress={() => setOpen((current) => !current)}
+      >
+        <Text style={styles.wheelsIcon}>⚙</Text>
       </Pressable>
       {open ? (
-        <View style={styles.filterDropdown}>
-          {cars.map((car) => {
-            const active = activeCarIds.includes(car.id);
-            return (
-              <Pressable
-                key={car.id}
-                style={[styles.filterDropdownItem, active && styles.filterDropdownItemActive]}
-                onPress={() => onToggleCar(car.id)}
-              >
-                <Text style={[styles.filterChipIcon, active && styles.filterChipTextActive]}>
-                  {vehicleTypeIcon(car.vehicleType)}
-                </Text>
-                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{car.nickname}</Text>
-                <Text style={[styles.filterCheck, active && styles.filterChipTextActive]}>{active ? "✓" : ""}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <>
+          <Pressable style={styles.menuDismissLayer} onPress={() => setOpen(false)} />
+          <View style={styles.headerFilterMenu}>
+            {cars.map((car) => {
+              const active = activeCarIds.includes(car.id);
+              return (
+                <Pressable
+                  key={car.id}
+                  style={[styles.filterDropdownItem, active && styles.filterDropdownItemActive]}
+                  onPress={() => onToggleCar(car.id)}
+                >
+                  <Text style={[styles.filterChipIcon, active && styles.filterChipTextActive]}>
+                    {vehicleTypeIcon(car.vehicleType)}
+                  </Text>
+                  <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{car.nickname}</Text>
+                  <Text style={[styles.filterCheck, active && styles.filterChipTextActive]}>{active ? "✓" : ""}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
       ) : null}
     </View>
   );
@@ -2028,7 +2036,7 @@ function Home({
   const monthLabel = visibleMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
-    <View style={styles.stack}>
+    <View style={styles.summaryStack}>
       <Section title="">
         <View style={styles.monthSwitcher}>
           <Pressable style={styles.iconButton} onPress={onPreviousMonth}>
@@ -2046,12 +2054,9 @@ function Home({
           <MetricCard label="Média km/L" value={metrics.averageKmPerLiter ? metrics.averageKmPerLiter.toFixed(1) : ""} small trend={efficiencyTrend} />
         </View>
 
-        <View style={styles.mapListDivider} />
-        <Text style={styles.sectionTitle}>Gasto mensal</Text>
         <Bars data={metrics.monthlyTotals} />
 
-        <View style={styles.mapListDivider} />
-        <Text style={styles.sectionTitle}>Média por combustível</Text>
+        <View style={styles.summaryBlockDivider} />
         {metrics.fuelAverages.length === 0 ? (
           <Empty text="Registre abastecimentos para comparar combustíveis." />
         ) : (
@@ -2436,18 +2441,6 @@ function StationMap({
           </Pressable>
         }
       >
-        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
-          <FuelMap numberedLogs={numberedLogs} stations={stations} />
-          <Pressable
-            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
-            style={styles.mapExpandButton}
-            onPress={() => setMapExpanded((current) => !current)}
-          >
-            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.mapListDivider} />
         {numberedLogs.length === 0 ? (
           <Empty text="Registre abastecimentos para construir sua lista." />
         ) : (
@@ -2499,6 +2492,17 @@ function StationMap({
             );
           })
         )}
+        <View style={styles.mapListDivider} />
+        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
+          <FuelMap numberedLogs={numberedLogs} stations={stations} />
+          <Pressable
+            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
+            style={styles.mapExpandButton}
+            onPress={() => setMapExpanded((current) => !current)}
+          >
+            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
+          </Pressable>
+        </View>
       </Section>
 
     </View>
@@ -3010,18 +3014,6 @@ function Stations({
           </View>
         ) : null}
 
-        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
-          <StationOverviewMap stations={stations} />
-          <Pressable
-            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
-            style={styles.mapExpandButton}
-            onPress={() => setMapExpanded((current) => !current)}
-          >
-            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.mapListDivider} />
         {stations.length === 0 ? (
           <Empty text="Cadastre seu primeiro posto." />
         ) : (
@@ -3087,6 +3079,17 @@ function Stations({
             </View>
           ))
         )}
+        <View style={styles.mapListDivider} />
+        <View style={[styles.mapPanel, mapExpanded && styles.mapPanelExpanded]}>
+          <StationOverviewMap stations={stations} />
+          <Pressable
+            accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
+            style={styles.mapExpandButton}
+            onPress={() => setMapExpanded((current) => !current)}
+          >
+            <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
+          </Pressable>
+        </View>
       </Section>
     </View>
   );
@@ -4024,7 +4027,7 @@ function createStyles(theme: Theme) {
   headerTools: {
     position: "relative",
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "flex-end",
     gap: 8,
     flexShrink: 0,
@@ -4138,7 +4141,46 @@ function createStyles(theme: Theme) {
   accountBox: {
     position: "relative",
     zIndex: 1000,
+    flexShrink: 0,
+    alignItems: "center",
+    minHeight: 34,
+    overflow: "visible"
+  },
+  headerFilterBox: {
+    position: "absolute",
+    top: 36,
+    left: 5,
+    zIndex: 999,
     flexShrink: 0
+  },
+  headerFilterButton: {
+    width: 24,
+    minHeight: 22,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    paddingHorizontal: 0
+  },
+  wheelsIcon: {
+    color: theme.primary,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  headerFilterMenu: {
+    position: "absolute",
+    top: 24,
+    right: 0,
+    minWidth: 230,
+    borderRadius: 8,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 6,
+    gap: 5,
+    zIndex: 1001,
+    elevation: 20
   },
   accountButton: {
     width: 34,
@@ -4249,48 +4291,6 @@ function createStyles(theme: Theme) {
     fontSize: 15,
     fontWeight: "800",
     fontFamily: theme.fontFamily
-  },
-  filterBar: {
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-    alignItems: "center"
-  },
-  filterCompactButton: {
-    minHeight: 34,
-    minWidth: 164,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8
-  },
-  filterCompactText: {
-    color: theme.text,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: theme.fontFamily
-  },
-  filterCompactArrow: {
-    color: theme.primary,
-    fontSize: 12,
-    fontWeight: "900",
-    fontFamily: theme.fontFamily
-  },
-  filterDropdown: {
-    width: "100%",
-    maxWidth: 360,
-    marginTop: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
-    padding: 6,
-    gap: 5,
-    zIndex: 15
   },
   filterDropdownItem: {
     minHeight: 36,
@@ -4428,6 +4428,16 @@ function createStyles(theme: Theme) {
   },
   stack: {
     gap: 10
+  },
+  summaryStack: {
+    gap: 8
+  },
+  summaryBlockDivider: {
+    height: 1,
+    backgroundColor: theme.border,
+    opacity: 0.75,
+    marginTop: 16,
+    marginBottom: 10
   },
   section: {
     position: "relative",
@@ -4914,13 +4924,14 @@ function createStyles(theme: Theme) {
   fuelGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 8,
+    marginTop: 2
   },
   fuelCard: {
     width: "48%",
-    minHeight: 68,
+    minHeight: 58,
     borderRadius: 8,
-    padding: 10,
+    padding: 8,
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
@@ -5062,19 +5073,20 @@ function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   bars: {
-    height: 148,
+    height: 136,
     flexDirection: "row",
     gap: 8,
+    marginTop: 2,
     alignItems: "flex-end"
   },
   barColumn: {
     flex: 1,
     alignItems: "center",
-    gap: 8
+    gap: 6
   },
   barTrack: {
     width: "100%",
-    height: 106,
+    height: 96,
     backgroundColor: theme.primarySoft,
     borderRadius: 8,
     justifyContent: "flex-end",
