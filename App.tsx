@@ -52,6 +52,7 @@ type AssistantMessage = {
   id: string;
   role: "assistant" | "user";
   text: string;
+  isError?: boolean;
   draftFuelLog?: AssistantDraftFuelLog;
 };
 type AssistantDraftFuelLog = {
@@ -2193,7 +2194,8 @@ function AssistantScreen({
         {
           id: IdFactory.create("msg-error"),
           role: "assistant",
-          text: error instanceof Error ? error.message : "Não consegui responder agora."
+          text: error instanceof Error ? error.message : "Não consegui responder agora.",
+          isError: true
         }
       ]);
     } finally {
@@ -2262,10 +2264,16 @@ function AssistantScreen({
               key={message.id}
               style={[
                 styles.assistantBubble,
-                message.role === "user" ? styles.assistantBubbleUser : styles.assistantBubbleBot
+                message.role === "user" ? styles.assistantBubbleUser : styles.assistantBubbleBot,
+                message.isError ? styles.assistantBubbleError : null
               ]}
             >
-              <Text style={message.role === "user" ? styles.assistantBubbleUserText : styles.assistantBubbleText}>
+              <Text
+                style={[
+                  message.role === "user" ? styles.assistantBubbleUserText : styles.assistantBubbleText,
+                  message.isError ? styles.assistantBubbleErrorText : null
+                ]}
+              >
                 {message.text}
               </Text>
               {message.draftFuelLog ? (
@@ -2284,7 +2292,7 @@ function AssistantScreen({
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Pergunte ou peça para registrar..."
+            placeholder="Escreva uma mensagem..."
             placeholderTextColor={theme.muted}
             style={styles.assistantInput}
             onSubmitEditing={() => void sendMessage()}
@@ -5260,6 +5268,11 @@ function createStyles(theme: Theme) {
     borderWidth: 1,
     borderColor: theme.border
   },
+  assistantBubbleError: {
+    backgroundColor: theme.mode === "dark" ? "#3A1010" : "#FFE8E8",
+    borderWidth: 1,
+    borderColor: theme.mode === "dark" ? "#F87171" : "#DC2626"
+  },
   assistantBubbleUser: {
     alignSelf: "flex-end",
     backgroundColor: theme.primaryDark
@@ -5269,6 +5282,9 @@ function createStyles(theme: Theme) {
     fontSize: 15,
     lineHeight: 20,
     fontFamily: theme.fontFamily
+  },
+  assistantBubbleErrorText: {
+    color: theme.mode === "dark" ? "#FCA5A5" : "#B91C1C"
   },
   assistantBubbleUserText: {
     color: "#FFFFFF",
