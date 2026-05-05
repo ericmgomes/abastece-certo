@@ -38,11 +38,8 @@ export function createLitroCertoMcpServer() {
       description: "Cria um veículo na conta logada.",
       inputSchema: {
         vehicleType: vehicleTypeSchema.optional(),
-        nickname: z.string().min(1),
-        brand: z.string().optional(),
-        model: z.string().optional(),
-        acceptedFuel: z.array(fuelSchema).optional(),
-        defaultFuel: fuelSchema
+        brand: z.string().min(1),
+        model: z.string().min(1)
       }
     },
     async (input, extra) => json(await (await service(extra)).createVehicle(input))
@@ -56,11 +53,8 @@ export function createLitroCertoMcpServer() {
       inputSchema: {
         id: z.string().min(1),
         vehicleType: vehicleTypeSchema.optional(),
-        nickname: z.string().optional(),
         brand: z.string().optional(),
-        model: z.string().optional(),
-        acceptedFuel: z.array(fuelSchema).optional(),
-        defaultFuel: fuelSchema.optional()
+        model: z.string().optional()
       }
     },
     async (input, extra) => json(await (await service(extra)).updateVehicle(input))

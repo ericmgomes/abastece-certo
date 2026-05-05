@@ -18,8 +18,6 @@ export type Car = {
   nickname: string;
   brand: string;
   model: string;
-  acceptedFuel: FuelType[];
-  defaultFuel: FuelType;
 };
 
 export type Station = {
@@ -273,21 +271,18 @@ export class FuelLogFactory {
 export class CarFactory {
   static create(input: {
     vehicleType?: VehicleType;
-    nickname: string;
+    nickname?: string;
     brand: string;
     model: string;
-    acceptedFuel?: FuelType[];
-    defaultFuel: FuelType;
   }): Car {
-    const acceptedFuel = input.acceptedFuel?.length ? input.acceptedFuel : [input.defaultFuel];
+    const brand = input.brand.trim();
+    const model = input.model.trim();
     return {
       id: IdFactory.create("carro"),
       vehicleType: input.vehicleType ?? "Carro",
-      nickname: input.nickname.trim(),
-      brand: input.brand.trim(),
-      model: input.model.trim(),
-      acceptedFuel,
-      defaultFuel: acceptedFuel.includes(input.defaultFuel) ? input.defaultFuel : acceptedFuel[0]
+      nickname: (input.nickname ?? VehicleName.base(brand, model)).trim(),
+      brand,
+      model
     };
   }
 
@@ -295,23 +290,46 @@ export class CarFactory {
     car: Car,
     input: {
       vehicleType: VehicleType;
-      nickname: string;
+      nickname?: string;
       brand: string;
       model: string;
-      acceptedFuel: FuelType[];
-      defaultFuel: FuelType;
     }
   ): Car {
-    const acceptedFuel = input.acceptedFuel.length ? input.acceptedFuel : [input.defaultFuel];
+    const brand = input.brand.trim();
+    const model = input.model.trim();
     return {
       ...car,
       vehicleType: input.vehicleType,
-      nickname: input.nickname.trim(),
-      brand: input.brand.trim(),
-      model: input.model.trim(),
-      acceptedFuel,
-      defaultFuel: acceptedFuel.includes(input.defaultFuel) ? input.defaultFuel : acceptedFuel[0]
+      nickname: (input.nickname ?? VehicleName.base(brand, model)).trim(),
+      brand,
+      model
     };
+  }
+}
+
+export class VehicleName {
+  static base(brand: string, model: string) {
+    return [brand.trim(), model.trim()].filter(Boolean).join(" ").trim() || "Veículo";
+  }
+
+  static unique(brand: string, model: string, cars: Car[], currentId?: string) {
+    const base = VehicleName.base(brand, model);
+    const used = new Set(
+      cars
+        .filter((car) => car.id !== currentId)
+        .map((car) => car.nickname.trim().toLowerCase())
+    );
+
+    if (!used.has(base.toLowerCase())) {
+      return base;
+    }
+
+    let suffix = 2;
+    while (used.has(`${base} ${suffix}`.toLowerCase())) {
+      suffix += 1;
+    }
+
+    return `${base} ${suffix}`;
   }
 }
 

@@ -37,6 +37,7 @@ import {
   ThemeMode,
   User,
   UserSummary,
+  VehicleName,
   VehicleType,
   fuels,
   vehicleTypes
@@ -199,29 +200,25 @@ const demoCars: Car[] = [
     vehicleType: "Carro",
     nickname: "Compass",
     brand: "Jeep",
-    model: "Compass",
-    acceptedFuel: fuels,
-    defaultFuel: "Gasolina comum"
+    model: "Compass"
   },
   {
     id: "demo-onix",
     vehicleType: "Carro",
     nickname: "Onix",
     brand: "Chevrolet",
-    model: "Onix Plus",
-    acceptedFuel: fuels,
-    defaultFuel: "Etanol"
+    model: "Onix Plus"
   },
   {
     id: "demo-hilux",
     vehicleType: "Caminhonete",
     nickname: "Hilux",
     brand: "Toyota",
-    model: "Hilux",
-    acceptedFuel: ["Diesel"],
-    defaultFuel: "Diesel"
+    model: "Hilux"
   }
 ];
+
+const visibleFuels = fuels.filter((fuel) => fuel !== "Gás Natural" && fuel !== "Eletricidade");
 
 function daysAgo(days: number) {
   const date = new Date();
@@ -2094,7 +2091,7 @@ function RegisterFuel({
 }) {
   const { styles } = useThemeStyles();
   const [carId, setCarId] = useState(selectedCar?.id ?? "");
-  const [fuel, setFuel] = useState<FuelType>(selectedCar?.defaultFuel ?? "Gasolina comum");
+  const [fuel, setFuel] = useState<FuelType>("Gasolina comum");
   const [paid, setPaid] = useState("");
   const [liters, setLiters] = useState("");
   const [odometerKm, setOdometerKm] = useState("");
@@ -2108,7 +2105,7 @@ function RegisterFuel({
   const [activeField, setActiveField] = useState("paid");
   const [dirty, setDirty] = useState(false);
   const currentCar = cars.find((car) => car.id === carId) ?? selectedCar;
-  const fuelOptions = currentCar?.acceptedFuel?.length ? currentCar.acceptedFuel : fuels;
+  const fuelOptions = visibleFuels;
 
   useEffect(() => {
     if (!selectedCar || editingLog) {
@@ -2116,20 +2113,7 @@ function RegisterFuel({
     }
 
     setCarId(selectedCar.id);
-    setFuel(selectedCar.defaultFuel);
   }, [editingLog, selectedCar?.id]);
-
-  useEffect(() => {
-    if (!currentCar || editingLog) {
-      return;
-    }
-
-    if (currentCar.acceptedFuel.includes(fuel)) {
-      return;
-    }
-
-    setFuel(currentCar.defaultFuel ?? currentCar.acceptedFuel[0] ?? "Gasolina comum");
-  }, [carId, currentCar?.id, editingLog, fuel]);
 
   useEffect(() => {
     if (!editingLog) {
@@ -2697,6 +2681,15 @@ function StationOverviewMap({ stations }: { stations: Station[] }) {
   return <FuelMap numberedLogs={numberedLogs} stations={stations} />;
 }
 
+function carSummary(car: Car, logs: FuelLog[]) {
+  const carLogs = logs.filter((log) => log.carId === car.id);
+  return {
+    car,
+    total: carLogs.reduce((sum, log) => sum + log.paid, 0),
+    count: carLogs.length
+  };
+}
+
 function Cars({
   cars,
   logs,
@@ -2721,27 +2714,18 @@ function Cars({
   const { styles } = useThemeStyles();
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
   const [selectedDetailsCarId, setSelectedDetailsCarId] = useState<string | null>(null);
-  const carRanking = cars
-    .map((car) => {
-      const carLogs = logs.filter((log) => log.carId === car.id);
-      const total = carLogs.reduce((sum, log) => sum + log.paid, 0);
-      return { car, total, count: carLogs.length };
-    })
-    .filter((item) => item.count > 0)
+  const carRows = cars
+    .map((car) => carSummary(car, logs))
     .sort((a, b) => b.total - a.total);
 
   function openNewForm() {
     setEditingCarId("new");
   }
 
-  function openEditForm(car: Car) {
-    if (editingCarId === car.id) {
-      closeForm();
-      return;
-    }
-
+  function selectCarDetails(car: Car) {
     onSelect(car.id);
-    setEditingCarId(car.id);
+    setSelectedDetailsCarId((current) => (current === car.id ? null : car.id));
+    setEditingCarId(null);
   }
 
   function closeForm() {
@@ -2767,7 +2751,7 @@ function Cars({
               </Pressable>
             </View>
             <View style={styles.inlineForm}>
-              <CarEditor onSave={onSave} onUpdate={onUpdate} onDelete={onDeleteCar} onCancel={closeForm} />
+              <CarEditor cars={cars} onSave={onSave} onUpdate={onUpdate} onDelete={onDeleteCar} onCancel={closeForm} />
             </View>
             <View style={styles.mapListDivider} />
           </View>
@@ -2776,71 +2760,60 @@ function Cars({
         {cars.length === 0 ? (
           <Empty text="Cadastre seu primeiro veículo." />
         ) : (
-          cars.map((car) => (
+          carRows.map(({ car, total, count }) => (
             <View key={car.id} style={styles.inlineEditGroup}>
               <Pressable
                 style={(state) => [
                   styles.listItem,
-                  car.id === selectedCarId && styles.selectedItem,
+                  (car.id === selectedCarId || car.id === selectedDetailsCarId) && styles.selectedItem,
                   isHovered(state) && styles.listItemHover
                 ]}
-                onPress={() => openEditForm(car)}
+                onPress={() => selectCarDetails(car)}
               >
-                <View>
+                <View style={styles.rankingInfo}>
                   <Text style={styles.itemTitle}>{car.nickname}</Text>
                   <Text style={styles.muted}>
-                    {[car.vehicleType ?? "Carro", car.brand, car.model].filter(Boolean).join(" - ")}
+                    {count} abastecimentos
                   </Text>
                 </View>
-                <Text style={styles.pill}>{car.defaultFuel}</Text>
-              </Pressable>
-              {editingCarId === car.id ? (
-                <View style={styles.inlineForm}>
-                  <CarEditor
-                    car={car}
-                    onSave={onSave}
-                    onUpdate={onUpdate}
-                    onDelete={onDeleteCar}
-                    onCancel={closeForm}
-                  />
+                <View style={styles.listItemActions}>
+                  <Text style={styles.rankingPrice}>{formatCurrency(total)}</Text>
+                  <Pressable
+                    accessibilityLabel="Editar veículo"
+                    style={styles.inlineIconButton}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      onSelect(car.id);
+                      setSelectedDetailsCarId(car.id);
+                      setEditingCarId((current) => (current === car.id ? null : car.id));
+                    }}
+                  >
+                    <Text style={styles.inlineIconButtonText}>✎</Text>
+                  </Pressable>
                 </View>
+              </Pressable>
+              {selectedDetailsCarId === car.id ? (
+                <EntityDetails
+                  title={editingCarId === car.id ? "Editar veículo" : "Abastecimentos"}
+                >
+                  {editingCarId === car.id ? (
+                    <View style={styles.inlineForm}>
+                      <CarEditor
+                        cars={cars}
+                        car={car}
+                        onSave={onSave}
+                        onUpdate={onUpdate}
+                        onDelete={onDeleteCar}
+                        onCancel={closeForm}
+                      />
+                    </View>
+                  ) : null}
+                  {editingCarId === car.id ? <Text style={styles.itemTitle}>Abastecimentos</Text> : null}
+                  <CarFuelLogDetails carId={car.id} logs={logs} allLogs={logs} stations={stations} onEditLog={onEditLog} compact />
+                </EntityDetails>
               ) : null}
             </View>
           ))
-        )}
-
-        <View style={styles.mapListDivider} />
-        <Text style={styles.sectionTitle}>Veículos que mais gastaram</Text>
-        {carRanking.length === 0 ? (
-          <Empty text="O ranking nasce a partir dos abastecimentos registrados." />
-        ) : (
-          <>
-            {carRanking.map((item, index) => (
-              <React.Fragment key={item.car.id}>
-                <Pressable
-                  style={(state) => [
-                    styles.listItem,
-                    item.car.id === selectedCarId && styles.selectedItem,
-                    isHovered(state) && styles.listItemHover
-                  ]}
-                  onPress={() =>
-                    setSelectedDetailsCarId((current) => (current === item.car.id ? null : item.car.id))
-                  }
-                >
-                  <View style={styles.rankingInfo}>
-                    <Text style={styles.itemTitle}>
-                      {index + 1}. {item.car.nickname}
-                    </Text>
-                    <Text style={styles.muted}>{item.count} abastecimentos</Text>
-                  </View>
-                  <Text style={styles.rankingPrice}>{formatCurrency(item.total)}</Text>
-                </Pressable>
-                {selectedDetailsCarId === item.car.id ? (
-                  <CarFuelLogDetails carId={item.car.id} logs={logs} allLogs={logs} stations={stations} onEditLog={onEditLog} />
-                ) : null}
-              </React.Fragment>
-            ))}
-          </>
         )}
       </Section>
     </View>
@@ -2848,12 +2821,14 @@ function Cars({
 }
 
 function CarEditor({
+  cars,
   car,
   onSave,
   onUpdate,
   onDelete,
   onCancel
 }: {
+  cars: Car[];
   car?: Car;
   onSave: (car: Car) => void;
   onUpdate: (car: Car) => void;
@@ -2863,14 +2838,11 @@ function CarEditor({
   const { styles } = useThemeStyles();
   const [draftCar, setDraftCar] = useState<Car | null>(null);
   const [vehicleType, setVehicleType] = useState<VehicleType>(car?.vehicleType ?? "Carro");
-  const [nickname, setNickname] = useState(car?.nickname ?? "");
   const [brand, setBrand] = useState(car?.brand ?? "");
   const [model, setModel] = useState(car?.model ?? "");
-  const [acceptedFuel, setAcceptedFuel] = useState<FuelType[]>(car?.acceptedFuel?.length ? car.acceptedFuel : [car?.defaultFuel ?? "Gasolina comum"]);
-  const [defaultFuel, setDefaultFuel] = useState<FuelType>(car?.defaultFuel ?? "Gasolina comum");
   const [status, setStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<ToastNotice | null>(null);
-  const [activeField, setActiveField] = useState("nickname");
+  const [activeField, setActiveField] = useState("brand");
 
   useEffect(() => {
     if (!car) {
@@ -2878,71 +2850,47 @@ function CarEditor({
     }
 
     setVehicleType(car.vehicleType ?? "Carro");
-    setNickname(car.nickname);
     setBrand(car.brand);
     setModel(car.model);
-    setAcceptedFuel(car.acceptedFuel?.length ? car.acceptedFuel : [car.defaultFuel]);
-    setDefaultFuel(car.defaultFuel);
     setDraftCar(null);
   }, [car?.id]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (!nickname.trim()) {
-        setStatus("Preencha o apelido para salvar.");
+      if (!brand.trim() || !model.trim()) {
+        setStatus("Preencha marca e modelo para salvar.");
         return;
       }
 
+      const nickname = VehicleName.unique(brand, model, cars, car?.id ?? draftCar?.id);
       if (car) {
-        onUpdate(CarFactory.update(car, { vehicleType, nickname, brand, model, acceptedFuel, defaultFuel }));
+        onUpdate(CarFactory.update(car, { vehicleType, nickname, brand, model }));
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
       if (draftCar) {
-        const updated = CarFactory.update(draftCar, { vehicleType, nickname, brand, model, acceptedFuel, defaultFuel });
+        const updated = CarFactory.update(draftCar, { vehicleType, nickname, brand, model });
         setDraftCar(updated);
         onUpdate(updated);
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
-      const created = CarFactory.create({ vehicleType, nickname, brand, model, acceptedFuel, defaultFuel });
+      const created = CarFactory.create({ vehicleType, nickname, brand, model });
       setDraftCar(created);
       onSave(created);
       showFieldNotice(setNotice, "Veículo criado.", activeField);
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [vehicleType, nickname, brand, model, acceptedFuel, defaultFuel, car?.id, draftCar?.id]);
-
-  useEffect(() => {
-    if (acceptedFuel.includes(defaultFuel)) {
-      return;
-    }
-
-    setDefaultFuel(acceptedFuel[0] ?? "Gasolina comum");
-  }, [acceptedFuel, defaultFuel]);
+  }, [vehicleType, brand, model, car?.id, draftCar?.id]);
 
   function updateCarField(anchor: string, update: (value: string) => void) {
     return (value: string) => {
       setActiveField(anchor);
       update(value);
     };
-  }
-
-  function toggleAcceptedFuel(fuel: FuelType) {
-    setAcceptedFuel((current) => {
-      if (current.includes(fuel)) {
-        if (current.length === 1) {
-          return current;
-        }
-
-        return current.filter((item) => item !== fuel);
-      }
-
-      return [...current, fuel];
-    });
   }
 
   function confirmDelete() {
@@ -2978,51 +2926,16 @@ function CarEditor({
         <FieldToast notice={notice} anchor="vehicleType" />
       </View>
       <View style={styles.fieldToastAnchor}>
-        <Field label="Apelido" value={nickname} onFocus={() => setActiveField("nickname")} onChangeText={updateCarField("nickname", setNickname)} />
-        <FieldToast notice={notice} anchor="nickname" />
-      </View>
-      <View style={styles.fieldToastAnchor}>
-        <Field label="Marca" value={brand} onFocus={() => setActiveField("brand")} onChangeText={updateCarField("brand", setBrand)} />
-        <View style={styles.inlineField}>
-          <Text style={styles.inlineLabel} />
-          <View style={styles.choiceFieldWrap}>
-            {brazilVehicleBrands.map((item) => (
-              <Choice
-                key={item}
-                label={item}
-                active={brand.trim().toLowerCase() === item.toLowerCase()}
-                onPress={() => {
-                  setActiveField("brand");
-                  setBrand(item);
-                }}
-              />
-            ))}
-          </View>
-        </View>
+        <BrandSelect
+          value={brand}
+          onFocus={() => setActiveField("brand")}
+          onChange={updateCarField("brand", setBrand)}
+        />
         <FieldToast notice={notice} anchor="brand" />
       </View>
       <View style={styles.fieldToastAnchor}>
         <Field label="Modelo" value={model} onFocus={() => setActiveField("model")} onChangeText={updateCarField("model", setModel)} />
         <FieldToast notice={notice} anchor="model" />
-      </View>
-      <View style={styles.fieldToastAnchor}>
-        <View style={styles.inlineField}>
-          <Text style={styles.inlineLabel}>Combustíveis</Text>
-          <View style={styles.choiceFieldWrap}>
-            {fuels.map((fuel) => (
-              <Choice
-                key={fuel}
-                label={fuel}
-                active={acceptedFuel.includes(fuel)}
-                onPress={() => {
-                  setActiveField("acceptedFuel");
-                  toggleAcceptedFuel(fuel);
-                }}
-              />
-            ))}
-          </View>
-        </View>
-        <FieldToast notice={notice} anchor="acceptedFuel" />
       </View>
       <Pressable style={styles.deleteButton} onPress={confirmDelete}>
         <Text style={styles.deleteButtonText}>Apagar veículo</Text>
@@ -3056,18 +2969,16 @@ function Stations({
   const [editingStationId, setEditingStationId] = useState<string | null>(null);
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [mapExpanded, setMapExpanded] = useState(false);
+  const stationRows = stations
+    .map((station) => ({
+      station,
+      ranking: metrics.stationRanking.find((item) => item.id === station.id),
+      count: logs.filter((log) => log.stationId === station.id).length
+    }))
+    .sort((a, b) => (a.ranking?.average ?? Number.POSITIVE_INFINITY) - (b.ranking?.average ?? Number.POSITIVE_INFINITY));
 
   function openNewForm() {
     setEditingStationId("new");
-  }
-
-  function openEditForm(station: Station) {
-    if (editingStationId === station.id) {
-      setEditingStationId(null);
-      return;
-    }
-
-    setEditingStationId(station.id);
   }
 
   return (
@@ -3115,48 +3026,68 @@ function Stations({
         {stations.length === 0 ? (
           <Empty text="Cadastre seu primeiro posto." />
         ) : (
-          stations.map((station) => (
+          stationRows.map(({ station, ranking, count }) => (
             <View key={station.id} style={styles.inlineEditGroup}>
               <Pressable
-                style={(state) => [styles.listItem, isHovered(state) && styles.listItemHover]}
-                onPress={() => openEditForm(station)}
+                style={(state) => [
+                  styles.listItem,
+                  selectedStationId === station.id && styles.selectedItem,
+                  isHovered(state) && styles.listItemHover
+                ]}
+                onPress={() => {
+                  setSelectedStationId((current) => (current === station.id ? null : station.id));
+                  setEditingStationId(null);
+                }}
               >
-                <View style={styles.logInfo}>
+                <View style={styles.rankingInfo}>
                   <Text style={styles.itemTitle}>{station.name}</Text>
-                  <Text style={styles.muted}>
-                    {[station.address, station.city, station.state].filter(Boolean).join(" - ")}
-                  </Text>
+                  <Text style={styles.muted}>{count} abastecimentos</Text>
+                </View>
+                <View style={styles.listItemActions}>
+                  {ranking ? <Text style={styles.rankingPrice}>{formatCurrency(ranking.average)}/L</Text> : null}
+                  <Pressable
+                    accessibilityLabel="Editar posto"
+                    style={styles.inlineIconButton}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setSelectedStationId(station.id);
+                      setEditingStationId((current) => (current === station.id ? null : station.id));
+                    }}
+                  >
+                    <Text style={styles.inlineIconButtonText}>✎</Text>
+                  </Pressable>
                 </View>
               </Pressable>
-              {editingStationId === station.id ? (
-                <View style={styles.inlineForm}>
-                  <StationEditor
-                    station={station}
-                    onSave={onSave}
-                    onUpdate={onUpdate}
-                    onDelete={onDeleteStation}
-                    onCancel={() => setEditingStationId(null)}
+              {selectedStationId === station.id ? (
+                <EntityDetails
+                  title={editingStationId === station.id ? "Editar posto" : "Abastecimentos"}
+                >
+                  {editingStationId === station.id ? (
+                    <View style={styles.inlineForm}>
+                      <StationEditor
+                        station={station}
+                        onSave={onSave}
+                        onUpdate={onUpdate}
+                        onDelete={onDeleteStation}
+                        onCancel={() => setEditingStationId(null)}
+                      />
+                    </View>
+                  ) : null}
+                  {editingStationId === station.id ? <Text style={styles.itemTitle}>Abastecimentos</Text> : null}
+                  <StationDetails
+                    stationId={station.id}
+                    logs={logs}
+                    allLogs={allLogs}
+                    cars={cars}
+                    stations={stations}
+                    onEditLog={onEditLog}
+                    compact
                   />
-                </View>
+                </EntityDetails>
               ) : null}
             </View>
           ))
         )}
-
-        <View style={styles.mapListDivider} />
-        <Text style={styles.sectionTitle}>Postos mais baratos</Text>
-        <Ranking
-          rows={metrics.stationRanking}
-          selectedStationId={selectedStationId}
-          logs={logs}
-          allLogs={allLogs}
-          cars={cars}
-          stations={stations}
-          onEditLog={onEditLog}
-          onSelectStation={(stationId) =>
-            setSelectedStationId((current) => (current === stationId ? null : stationId))
-          }
-        />
       </Section>
     </View>
   );
@@ -3422,64 +3353,22 @@ function metricTrend(current: number, previous: number, betterWhen: "higher" | "
   };
 }
 
-function Ranking({
-  rows,
-  selectedStationId,
-  logs,
-  allLogs,
-  cars,
-  stations,
-  onSelectStation,
-  onEditLog
+function EntityDetails({
+  title,
+  children
 }: {
-  rows: StationRankingItem[];
-  selectedStationId?: string | null;
-  logs: FuelLog[];
-  allLogs: FuelLog[];
-  cars: Car[];
-  stations: Station[];
-  onSelectStation?: (stationId: string) => void;
-  onEditLog?: (logId: string) => void;
+  title: string;
+  children: React.ReactNode;
 }) {
   const { styles } = useThemeStyles();
 
-  if (rows.length === 0) {
-    return <Empty text="O ranking nasce a partir do histórico de abastecimentos." />;
-  }
-
   return (
-    <>
-      {rows.map((row, index) => (
-        <React.Fragment key={row.id}>
-          <Pressable
-            style={(state) => [
-              styles.listItem,
-              selectedStationId === row.id && styles.selectedItem,
-              isHovered(state) && styles.listItemHover
-            ]}
-            onPress={() => onSelectStation?.(row.id)}
-          >
-            <View style={styles.rankingInfo}>
-              <Text style={styles.itemTitle}>
-                {index + 1}. {row.name}
-              </Text>
-              <Text style={styles.muted}>{row.count} abastecimentos</Text>
-            </View>
-            <Text style={styles.rankingPrice}>{formatCurrency(row.average)}/L</Text>
-          </Pressable>
-          {selectedStationId === row.id ? (
-            <StationDetails
-              stationId={row.id}
-              logs={logs}
-              allLogs={allLogs}
-              cars={cars}
-              stations={stations}
-              onEditLog={onEditLog}
-            />
-          ) : null}
-        </React.Fragment>
-      ))}
-    </>
+    <View style={styles.stationDetails}>
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.itemTitle}>{title}</Text>
+      </View>
+      {children}
+    </View>
   );
 }
 
@@ -3489,7 +3378,8 @@ function StationDetails({
   allLogs,
   cars,
   stations,
-  onEditLog
+  onEditLog,
+  compact
 }: {
   stationId: string;
   logs: FuelLog[];
@@ -3497,6 +3387,7 @@ function StationDetails({
   cars: Car[];
   stations: Station[];
   onEditLog?: (logId: string) => void;
+  compact?: boolean;
 }) {
   const { styles } = useThemeStyles();
   const station = stations.find((item) => item.id === stationId);
@@ -3508,8 +3399,7 @@ function StationDetails({
   }
 
   return (
-    <View style={styles.stationDetails}>
-      <Text style={styles.itemTitle}>Abastecimentos</Text>
+    <View style={compact ? styles.detailList : styles.stationDetails}>
       {stationLogs.map((log) => {
         const car = cars.find((item) => item.id === log.carId);
         return (
@@ -3535,13 +3425,15 @@ function CarFuelLogDetails({
   logs,
   allLogs,
   stations,
-  onEditLog
+  onEditLog,
+  compact
 }: {
   carId: string;
   logs: FuelLog[];
   allLogs: FuelLog[];
   stations: Station[];
   onEditLog?: (logId: string) => void;
+  compact?: boolean;
 }) {
   const { styles } = useThemeStyles();
   const carLogs = logs.filter((log) => log.carId === carId);
@@ -3549,16 +3441,14 @@ function CarFuelLogDetails({
 
   if (carLogs.length === 0) {
     return (
-      <View style={styles.stationDetails}>
-        <Text style={styles.itemTitle}>Abastecimentos</Text>
+      <View style={compact ? styles.detailList : styles.stationDetails}>
         <Empty text="Nenhum abastecimento registrado para este veículo." />
       </View>
     );
   }
 
   return (
-    <View style={styles.stationDetails}>
-      <Text style={styles.itemTitle}>Abastecimentos</Text>
+    <View style={compact ? styles.detailList : styles.stationDetails}>
       {carLogs.map((log) => {
         const station = stations.find((item) => item.id === log.stationId);
         return (
@@ -3608,6 +3498,59 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
       <Text style={styles.inlineLabel}>{label}</Text>
       <TextInput placeholderTextColor={theme.muted} style={[styles.input, style]} {...inputProps} />
     </View>
+  );
+}
+
+function BrandSelect({
+  value,
+  onChange,
+  onFocus
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+}) {
+  const { styles, theme } = useThemeStyles();
+  const normalizedValue = value.trim();
+  const selectedValue = brazilVehicleBrands.find((brand) => brand.toLowerCase() === normalizedValue.toLowerCase()) ?? "";
+
+  function selectValue(nextValue: string) {
+    onFocus?.();
+    onChange(nextValue);
+  }
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={styles.inlineField}>
+        <Text style={styles.inlineLabel}>Marca</Text>
+        {React.createElement(
+          "select",
+          {
+            value: selectedValue,
+            onFocus,
+            onChange: (event: { target: { value: string } }) => selectValue(event.target.value),
+            style: StyleSheet.flatten(styles.input) as never
+          },
+          [
+            React.createElement("option", { key: "empty", value: "" }, "Selecionar"),
+            ...brazilVehicleBrands.map((item) =>
+              React.createElement("option", { key: item, value: item }, item)
+            )
+          ]
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <Field
+      label="Marca"
+      value={value}
+      onFocus={onFocus}
+      onChangeText={selectValue}
+      placeholder="Marca"
+      placeholderTextColor={theme.muted}
+    />
   );
 }
 
@@ -5008,6 +4951,9 @@ function createStyles(theme: Theme) {
     borderLeftWidth: 2,
     borderLeftColor: theme.border
   },
+  detailList: {
+    gap: 6
+  },
   detailRow: {
     minHeight: 54,
     borderRadius: 8,
@@ -5019,6 +4965,27 @@ function createStyles(theme: Theme) {
     justifyContent: "space-between",
     alignItems: "center",
     gap: 10
+  },
+  listItemActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    flexShrink: 0
+  },
+  inlineIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent"
+  },
+  inlineIconButtonText: {
+    color: theme.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   historyTop: {
     flexDirection: "row",

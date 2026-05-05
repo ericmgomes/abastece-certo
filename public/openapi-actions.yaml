@@ -263,49 +263,27 @@ components:
           type: string
         model:
           type: string
-        acceptedFuel:
-          type: array
-          items:
-            $ref: "#/components/schemas/FuelType"
-        defaultFuel:
-          $ref: "#/components/schemas/FuelType"
     VehicleCreate:
       type: object
       required:
-        - nickname
-        - defaultFuel
+        - brand
+        - model
       properties:
         vehicleType:
           $ref: "#/components/schemas/VehicleType"
-        nickname:
-          type: string
         brand:
           type: string
         model:
           type: string
-        acceptedFuel:
-          type: array
-          items:
-            $ref: "#/components/schemas/FuelType"
-        defaultFuel:
-          $ref: "#/components/schemas/FuelType"
     VehicleUpdate:
       type: object
       properties:
         vehicleType:
           $ref: "#/components/schemas/VehicleType"
-        nickname:
-          type: string
         brand:
           type: string
         model:
           type: string
-        acceptedFuel:
-          type: array
-          items:
-            $ref: "#/components/schemas/FuelType"
-        defaultFuel:
-          $ref: "#/components/schemas/FuelType"
     Station:
       type: object
       properties:

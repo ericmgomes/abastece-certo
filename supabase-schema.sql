@@ -17,13 +17,13 @@ create table if not exists cars (
   nickname text not null,
   brand text not null default '',
   model text not null default '',
-  accepted_fuel text[] not null default '{}',
-  default_fuel text not null,
   updated_at timestamp with time zone not null default now()
 );
 
 alter table cars drop column if exists plate;
 alter table cars drop column if exists year;
+alter table cars drop column if exists default_fuel;
+alter table cars drop column if exists accepted_fuel;
 
 create table if not exists stations (
   id text primary key,

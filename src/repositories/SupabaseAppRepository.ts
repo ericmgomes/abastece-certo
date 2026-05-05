@@ -20,8 +20,6 @@ type CarRow = {
   nickname: string;
   brand: string;
   model: string;
-  accepted_fuel: FuelType[];
-  default_fuel: FuelType;
 };
 
 type StationRow = {
@@ -224,9 +222,7 @@ export class SupabaseAppRepository {
       vehicleType: row.vehicle_type ?? "Carro",
       nickname: row.nickname,
       brand: row.brand,
-      model: row.model,
-      acceptedFuel: row.accepted_fuel,
-      defaultFuel: row.default_fuel
+      model: row.model
     };
   }
 
@@ -237,9 +233,7 @@ export class SupabaseAppRepository {
       vehicle_type: car.vehicleType ?? "Carro",
       nickname: car.nickname,
       brand: car.brand,
-      model: car.model,
-      accepted_fuel: car.acceptedFuel,
-      default_fuel: car.defaultFuel
+      model: car.model
     };
   }
 

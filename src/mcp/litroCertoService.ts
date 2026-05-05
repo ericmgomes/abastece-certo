@@ -9,6 +9,7 @@ import {
   FuelType,
   Station,
   User,
+  VehicleName,
   VehicleType
 } from "../domain";
 import { McpUserContext } from "./supabaseAuth";
@@ -32,8 +33,6 @@ type CarRow = {
   nickname: string;
   brand: string;
   model: string;
-  accepted_fuel: FuelType[];
-  default_fuel: FuelType;
 };
 
 type StationRow = {
@@ -78,19 +77,17 @@ export class LitroCertoMcpService {
 
   async createVehicle(input: {
     vehicleType?: VehicleType;
-    nickname: string;
-    brand?: string;
-    model?: string;
-    acceptedFuel?: FuelType[];
-    defaultFuel: FuelType;
+    brand: string;
+    model: string;
   }) {
+    const vehicles = await this.listVehicles();
+    const brand = input.brand;
+    const model = input.model;
     const vehicle = CarFactory.create({
       vehicleType: input.vehicleType,
-      nickname: input.nickname,
-      brand: input.brand ?? "",
-      model: input.model ?? "",
-      acceptedFuel: input.acceptedFuel,
-      defaultFuel: input.defaultFuel
+      nickname: VehicleName.unique(brand, model, vehicles),
+      brand,
+      model
     });
     await this.ensureProfile();
     await this.upsertVehicle(vehicle);
@@ -100,20 +97,18 @@ export class LitroCertoMcpService {
   async updateVehicle(input: {
     id: string;
     vehicleType?: VehicleType;
-    nickname?: string;
     brand?: string;
     model?: string;
-    acceptedFuel?: FuelType[];
-    defaultFuel?: FuelType;
   }) {
     const current = await this.getVehicle(input.id);
+    const vehicles = await this.listVehicles();
+    const brand = input.brand ?? current.brand;
+    const model = input.model ?? current.model;
     const updated = CarFactory.update(current, {
       vehicleType: input.vehicleType ?? current.vehicleType,
-      nickname: input.nickname ?? current.nickname,
-      brand: input.brand ?? current.brand,
-      model: input.model ?? current.model,
-      acceptedFuel: input.acceptedFuel ?? current.acceptedFuel,
-      defaultFuel: input.defaultFuel ?? current.defaultFuel
+      nickname: VehicleName.unique(brand, model, vehicles, current.id),
+      brand,
+      model
     });
     await this.upsertVehicle(updated);
     return updated;
@@ -413,9 +408,7 @@ export class LitroCertoMcpService {
       vehicleType: row.vehicle_type ?? "Carro",
       nickname: row.nickname,
       brand: row.brand,
-      model: row.model,
-      acceptedFuel: row.accepted_fuel,
-      defaultFuel: row.default_fuel
+      model: row.model
     };
   }
 
@@ -426,9 +419,7 @@ export class LitroCertoMcpService {
       vehicle_type: car.vehicleType,
       nickname: car.nickname,
       brand: car.brand,
-      model: car.model,
-      accepted_fuel: car.acceptedFuel,
-      default_fuel: car.defaultFuel
+      model: car.model
     };
   }
 
