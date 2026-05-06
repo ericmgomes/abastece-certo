@@ -48,6 +48,7 @@ import {
   withStableLogSequences
 } from "./src/state/appStateHelpers";
 import { initAnalytics, trackEvent, trackScreen } from "./src/analytics";
+import { useRevenueCat } from "./src/revenuecat/useRevenueCat";
 
 type Tab = AppTab;
 type UtilityScreen = "help" | "privacy" | "users" | null;
@@ -136,6 +137,7 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const oauthConsentRoute = isOAuthConsentRoute();
   const oauthRequest = oauthAuthorizeRequestFromUrl();
+  const revenueCat = useRevenueCat(ownerId);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -182,6 +184,14 @@ export default function App() {
 
     return () => clearTimeout(timeoutId);
   }, [assistantMessages.length, tab]);
+
+  useEffect(() => {
+    if (!revenueCat.lastError) {
+      return;
+    }
+
+    Alert.alert("Assinatura", revenueCat.lastError);
+  }, [revenueCat.lastError]);
 
   function emptyAuthenticatedState(name: string | null, email: string | null): AppState {
     return {
@@ -424,6 +434,7 @@ export default function App() {
 
   async function signOut() {
     trackEvent("logout");
+    await revenueCat.logout();
     await supabase.auth.signOut();
     enterGuestMode();
   }
@@ -841,8 +852,20 @@ export default function App() {
                     trackEvent("users_admin_opened");
                     setUtilityScreen("users");
                   }}
+                  onOpenPremium={() => {
+                    trackEvent("premium_opened", {
+                      is_premium: revenueCat.isPremium
+                    });
+                    void revenueCat.openPaywall();
+                  }}
+                  onOpenCustomerCenter={() => {
+                    trackEvent("subscription_management_opened");
+                    void revenueCat.openCustomerCenter();
+                  }}
                   onSignOut={confirmSignOut}
                   authEmail={authEmail}
+                  isPremium={revenueCat.isPremium}
+                  subscriptionLoading={revenueCat.loading || !revenueCat.ready}
                   showNewFuelButton={fuelFormMode !== "new"}
                   cars={state.cars}
                   activeCarIds={activeCarIds}
