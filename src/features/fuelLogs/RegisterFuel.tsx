@@ -67,6 +67,7 @@ export function RegisterFuel({
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<ToastNotice | null>(null);
   const [activeField, setActiveField] = useState("paid");
+  const [dirty, setDirty] = useState(false);
   const currentCar = cars.find((car) => car.id === carId) ?? selectedCar;
   const fuelOptions = visibleFuels;
 
@@ -96,6 +97,7 @@ export function RegisterFuel({
     setStationId(editingLog.stationId);
     setDraftLog(null);
     setSaveStatus(null);
+    setDirty(false);
   }, [editingLog?.id]);
 
   useEffect(() => {
@@ -161,32 +163,52 @@ export function RegisterFuel({
     };
   }
 
-  function submitFuelLog() {
+  function saveCurrentFuelLog(feedbackField = activeField) {
     setSaveStatus(null);
     const payload = buildPayload();
     if (!payload) {
-      return;
+      return false;
     }
 
     if (editingLog) {
       onUpdate(FuelLogFactory.update(editingLog, payload));
-      showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
-      return;
+      setDirty(false);
+      showFieldNotice(setNotice, "Abastecimento atualizado.", feedbackField);
+      return true;
     }
 
     if (draftLog) {
       const updatedDraft = FuelLogFactory.update(draftLog, payload);
       setDraftLog(updatedDraft);
       onUpdate(updatedDraft);
-      showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
-      return;
+      setDirty(false);
+      showFieldNotice(setNotice, "Abastecimento atualizado.", feedbackField);
+      return true;
     }
 
     const newLog = FuelLogFactory.create(payload);
     setDraftLog(newLog);
     onSave(newLog);
-    showFieldNotice(setNotice, "Abastecimento criado.", activeField);
+    setDirty(false);
+    showFieldNotice(setNotice, "Abastecimento criado.", feedbackField);
+    return true;
   }
+
+  function submitFuelLog() {
+    saveCurrentFuelLog("submit");
+  }
+
+  useEffect(() => {
+    if (!dirty) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      saveCurrentFuelLog();
+    }, 550);
+
+    return () => clearTimeout(timeout);
+  }, [dirty, carId, fuel, paid, liters, odometerKm, date, time, stationId, location.latitude, location.longitude, editingLog?.id, draftLog?.id]);
 
   return (
     <View style={styles.stack}>
@@ -211,12 +233,12 @@ export function RegisterFuel({
                 onFocus={() => setActiveField("dateTime")}
                 onDateChange={(value: string) => {
                   setActiveField("dateTime");
-
+                  setDirty(true);
                   setDate(value);
                 }}
                 onTimeChange={(value: string) => {
                   setActiveField("dateTime");
-
+                  setDirty(true);
                   setTime(value);
                 }}
               />
@@ -234,7 +256,7 @@ export function RegisterFuel({
                       active={car.id === currentCar?.id}
                       onPress={() => {
                         setActiveField("car");
-
+                        setDirty(true);
                         setCarId(car.id);
                         onCarSelect(car.id);
                       }}
@@ -256,7 +278,7 @@ export function RegisterFuel({
                       active={item === fuel}
                       onPress={() => {
                         setActiveField("fuel");
-
+                        setDirty(true);
                         setFuel(item);
                       }}
                     />
@@ -274,7 +296,7 @@ export function RegisterFuel({
                   onFocus={() => setActiveField("paid")}
                   onChangeText={(value: string) => {
                     setActiveField("paid");
-
+                    setDirty(true);
                     setPaid(value);
                   }}
                   keyboardType="decimal-pad"
@@ -289,7 +311,7 @@ export function RegisterFuel({
                   onFocus={() => setActiveField("liters")}
                   onChangeText={(value: string) => {
                     setActiveField("liters");
-
+                    setDirty(true);
                     setLiters(value);
                   }}
                   keyboardType="decimal-pad"
@@ -304,7 +326,7 @@ export function RegisterFuel({
                   onFocus={() => setActiveField("odometerKm")}
                   onChangeText={(value: string) => {
                     setActiveField("odometerKm");
-
+                    setDirty(true);
                     setOdometerKm(value);
                   }}
                   keyboardType="decimal-pad"
@@ -332,7 +354,7 @@ export function RegisterFuel({
                       active={station.id === stationId}
                       onPress={() => {
                         setActiveField("station");
-
+                        setDirty(true);
                         setStationId(station.id);
                       }}
                     />
@@ -344,7 +366,7 @@ export function RegisterFuel({
             {saveStatus ? <Text style={styles.errorText}>{saveStatus}</Text> : null}
             <Pressable style={styles.primaryButton} onPress={submitFuelLog}>
               <Text style={styles.primaryButtonText}>
-                {editingLog || draftLog ? "Atualizar" : "Registrar"}
+                {editingLog ? "Atualizar" : "Abastecer"}
               </Text>
             </Pressable>
           </>

@@ -831,6 +831,11 @@ export function createStyles(theme: Theme) {
     flexDirection: "row",
     gap: 8
   },
+  periodGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
   monthSwitcher: {
     minHeight: 48,
     borderRadius: 8,
@@ -883,7 +888,9 @@ export function createStyles(theme: Theme) {
     backgroundColor: theme.primarySoft
   },
   periodMetricCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "30%",
     minHeight: 70,
     backgroundColor: theme.surface,
     borderRadius: 8,
@@ -1140,6 +1147,58 @@ export function createStyles(theme: Theme) {
     fontSize: 16,
     fontWeight: "900",
     fontFamily: theme.fontFamily
+  },
+  formActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: -2
+  },
+  deleteIconButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent"
+  },
+  deleteIconText: {
+    color: "#D95D5D",
+    fontSize: 19,
+    lineHeight: 22,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  trashIcon: {
+    width: 17,
+    height: 19,
+    alignItems: "center",
+    justifyContent: "flex-end"
+  },
+  trashIconLid: {
+    width: 15,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: "#D95D5D",
+    marginBottom: 2
+  },
+  trashIconCan: {
+    width: 13,
+    height: 14,
+    borderWidth: 2,
+    borderTopWidth: 0,
+    borderColor: "#D95D5D",
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 3,
+    paddingTop: 3
+  },
+  trashIconLine: {
+    width: 2,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: "#D95D5D"
   },
   row: {
     flexDirection: "row",
@@ -1594,6 +1653,9 @@ export function createStyles(theme: Theme) {
     fontWeight: "900",
     fontFamily: theme.fontFamily,
     textAlign: "center"
+  },
+  barValueEmpty: {
+    color: theme.text
   },
   barLabel: {
     color: theme.muted,

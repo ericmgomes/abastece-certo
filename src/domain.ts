@@ -171,39 +171,54 @@ export class FuelPrice {
 
 export class FuelEfficiencyCalculator {
   static calculate(logs: FuelLog[], cars: Car[] = []) {
-    return logs
-      .filter((log) => typeof log.odometerKm === "number" && Number.isFinite(log.odometerKm))
-      .sort((a, b) => {
-        const dateDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        if (dateDifference !== 0) {
-          return dateDifference;
-        }
+    const sortedLogs = [...logs].sort((a, b) => {
+      const dateDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (dateDifference !== 0) {
+        return dateDifference;
+      }
 
-        return (a.sequence ?? 0) - (b.sequence ?? 0);
-      })
-      .reduce<Array<{ logId: string; kmPerLiter: number; distanceKm: number }>>((entries, log, index, sortedLogs) => {
-        const car = cars.find((item) => item.id === log.carId);
-        const previous = [...sortedLogs]
-          .slice(0, index)
-          .reverse()
-          .find((item) => item.carId === log.carId && typeof item.odometerKm === "number");
-        const previousOdometerKm = previous?.odometerKm ?? car?.initialOdometerKm;
+      return (a.sequence ?? 0) - (b.sequence ?? 0);
+    });
 
-        if (typeof previousOdometerKm !== "number" || !Number.isFinite(previousOdometerKm) || !log.odometerKm) {
-          return entries;
-        }
+    return cars.flatMap((car) => {
+      let previousOdometerKm = car.initialOdometerKm;
+      let litersSincePreviousOdometer = 0;
 
-        const distanceKm = log.odometerKm - previousOdometerKm;
-        if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
-          return entries;
-        }
+      return sortedLogs
+        .filter((log) => log.carId === car.id)
+        .reduce<Array<{ logId: string; kmPerLiter: number; distanceKm: number }>>((entries, log) => {
+          if (Number.isFinite(log.liters) && log.liters > 0) {
+            litersSincePreviousOdometer += log.liters;
+          }
 
-        if (!Number.isFinite(log.liters) || log.liters <= 0) {
-          return entries;
-        }
+          if (typeof log.odometerKm !== "number" || !Number.isFinite(log.odometerKm)) {
+            return entries;
+          }
 
-        return [...entries, { logId: log.id, kmPerLiter: distanceKm / log.liters, distanceKm }];
-      }, []);
+          if (typeof previousOdometerKm !== "number" || !Number.isFinite(previousOdometerKm)) {
+            previousOdometerKm = log.odometerKm;
+            litersSincePreviousOdometer = 0;
+            return entries;
+          }
+
+          const distanceKm = log.odometerKm - previousOdometerKm;
+          if (!Number.isFinite(distanceKm) || distanceKm <= 0 || litersSincePreviousOdometer <= 0) {
+            previousOdometerKm = log.odometerKm;
+            litersSincePreviousOdometer = 0;
+            return entries;
+          }
+
+          const entry = {
+            logId: log.id,
+            kmPerLiter: distanceKm / litersSincePreviousOdometer,
+            distanceKm
+          };
+
+          previousOdometerKm = log.odometerKm;
+          litersSincePreviousOdometer = 0;
+          return [...entries, entry];
+        }, []);
+    });
   }
 
   static valueForLog(log: FuelLog, logs: FuelLog[], cars: Car[] = []) {

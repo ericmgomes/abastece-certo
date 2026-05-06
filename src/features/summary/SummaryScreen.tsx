@@ -4,7 +4,6 @@ import {
   Car,
   DashboardCalculator,
   DashboardMetrics,
-  FuelEfficiencyCalculator,
   FuelLog,
   Station
 } from "../../domain";
@@ -58,12 +57,9 @@ export function SummaryScreen({
   const litersTrend = hasPreviousMonth
     ? metricTrend(monthLiters, previousMonthLiters, "lower")
     : undefined;
-  const efficiencyTrend = hasPreviousMonth && metrics.averageKmPerLiter && previousMetrics.averageKmPerLiter
-    ? metricTrend(metrics.averageKmPerLiter, previousMetrics.averageKmPerLiter, "higher")
-    : undefined;
   const monthLabel = visibleMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const chartData = monthlyChartData(logs, cars, visibleMonth, chartMetric);
-  const periodStats = fullPeriodStats(logs, cars);
+  const chartData = monthlyChartData(logs, visibleMonth, chartMetric);
+  const periodStats = fullPeriodStats(logs);
 
   return (
     <View style={styles.summaryStack}>
@@ -106,9 +102,9 @@ export function SummaryScreen({
           <MetricCard
             styles={styles}
             label="Média km/L"
-            value={metrics.averageKmPerLiter ? metrics.averageKmPerLiter.toFixed(1) : ""}
+            value="-"
             small
-            trend={efficiencyTrend}
+            trend={undefined}
             active={chartMetric === "efficiency"}
             onPress={() => {
               trackEvent("summary_chart_metric_changed", { metric: "efficiency" });
@@ -144,10 +140,12 @@ export function SummaryScreen({
           <>
             <View style={styles.summaryBlockDivider} />
             <Text style={styles.periodTitle}>{periodStats.label}</Text>
-            <View style={styles.grid}>
+            <View style={styles.periodGrid}>
               <PeriodMetricCard styles={styles} label="Gasto total" value={formatCurrency(periodStats.totalSpent)} />
               <PeriodMetricCard styles={styles} label="Litros" value={formatLiters(periodStats.totalLiters)} />
-              <PeriodMetricCard styles={styles} label="Média km/L" value={periodStats.averageKmPerLiter ? periodStats.averageKmPerLiter.toFixed(1) : ""} />
+              <PeriodMetricCard styles={styles} label="Média km/L" value="-" />
+              <PeriodMetricCard styles={styles} label="Média gasto mensal" value={formatCurrency(periodStats.averageMonthlySpent)} />
+              <PeriodMetricCard styles={styles} label="Média litros mensal" value={formatLiters(periodStats.averageMonthlyLiters)} />
             </View>
           </>
         ) : null}
@@ -240,7 +238,7 @@ function Bars({
         <View style={styles.barColumn} key={item.label}>
           <View style={styles.barTrack}>
             <View style={[styles.barFill, { height: item.value > 0 ? `${Math.max(10, (item.value / max) * 100)}%` : "0%" }]} />
-            {item.display ? <Text style={styles.barValue}>{item.display}</Text> : null}
+            {item.display ? <Text style={[styles.barValue, item.value <= 0 && styles.barValueEmpty]}>{item.display}</Text> : null}
           </View>
           <Text style={styles.barLabel}>{item.label}</Text>
         </View>
@@ -249,13 +247,12 @@ function Bars({
   );
 }
 
-function monthlyChartData(logs: FuelLog[], cars: Car[], visibleMonth: Date, metric: ChartMetric) {
-  const efficiencyEntries = FuelEfficiencyCalculator.calculate(logs, cars);
+function monthlyChartData(logs: FuelLog[], visibleMonth: Date, metric: ChartMetric) {
   return Array.from({ length: 3 }, (_item, index) =>
     new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - (2 - index), 1)
   ).map((month) => {
     const monthLogs = logsForMonth(logs, month);
-    const value = monthlyMetricValue(monthLogs, logs, efficiencyEntries, metric);
+    const value = monthlyMetricValue(monthLogs, metric);
     return {
       label: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
       value,
@@ -264,12 +261,7 @@ function monthlyChartData(logs: FuelLog[], cars: Car[], visibleMonth: Date, metr
   });
 }
 
-function monthlyMetricValue(
-  monthLogs: FuelLog[],
-  allLogs: FuelLog[],
-  efficiencyEntries: Array<{ logId: string; kmPerLiter: number }>,
-  metric: ChartMetric
-) {
+function monthlyMetricValue(monthLogs: FuelLog[], metric: ChartMetric) {
   if (metric === "spent") {
     return monthLogs.reduce((sum, log) => sum + log.paid, 0);
   }
@@ -278,16 +270,14 @@ function monthlyMetricValue(
     return monthLogs.reduce((sum, log) => sum + log.liters, 0);
   }
 
-  const monthLogIds = new Set(monthLogs.map((log) => log.id));
-  const monthEntries = efficiencyEntries.filter((entry) => monthLogIds.has(entry.logId) && allLogs.some((log) => log.id === entry.logId));
-  if (monthEntries.length === 0) {
-    return 0;
-  }
-
-  return monthEntries.reduce((sum, entry) => sum + entry.kmPerLiter, 0) / monthEntries.length;
+  return 0;
 }
 
 function formatChartValue(value: number, metric: ChartMetric) {
+  if (metric === "efficiency") {
+    return "-";
+  }
+
   if (!value) {
     return "";
   }
@@ -300,10 +290,10 @@ function formatChartValue(value: number, metric: ChartMetric) {
     return `${formatLiters(value)} L`;
   }
 
-  return `${value.toFixed(1)}`;
+  return "";
 }
 
-function fullPeriodStats(logs: FuelLog[], cars: Car[]) {
+function fullPeriodStats(logs: FuelLog[]) {
   if (logs.length === 0) {
     return null;
   }
@@ -313,17 +303,21 @@ function fullPeriodStats(logs: FuelLog[], cars: Car[]) {
   const last = sortedLogs[sortedLogs.length - 1];
   const totalSpent = sortedLogs.reduce((sum, log) => sum + log.paid, 0);
   const totalLiters = sortedLogs.reduce((sum, log) => sum + log.liters, 0);
-  const efficiencyEntries = FuelEfficiencyCalculator.calculate(sortedLogs, cars);
-  const averageKmPerLiter = efficiencyEntries.length
-    ? efficiencyEntries.reduce((sum, entry) => sum + entry.kmPerLiter, 0) / efficiencyEntries.length
-    : undefined;
+  const monthCount = inclusiveMonthCount(new Date(first.createdAt), new Date(last.createdAt));
 
   return {
     label: `de ${formatShortDate(first.createdAt)} a ${formatShortDate(last.createdAt)}`,
     totalSpent,
     totalLiters,
-    averageKmPerLiter
+    averageMonthlySpent: totalSpent / monthCount,
+    averageMonthlyLiters: totalLiters / monthCount
   };
+}
+
+function inclusiveMonthCount(first: Date, last: Date) {
+  const firstMonth = first.getFullYear() * 12 + first.getMonth();
+  const lastMonth = last.getFullYear() * 12 + last.getMonth();
+  return Math.max(1, lastMonth - firstMonth + 1);
 }
 
 function formatShortDate(value: string) {

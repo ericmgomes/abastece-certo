@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
 import { Car, DashboardMetrics, FuelLog, Station } from "../../domain";
 import { FieldToast, ToastNotice, showFieldNotice } from "../../components/formFeedback";
 import { Field, StateSelect } from "../../components/formControls";
 import { EntityDetails, StationDetails } from "../../components/fuelLogDetails";
+import { TrashIcon } from "../../components/icons";
 import { StationOverviewMap } from "../fuelLogs/FuelLogMapScreen";
 import { trackEvent } from "../../analytics";
 
@@ -302,11 +303,25 @@ function StationEditor({
       return;
     }
 
-    trackEvent("station_delete_clicked", {
-      mode: station ? "existing" : "draft"
-    });
-    onDelete(stationToDelete.id);
-    onCancel();
+    const deleteStation = () => {
+      trackEvent("station_delete_clicked", {
+        mode: station ? "existing" : "draft"
+      });
+      onDelete(stationToDelete.id);
+      onCancel();
+    };
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.("Apagar este posto? Os abastecimentos dele também serão removidos.")) {
+        deleteStation();
+      }
+      return;
+    }
+
+    Alert.alert("Apagar posto", "Os abastecimentos dele também serão removidos.", [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Apagar", style: "destructive", onPress: deleteStation }
+    ]);
   }
 
   function updateStationField(anchor: string, update: (value: string) => void) {
@@ -322,6 +337,11 @@ function StationEditor({
 
   return (
     <View style={styles.formStack}>
+      <View style={styles.formActionRow}>
+        <Pressable accessibilityLabel="Apagar posto" style={styles.deleteIconButton} onPress={confirmDelete}>
+          <TrashIcon styles={styles} />
+        </Pressable>
+      </View>
       <View style={styles.fieldToastAnchor}>
         <Field label="Nome" value={name} onFocus={() => setActiveField("name")} onChangeText={updateStationField("name", setName)} />
         <FieldToast notice={notice} anchor="name" styles={styles} />
@@ -352,9 +372,6 @@ function StationEditor({
         </View>
         <FieldToast notice={notice} anchor="state" styles={styles} />
       </View>
-      <Pressable style={styles.deleteButton} onPress={confirmDelete}>
-        <Text style={styles.deleteButtonText}>Apagar posto</Text>
-      </Pressable>
     </View>
   );
 }

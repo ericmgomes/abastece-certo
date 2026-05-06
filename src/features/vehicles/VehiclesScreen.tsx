@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
 import {
   Car,
   CarFactory,
@@ -12,6 +12,7 @@ import {
 import { FieldToast, ToastNotice, showFieldNotice } from "../../components/formFeedback";
 import { BrandSelect, Choice, Field } from "../../components/formControls";
 import { CarFuelLogDetails, EntityDetails } from "../../components/fuelLogDetails";
+import { TrashIcon } from "../../components/icons";
 import { trackEvent } from "../../analytics";
 
 type SharedComponent = React.ComponentType<any>;
@@ -289,15 +290,34 @@ function CarEditor({
       return;
     }
 
-    trackEvent("vehicle_delete_clicked", {
-      mode: car ? "existing" : "draft"
-    });
-    onDelete(carToDelete.id);
-    onCancel();
+    const deleteCar = () => {
+      trackEvent("vehicle_delete_clicked", {
+        mode: car ? "existing" : "draft"
+      });
+      onDelete(carToDelete.id);
+      onCancel();
+    };
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.("Apagar este veículo? Os abastecimentos dele também serão removidos.")) {
+        deleteCar();
+      }
+      return;
+    }
+
+    Alert.alert("Apagar veículo", "Os abastecimentos dele também serão removidos.", [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Apagar", style: "destructive", onPress: deleteCar }
+    ]);
   }
 
   return (
     <View style={styles.formStack}>
+      <View style={styles.formActionRow}>
+        <Pressable accessibilityLabel="Apagar veículo" style={styles.deleteIconButton} onPress={confirmDelete}>
+          <TrashIcon styles={styles} />
+        </Pressable>
+      </View>
       <View style={styles.fieldToastAnchor}>
         <View style={styles.inlineField}>
           <Text style={styles.inlineLabel}>Tipo</Text>
@@ -353,9 +373,6 @@ function CarEditor({
         />
         <FieldToast notice={notice} anchor="currentOdometerKm" styles={styles} />
       </View>
-      <Pressable style={styles.deleteButton} onPress={confirmDelete}>
-        <Text style={styles.deleteButtonText}>Apagar veículo</Text>
-      </Pressable>
     </View>
   );
 }
