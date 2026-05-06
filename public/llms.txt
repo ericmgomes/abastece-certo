@@ -1,0 +1,31 @@
+# LitroCerto
+
+> LitroCerto é um app para controle inteligente de abastecimentos, ajudando motoristas a registrar abastecimentos, acompanhar gastos com combustível, comparar postos e consultar métricas como R$/L e km/L.
+
+## Site
+
+- URL principal: https://litrocerto.com.br/
+- OpenAPI Actions: https://litrocerto.com.br/openapi-actions.yaml
+
+## O que o app faz
+
+- Registra abastecimentos com veículo, posto, combustível, valor pago, litros, data/hora e quilometragem.
+- Calcula preço real por litro e média de km/L.
+- Mostra histórico de abastecimentos, ranking de postos mais baratos e ranking de veículos que mais gastaram.
+- Permite consultar dados por IA no app, via Custom GPT Actions e via MCP.
+- Usa dados de exemplo quando a pessoa navega sem login.
+
+## Privacidade
+
+- O app não rastreia trajetos.
+- A localização é usada para sugerir o posto no momento do registro.
+- Dados pessoais de abastecimento pertencem à conta logada do usuário.
+
+## Integrações
+
+- Supabase para autenticação e banco de dados.
+- OpenAI para o assistente de IA.
+- MCP Server para clientes compatíveis.
+- OpenAPI Actions para Custom GPTs.
+- RevenueCat para assinaturas nos apps iOS e Android.
+- GTM/GA4 para analytics sem enviar dados sensíveis como email, endereço, localização, valor pago ou litros.
