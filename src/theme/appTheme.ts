@@ -157,7 +157,14 @@ export function createStyles(theme: Theme) {
   return StyleSheet.create({
   shell: {
     flex: 1,
-    backgroundColor: theme.background
+    width: "100%",
+    maxWidth: Platform.OS === "web" ? 430 : undefined,
+    maxHeight: Platform.OS === "web" ? 900 : undefined,
+    alignSelf: "center",
+    backgroundColor: theme.background,
+    borderLeftWidth: Platform.OS === "web" ? 1 : 0,
+    borderRightWidth: Platform.OS === "web" ? 1 : 0,
+    borderColor: theme.border
   },
   keyboard: {
     flex: 1
@@ -265,17 +272,12 @@ export function createStyles(theme: Theme) {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
     alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#DADCE0"
+    justifyContent: "center"
   },
-  googleLogoText: {
-    color: "#4285F4",
-    fontSize: 16,
-    fontWeight: "900",
-    fontFamily: Platform.select({ ios: "Avenir", android: "sans-serif", default: "Arial" }) ?? "Arial"
+  googleLogoImage: {
+    width: 22,
+    height: 22
   },
   googleButtonText: {
     color: theme.text,

@@ -195,15 +195,6 @@ export function Header({
                       onOpenUsers();
                     }} />
                   ) : null}
-                  <AccountMenuItem label={isPremium ? "Gerenciar assinatura" : subscriptionLoading ? "Carregando..." : "Premium"} styles={styles} onPress={() => {
-                    setAccountOpen(false);
-                    if (isPremium) {
-                      onOpenCustomerCenter();
-                      return;
-                    }
-
-                    onOpenPremium();
-                  }} />
                   {authEmail ? (
                     <AccountMenuItem label="Sair" styles={styles} onPress={() => {
                       setAccountOpen(false);
