@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 
 const GA4_MEASUREMENT_ID = "G-S83NNJLEYP";
+const GTM_ID = "GTM-NXSFBVPL";
 
 type AnalyticsValue = string | number | boolean | null | undefined;
 type AnalyticsPayload = Record<string, AnalyticsValue>;
@@ -24,15 +25,26 @@ export function initAnalytics() {
   window.gtag = window.gtag ?? function gtag() {
     window.dataLayer?.push(arguments as unknown as Record<string, unknown>);
   };
+
+  window.dataLayer.push({
+    "gtm.start": Date.now(),
+    event: "gtm.js"
+  });
+
+  const gtmScript = document.createElement("script");
+  gtmScript.async = true;
+  gtmScript.src = `https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`;
+  document.head.appendChild(gtmScript);
+
   window.gtag("js", new Date());
   window.gtag("config", GA4_MEASUREMENT_ID, {
     send_page_view: false
   });
 
-  const script = document.createElement("script");
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`;
-  document.head.appendChild(script);
+  const ga4Script = document.createElement("script");
+  ga4Script.async = true;
+  ga4Script.src = `https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`;
+  document.head.appendChild(ga4Script);
 }
 
 export function trackScreen(screenName: string, payload: AnalyticsPayload = {}) {
