@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-const GTM_ID = "GTM-KFJVZCVR";
+const GTM_ID = "GTM-NXSFBVPL";
 
 type AnalyticsValue = string | number | boolean | null | undefined;
 type AnalyticsPayload = Record<string, AnalyticsValue>;
