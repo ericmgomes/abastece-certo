@@ -11,6 +11,7 @@ import {
   fuels
 } from "../../domain";
 import { supabase } from "../../supabaseClient";
+import { trackEvent } from "../../analytics";
 
 export type AssistantMessage = {
   id: string;
@@ -78,7 +79,7 @@ export function AssistantScreen({
     "Registrar abastecimento"
   ];
 
-  async function sendMessage(text = input) {
+  async function sendMessage(text = input, source: "manual" | "quick_prompt" = "manual") {
     const trimmed = text.trim();
     if (!trimmed || loading) {
       return;
@@ -93,6 +94,11 @@ export function AssistantScreen({
     setInput("");
     inputRef.current?.focus();
     setLoading(true);
+    trackEvent("ai_message_sent", {
+      source,
+      auth_state: state.user?.email ? "authenticated" : "guest",
+      message_length: trimmed.length
+    });
 
     try {
       const { data } = await supabase.auth.getSession();
@@ -116,6 +122,10 @@ export function AssistantScreen({
         throw new Error(payload.message ?? "Não foi possível falar com o assistente.");
       }
 
+      trackEvent("ai_response_received", {
+        auth_state: state.user?.email ? "authenticated" : "guest",
+        has_draft: Boolean(payload.draftFuelLog)
+      });
       setMessages((current) => [
         ...current,
         {
@@ -126,6 +136,9 @@ export function AssistantScreen({
         }
       ]);
     } catch (error) {
+      trackEvent("ai_response_error", {
+        auth_state: state.user?.email ? "authenticated" : "guest"
+      });
       setMessages((current) => [
         ...current,
         {
@@ -167,6 +180,11 @@ export function AssistantScreen({
       latitude: station?.latitude ?? fakeCurrentLocation.latitude,
       longitude: station?.longitude ?? fakeCurrentLocation.longitude
     }));
+    trackEvent("ai_fuel_log_draft_confirmed", {
+      auth_state: state.user?.email ? "authenticated" : "guest",
+      fuel_type: draft.fuel,
+      has_odometer: Boolean(draft.odometerKm)
+    });
     setMessages((current) => [
       ...current,
       {
@@ -191,7 +209,7 @@ export function AssistantScreen({
         ) : null}
         <View style={styles.assistantQuickRow}>
           {quickPrompts.map((prompt) => (
-            <Pressable key={prompt} style={styles.assistantChip} onPress={() => void sendMessage(prompt)}>
+            <Pressable key={prompt} style={styles.assistantChip} onPress={() => void sendMessage(prompt, "quick_prompt")}>
               <Text style={styles.assistantChipText}>{prompt}</Text>
             </Pressable>
           ))}

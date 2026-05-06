@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { ThemeMode, ThemePalette } from "../../domain";
 import { supabase } from "../../supabaseClient";
+import { trackEvent } from "../../analytics";
 
 type AuthStyles = Record<string, any>;
 type AuthTheme = { muted: string };
@@ -53,31 +54,54 @@ export function AuthScreen({
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     if (modeToSubmit === "signUp" && trimmedName.length < 2) {
+      trackEvent("auth_validation_error", {
+        mode: modeToSubmit,
+        field: "name"
+      });
       setFormError("Informe seu nome para criar a conta.");
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
+      trackEvent("auth_validation_error", {
+        mode: modeToSubmit,
+        field: "email"
+      });
       setFormError("Informe um email válido para continuar.");
       return;
     }
 
     if (!password) {
+      trackEvent("auth_validation_error", {
+        mode: modeToSubmit,
+        field: "password"
+      });
       setFormError("Informe sua senha para continuar.");
       return;
     }
 
     if (password.length < 6) {
+      trackEvent("auth_validation_error", {
+        mode: modeToSubmit,
+        field: "password_length"
+      });
       setFormError("Use uma senha com pelo menos 6 caracteres.");
       return;
     }
 
     if (modeToSubmit === "signUp" && password !== passwordConfirmation) {
+      trackEvent("auth_validation_error", {
+        mode: modeToSubmit,
+        field: "password_confirmation"
+      });
       setFormError("A confirmação de senha precisa ser igual à senha.");
       return;
     }
 
     setLoading(true);
+    trackEvent(modeToSubmit === "signIn" ? "login_submitted" : "sign_up_submitted", {
+      method: "password"
+    });
     const credentials = { email: trimmedEmail, password };
     const result = modeToSubmit === "signIn"
       ? await supabase.auth.signInWithPassword(credentials)
@@ -93,9 +117,17 @@ export function AuthScreen({
     setLoading(false);
 
     if (result.error) {
+      trackEvent(modeToSubmit === "signIn" ? "login_error" : "sign_up_error", {
+        method: "password"
+      });
       setFormError(authErrorMessage(result.error.message));
       return;
     }
+
+    trackEvent(modeToSubmit === "signIn" ? "login" : "sign_up", {
+      method: "password",
+      requires_email_confirmation: modeToSubmit === "signUp" && !result.data.session
+    });
 
     if (modeToSubmit === "signUp" && !result.data.session) {
       Alert.alert("Conta criada", "Confira seu email para confirmar a conta antes de fazer login.");
@@ -104,6 +136,9 @@ export function AuthScreen({
 
   async function signInWithGoogle() {
     setLoading(true);
+    trackEvent("login_submitted", {
+      method: "google"
+    });
     const result = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -113,6 +148,9 @@ export function AuthScreen({
     setLoading(false);
 
     if (result.error) {
+      trackEvent("login_error", {
+        method: "google"
+      });
       Alert.alert("Ops", result.error.message);
     }
   }

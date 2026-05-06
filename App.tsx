@@ -47,6 +47,7 @@ import {
   withDemoData,
   withStableLogSequences
 } from "./src/state/appStateHelpers";
+import { initAnalytics, trackEvent, trackScreen } from "./src/analytics";
 
 type Tab = AppTab;
 type UtilityScreen = "help" | "privacy" | "users" | null;
@@ -139,8 +140,36 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS === "web") {
       document.title = "LitroCerto";
+      initAnalytics();
+      trackEvent("app_loaded");
     }
   }, []);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+
+    const screenName = authScreenOpen
+      ? "Login"
+      : oauthConsentRoute
+        ? "OAuth consent"
+        : utilityScreen === "help"
+          ? "Ajuda"
+          : utilityScreen === "privacy"
+            ? "Privacidade"
+            : utilityScreen === "users"
+              ? "Usuários"
+              : fuelFormMode === "new"
+                ? "Novo abastecimento"
+                : fuelFormMode === "edit"
+                  ? "Editar abastecimento"
+                  : tab;
+
+    trackScreen(screenName, {
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
+  }, [authScreenOpen, fuelFormMode, oauthConsentRoute, ownerId, ready, tab, utilityScreen]);
 
   useEffect(() => {
     if (tab !== "IA") {
@@ -341,6 +370,11 @@ export default function App() {
   }
 
   function saveFuelLog(log: FuelLog) {
+    trackEvent("fuel_log_created", {
+      auth_state: ownerId ? "authenticated" : "guest",
+      fuel_type: log.fuel,
+      has_odometer: Boolean(log.odometerKm)
+    });
     setState((current) => ({
       ...current,
       logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
@@ -352,6 +386,9 @@ export default function App() {
   }
 
   function saveUser(user: User) {
+    trackEvent("profile_updated", {
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
     updateState({ user });
     setAuthName(user.name);
 
@@ -372,14 +409,21 @@ export default function App() {
   }
 
   function toggleTheme() {
+    trackEvent("theme_mode_changed", {
+      mode: themeMode === "light" ? "dark" : "light"
+    });
     updateState({ themeMode: themeMode === "light" ? "dark" : "light" });
   }
 
   function selectThemePalette(nextPalette: ThemePalette) {
+    trackEvent("theme_palette_changed", {
+      palette: nextPalette
+    });
     updateState({ themePalette: nextPalette });
   }
 
   async function signOut() {
+    trackEvent("logout");
     await supabase.auth.signOut();
     enterGuestMode();
   }
@@ -406,10 +450,17 @@ export default function App() {
       ? activeCarIds.filter((id) => id !== carId)
       : [...activeCarIds, carId];
 
+    trackEvent("vehicle_filter_changed", {
+      selected_vehicle_count: next.length
+    });
     updateState({ filteredCarIds: next });
   }
 
   function openNewFuelForm() {
+    trackEvent("fuel_log_form_opened", {
+      mode: "new",
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
     setEditingLogId(null);
     setFuelFormMode("new");
     setUtilityScreen(null);
@@ -422,6 +473,10 @@ export default function App() {
       return;
     }
 
+    trackEvent("fuel_log_form_opened", {
+      mode: "edit",
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
     setEditingLogId(logId);
     setFuelFormMode("edit");
     setTab("Abastecimentos");
@@ -435,6 +490,10 @@ export default function App() {
   function changeTab(nextTab: Tab) {
     closeFuelForm();
     setUtilityScreen(null);
+    trackEvent("tab_selected", {
+      tab: nextTab,
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
     setTab(nextTab);
   }
 
@@ -469,14 +528,21 @@ export default function App() {
           onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
           onSave={saveFuelLog}
           onUpdate={(log) =>
-            setState((current) => ({
-              ...current,
-              logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
-              selectedCarId: log.carId,
-              filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                ? current.filteredCarIds
-                : [...(current.filteredCarIds ?? []), log.carId]
-            }))
+            {
+              trackEvent("fuel_log_updated", {
+                auth_state: ownerId ? "authenticated" : "guest",
+                fuel_type: log.fuel,
+                has_odometer: Boolean(log.odometerKm)
+              });
+              setState((current) => ({
+                ...current,
+                logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
+                selectedCarId: log.carId,
+                filteredCarIds: current.filteredCarIds?.includes(log.carId)
+                  ? current.filteredCarIds
+                  : [...(current.filteredCarIds ?? []), log.carId]
+              }));
+            }
           }
           styles={styles}
           Section={Section}
@@ -494,33 +560,50 @@ export default function App() {
           onEditLog={openEditFuelForm}
           onSelect={(selectedCarId) => updateState({ selectedCarId })}
           onSave={(car) =>
-            setState((current) => ({
-              ...current,
-              cars: [...current.cars, car],
-              selectedCarId: current.selectedCarId ?? car.id,
-              filteredCarIds: [...(current.filteredCarIds ?? []), car.id]
-            }))
+            {
+              trackEvent("vehicle_created", {
+                auth_state: ownerId ? "authenticated" : "guest",
+                vehicle_type: car.vehicleType
+              });
+              setState((current) => ({
+                ...current,
+                cars: [...current.cars, car],
+                selectedCarId: current.selectedCarId ?? car.id,
+                filteredCarIds: [...(current.filteredCarIds ?? []), car.id]
+              }));
+            }
           }
           onUpdate={(car) =>
-            setState((current) => ({
-              ...current,
-              cars: current.cars.map((item) => (item.id === car.id ? car : item)),
-              selectedCarId: car.id
-            }))
+            {
+              trackEvent("vehicle_updated", {
+                auth_state: ownerId ? "authenticated" : "guest",
+                vehicle_type: car.vehicleType
+              });
+              setState((current) => ({
+                ...current,
+                cars: current.cars.map((item) => (item.id === car.id ? car : item)),
+                selectedCarId: car.id
+              }));
+            }
           }
           onDeleteCar={(carId) =>
-            setState((current) => {
-              const cars = current.cars.filter((car) => car.id !== carId);
-              const logs = current.logs.filter((log) => log.carId !== carId);
-              const filteredCarIds = (current.filteredCarIds ?? []).filter((id) => id !== carId);
-              return {
-                ...current,
-                cars,
-                logs,
-                filteredCarIds,
-                selectedCarId: current.selectedCarId === carId ? cars[0]?.id ?? null : current.selectedCarId
-              };
-            })
+            {
+              trackEvent("vehicle_deleted", {
+                auth_state: ownerId ? "authenticated" : "guest"
+              });
+              setState((current) => {
+                const cars = current.cars.filter((car) => car.id !== carId);
+                const logs = current.logs.filter((log) => log.carId !== carId);
+                const filteredCarIds = (current.filteredCarIds ?? []).filter((id) => id !== carId);
+                return {
+                  ...current,
+                  cars,
+                  logs,
+                  filteredCarIds,
+                  selectedCarId: current.selectedCarId === carId ? cars[0]?.id ?? null : current.selectedCarId
+                };
+              });
+            }
           }
           styles={styles}
           components={{
@@ -537,7 +620,12 @@ export default function App() {
           state={state}
           messages={assistantMessages}
           setMessages={setAssistantMessages}
-          onOpenAuth={() => setAuthScreenOpen(true)}
+          onOpenAuth={() => {
+            trackEvent("login_opened", {
+              source: "assistant"
+            });
+            setAuthScreenOpen(true);
+          }}
           onSaveFuelLog={saveFuelLog}
           Section={Section}
           styles={styles}
@@ -556,23 +644,38 @@ export default function App() {
           metrics={metrics}
           onEditLog={openEditFuelForm}
           onSave={(station) =>
-            setState((current) => ({
-              ...current,
-              stations: [...current.stations, station]
-            }))
+            {
+              trackEvent("station_created", {
+                auth_state: ownerId ? "authenticated" : "guest"
+              });
+              setState((current) => ({
+                ...current,
+                stations: [...current.stations, station]
+              }));
+            }
           }
           onUpdate={(station) =>
-            setState((current) => ({
-              ...current,
-              stations: current.stations.map((item) => (item.id === station.id ? station : item))
-            }))
+            {
+              trackEvent("station_updated", {
+                auth_state: ownerId ? "authenticated" : "guest"
+              });
+              setState((current) => ({
+                ...current,
+                stations: current.stations.map((item) => (item.id === station.id ? station : item))
+              }));
+            }
           }
           onDeleteStation={(stationId) =>
-            setState((current) => ({
-              ...current,
-              stations: current.stations.filter((station) => station.id !== stationId),
-              logs: current.logs.filter((log) => log.stationId !== stationId)
-            }))
+            {
+              trackEvent("station_deleted", {
+                auth_state: ownerId ? "authenticated" : "guest"
+              });
+              setState((current) => ({
+                ...current,
+                stations: current.stations.filter((station) => station.id !== stationId),
+                logs: current.logs.filter((log) => log.stationId !== stationId)
+              }));
+            }
           }
           styles={styles}
           theme={theme}
@@ -616,14 +719,21 @@ export default function App() {
           onCarSelect={(selectedCarId) => updateState({ selectedCarId })}
           onSave={saveFuelLog}
           onUpdate={(log) =>
-            setState((current) => ({
-              ...current,
-              logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
-              selectedCarId: log.carId,
-              filteredCarIds: current.filteredCarIds?.includes(log.carId)
-                ? current.filteredCarIds
-                : [...(current.filteredCarIds ?? []), log.carId]
-            }))
+            {
+              trackEvent("fuel_log_updated", {
+                auth_state: ownerId ? "authenticated" : "guest",
+                fuel_type: log.fuel,
+                has_odometer: Boolean(log.odometerKm)
+              });
+              setState((current) => ({
+                ...current,
+                logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
+                selectedCarId: log.carId,
+                filteredCarIds: current.filteredCarIds?.includes(log.carId)
+                  ? current.filteredCarIds
+                  : [...(current.filteredCarIds ?? []), log.carId]
+              }));
+            }
           }
           styles={styles}
           theme={theme}
@@ -710,17 +820,25 @@ export default function App() {
                   onToggleTheme={toggleTheme}
                   onThemePaletteSelect={selectThemePalette}
                   onNewFuel={openNewFuelForm}
-                  onOpenAuth={() => setAuthScreenOpen(true)}
+                  onOpenAuth={() => {
+                    trackEvent("login_opened", {
+                      source: "header"
+                    });
+                    setAuthScreenOpen(true);
+                  }}
                   onOpenHelp={() => {
                     closeFuelForm();
+                    trackEvent("help_opened");
                     setUtilityScreen("help");
                   }}
                   onOpenPrivacy={() => {
                     closeFuelForm();
+                    trackEvent("privacy_opened");
                     setUtilityScreen("privacy");
                   }}
                   onOpenUsers={() => {
                     closeFuelForm();
+                    trackEvent("users_admin_opened");
                     setUtilityScreen("users");
                   }}
                   onSignOut={confirmSignOut}
@@ -736,7 +854,12 @@ export default function App() {
                   theme={theme}
                 />
                 {!ownerId ? (
-                  <DemoBanner onOpenAuth={() => setAuthScreenOpen(true)} styles={styles} />
+                  <DemoBanner onOpenAuth={() => {
+                    trackEvent("login_opened", {
+                      source: "demo_banner"
+                    });
+                    setAuthScreenOpen(true);
+                  }} styles={styles} />
                 ) : null}
                 <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
                   {renderContent()}

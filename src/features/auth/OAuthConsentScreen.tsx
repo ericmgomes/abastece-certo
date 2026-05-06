@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { supabase } from "../../supabaseClient";
+import { trackEvent } from "../../analytics";
 
 export type OAuthAuthorizeRequest = {
   response_type: string;
@@ -75,6 +76,9 @@ export function OAuthConsentScreen({
     }
 
     if (decision === "deny") {
+      trackEvent("oauth_access_denied", {
+        client: oauthClientName(request.redirect_uri)
+      });
       const redirectUrl = new URL(request.redirect_uri);
       redirectUrl.searchParams.set("error", "access_denied");
       if (request.state) {
@@ -90,6 +94,10 @@ export function OAuthConsentScreen({
     const supabaseAccessToken = sessionResult.data.session?.access_token;
     if (!supabaseAccessToken) {
       setLoading(false);
+      trackEvent("oauth_access_error", {
+        reason: "expired_session",
+        client: oauthClientName(request.redirect_uri)
+      });
       setError("Sua sessão expirou. Faça login novamente.");
       return;
     }
@@ -108,10 +116,17 @@ export function OAuthConsentScreen({
     setLoading(false);
 
     if (!result.ok || !data.redirect_url) {
+      trackEvent("oauth_access_error", {
+        reason: "approve_failed",
+        client: oauthClientName(request.redirect_uri)
+      });
       setError(data.message ?? "Não foi possível autorizar o acesso.");
       return;
     }
 
+    trackEvent("oauth_access_approved", {
+      client: oauthClientName(request.redirect_uri)
+    });
     redirectBrowserTo(data.redirect_url);
   }
 
