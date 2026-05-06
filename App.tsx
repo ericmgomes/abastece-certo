@@ -387,6 +387,7 @@ export default function App() {
     });
     setState((current) => ({
       ...current,
+      cars: updateCarCurrentOdometer(current.cars, log),
       logs: sortFuelLogs([{ ...log, sequence: nextLogSequence(current.logs) }, ...current.logs]),
       selectedCarId: log.carId,
       filteredCarIds: current.filteredCarIds?.includes(log.carId)
@@ -547,6 +548,7 @@ export default function App() {
               });
               setState((current) => ({
                 ...current,
+                cars: updateCarCurrentOdometer(current.cars, log),
                 logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
                 selectedCarId: log.carId,
                 filteredCarIds: current.filteredCarIds?.includes(log.carId)
@@ -738,6 +740,7 @@ export default function App() {
               });
               setState((current) => ({
                 ...current,
+                cars: updateCarCurrentOdometer(current.cars, log),
                 logs: sortFuelLogs(current.logs.map((item) => (item.id === log.id ? log : item))),
                 selectedCarId: log.carId,
                 filteredCarIds: current.filteredCarIds?.includes(log.carId)
@@ -895,5 +898,28 @@ export default function App() {
       </ThemeContext.Provider>
     </SafeAreaProvider>
   );
+}
+
+function updateCarCurrentOdometer(cars: AppState["cars"], log: FuelLog) {
+  if (typeof log.odometerKm !== "number" || !Number.isFinite(log.odometerKm)) {
+    return cars;
+  }
+
+  const nextOdometerKm = log.odometerKm;
+  return cars.map((car) => {
+    if (car.id !== log.carId) {
+      return car;
+    }
+
+    const currentKm = car.currentOdometerKm;
+    if (typeof currentKm === "number" && currentKm > nextOdometerKm) {
+      return car;
+    }
+
+    return {
+      ...car,
+      currentOdometerKm: nextOdometerKm
+    };
+  });
 }
 

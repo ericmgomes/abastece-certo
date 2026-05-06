@@ -177,6 +177,9 @@ export function AuthScreen({
         <Text style={styles.muted}>Use Google para entrar mais rápido ou continue com email e senha.</Text>
         <Text style={styles.privacyText}>O app não rastreia seus trajetos. A localização só ajuda a sugerir o posto no momento do registro.</Text>
         <Pressable style={[styles.googleButton, styles.authButton]} onPress={signInWithGoogle} disabled={loading}>
+          <View style={styles.googleLogo}>
+            <Text style={styles.googleLogoText}>G</Text>
+          </View>
           <Text style={styles.googleButtonText}>
             {isSignIn ? "Login com Google" : "Criar conta com Google"}
           </Text>

@@ -104,7 +104,7 @@ export function Cars({
         {cars.length === 0 ? (
           <Empty text="Cadastre seu primeiro veículo." />
         ) : (
-          carRows.map(({ car, total, count }) => (
+          carRows.map(({ car, total, count, currentOdometerKm }) => (
             <View key={car.id} style={styles.inlineEditGroup}>
               <Pressable
                 style={(state) => [
@@ -117,7 +117,7 @@ export function Cars({
                 <View style={styles.rankingInfo}>
                   <Text style={styles.itemTitle}>{car.nickname}</Text>
                   <Text style={styles.muted}>
-                    {count} abastecimentos
+                    {currentOdometerKm ? `Km atual: ${currentOdometerKm.toLocaleString("pt-BR")} km` : `${count} abastecimentos`}
                   </Text>
                 </View>
                 <View style={styles.listItemActions}>
@@ -199,6 +199,8 @@ function CarEditor({
   const [vehicleType, setVehicleType] = useState<VehicleType>(car?.vehicleType ?? "Carro");
   const [brand, setBrand] = useState(car?.brand ?? "");
   const [model, setModel] = useState(car?.model ?? "");
+  const [initialOdometerKm, setInitialOdometerKm] = useState(car?.initialOdometerKm ? String(car.initialOdometerKm) : "");
+  const [currentOdometerKm, setCurrentOdometerKm] = useState(car?.currentOdometerKm ? String(car.currentOdometerKm) : "");
   const [status, setStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<ToastNotice | null>(null);
   const [activeField, setActiveField] = useState("brand");
@@ -211,6 +213,8 @@ function CarEditor({
     setVehicleType(car.vehicleType ?? "Carro");
     setBrand(car.brand);
     setModel(car.model);
+    setInitialOdometerKm(car.initialOdometerKm ? String(car.initialOdometerKm) : "");
+    setCurrentOdometerKm(car.currentOdometerKm ? String(car.currentOdometerKm) : "");
     setDraftCar(null);
   }, [car?.id]);
 
@@ -222,28 +226,30 @@ function CarEditor({
       }
 
       const nickname = VehicleName.unique(brand, model, cars, car?.id ?? draftCar?.id);
+      const parsedInitialOdometerKm = parseOptionalNumber(initialOdometerKm);
+      const parsedCurrentOdometerKm = parseOptionalNumber(currentOdometerKm);
       if (car) {
-        onUpdate(CarFactory.update(car, { vehicleType, nickname, brand, model }));
+        onUpdate(CarFactory.update(car, { vehicleType, nickname, brand, model, initialOdometerKm: parsedInitialOdometerKm, currentOdometerKm: parsedCurrentOdometerKm }));
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
       if (draftCar) {
-        const updated = CarFactory.update(draftCar, { vehicleType, nickname, brand, model });
+        const updated = CarFactory.update(draftCar, { vehicleType, nickname, brand, model, initialOdometerKm: parsedInitialOdometerKm, currentOdometerKm: parsedCurrentOdometerKm });
         setDraftCar(updated);
         onUpdate(updated);
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
         return;
       }
 
-      const created = CarFactory.create({ vehicleType, nickname, brand, model });
+      const created = CarFactory.create({ vehicleType, nickname, brand, model, initialOdometerKm: parsedInitialOdometerKm, currentOdometerKm: parsedCurrentOdometerKm });
       setDraftCar(created);
       onSave(created);
       showFieldNotice(setNotice, "Veículo criado.", activeField);
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [vehicleType, brand, model, car?.id, draftCar?.id]);
+  }, [vehicleType, brand, model, initialOdometerKm, currentOdometerKm, car?.id, draftCar?.id]);
 
   function updateCarField(anchor: string, update: (value: string) => void) {
     return (value: string) => {
@@ -296,6 +302,26 @@ function CarEditor({
         <Field label="Modelo" value={model} onFocus={() => setActiveField("model")} onChangeText={updateCarField("model", setModel)} />
         <FieldToast notice={notice} anchor="model" styles={styles} />
       </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field
+          label="Km inicial"
+          value={initialOdometerKm}
+          keyboardType="numeric"
+          onFocus={() => setActiveField("initialOdometerKm")}
+          onChangeText={updateCarField("initialOdometerKm", (value) => setInitialOdometerKm(value.replace(/[^\d,.]/g, "")))}
+        />
+        <FieldToast notice={notice} anchor="initialOdometerKm" styles={styles} />
+      </View>
+      <View style={styles.fieldToastAnchor}>
+        <Field
+          label="Km atual"
+          value={currentOdometerKm}
+          keyboardType="numeric"
+          onFocus={() => setActiveField("currentOdometerKm")}
+          onChangeText={updateCarField("currentOdometerKm", (value) => setCurrentOdometerKm(value.replace(/[^\d,.]/g, "")))}
+        />
+        <FieldToast notice={notice} anchor="currentOdometerKm" styles={styles} />
+      </View>
       <Pressable style={styles.deleteButton} onPress={confirmDelete}>
         <Text style={styles.deleteButtonText}>Apagar veículo</Text>
       </Pressable>
@@ -303,12 +329,22 @@ function CarEditor({
   );
 }
 
+function parseOptionalNumber(value: string) {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
 function carSummary(car: Car, logs: FuelLog[]) {
   const carLogs = logs.filter((log) => log.carId === car.id);
+  const latestLogKm = [...carLogs]
+    .filter((log) => typeof log.odometerKm === "number")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]?.odometerKm;
+  const currentOdometerKm = car.currentOdometerKm ?? latestLogKm ?? car.initialOdometerKm;
   return {
     car,
     total: carLogs.reduce((sum, log) => sum + log.paid, 0),
-    count: carLogs.length
+    count: carLogs.length,
+    currentOdometerKm
   };
 }
 

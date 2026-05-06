@@ -18,6 +18,8 @@ export type Car = {
   nickname: string;
   brand: string;
   model: string;
+  initialOdometerKm?: number;
+  currentOdometerKm?: number;
 };
 
 export type Station = {
@@ -168,7 +170,7 @@ export class FuelPrice {
 }
 
 export class FuelEfficiencyCalculator {
-  static calculate(logs: FuelLog[]) {
+  static calculate(logs: FuelLog[], cars: Car[] = []) {
     return logs
       .filter((log) => typeof log.odometerKm === "number" && Number.isFinite(log.odometerKm))
       .sort((a, b) => {
@@ -180,16 +182,18 @@ export class FuelEfficiencyCalculator {
         return (a.sequence ?? 0) - (b.sequence ?? 0);
       })
       .reduce<Array<{ logId: string; kmPerLiter: number; distanceKm: number }>>((entries, log, index, sortedLogs) => {
+        const car = cars.find((item) => item.id === log.carId);
         const previous = [...sortedLogs]
           .slice(0, index)
           .reverse()
           .find((item) => item.carId === log.carId && typeof item.odometerKm === "number");
+        const previousOdometerKm = previous?.odometerKm ?? car?.initialOdometerKm;
 
-        if (!previous?.odometerKm || !log.odometerKm) {
+        if (typeof previousOdometerKm !== "number" || !Number.isFinite(previousOdometerKm) || !log.odometerKm) {
           return entries;
         }
 
-        const distanceKm = log.odometerKm - previous.odometerKm;
+        const distanceKm = log.odometerKm - previousOdometerKm;
         if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
           return entries;
         }
@@ -202,8 +206,8 @@ export class FuelEfficiencyCalculator {
       }, []);
   }
 
-  static valueForLog(log: FuelLog, logs: FuelLog[]) {
-    return FuelEfficiencyCalculator.calculate(logs).find((entry) => entry.logId === log.id);
+  static valueForLog(log: FuelLog, logs: FuelLog[], cars: Car[] = []) {
+    return FuelEfficiencyCalculator.calculate(logs, cars).find((entry) => entry.logId === log.id);
   }
 }
 
@@ -274,6 +278,8 @@ export class CarFactory {
     nickname?: string;
     brand: string;
     model: string;
+    initialOdometerKm?: number;
+    currentOdometerKm?: number;
   }): Car {
     const brand = input.brand.trim();
     const model = input.model.trim();
@@ -282,7 +288,9 @@ export class CarFactory {
       vehicleType: input.vehicleType ?? "Carro",
       nickname: (input.nickname ?? VehicleName.base(brand, model)).trim(),
       brand,
-      model
+      model,
+      initialOdometerKm: input.initialOdometerKm,
+      currentOdometerKm: input.currentOdometerKm
     };
   }
 
@@ -293,6 +301,8 @@ export class CarFactory {
       nickname?: string;
       brand: string;
       model: string;
+      initialOdometerKm?: number;
+      currentOdometerKm?: number;
     }
   ): Car {
     const brand = input.brand.trim();
@@ -302,7 +312,9 @@ export class CarFactory {
       vehicleType: input.vehicleType,
       nickname: (input.nickname ?? VehicleName.base(brand, model)).trim(),
       brand,
-      model
+      model,
+      initialOdometerKm: input.initialOdometerKm,
+      currentOdometerKm: input.currentOdometerKm
     };
   }
 }
@@ -512,7 +524,7 @@ export class DashboardCalculator {
   }
 
   private averageKmPerLiter() {
-    const entries = FuelEfficiencyCalculator.calculate(this.state.logs);
+    const entries = FuelEfficiencyCalculator.calculate(this.state.logs, this.state.cars);
     const monthlyEntries = entries.filter((entry) => {
       const log = this.state.logs.find((item) => item.id === entry.logId);
       return log ? this.isReferenceMonth(log.createdAt) : false;

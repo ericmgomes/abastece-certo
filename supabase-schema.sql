@@ -17,8 +17,13 @@ create table if not exists cars (
   nickname text not null,
   brand text not null default '',
   model text not null default '',
+  initial_odometer_km numeric,
+  current_odometer_km numeric,
   updated_at timestamp with time zone not null default now()
 );
+
+alter table cars add column if not exists initial_odometer_km numeric;
+alter table cars add column if not exists current_odometer_km numeric;
 
 alter table cars drop column if exists plate;
 alter table cars drop column if exists year;

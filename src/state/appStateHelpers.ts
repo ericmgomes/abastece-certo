@@ -45,21 +45,27 @@ const demoCars: Car[] = [
     vehicleType: "Carro",
     nickname: "Compass",
     brand: "Jeep",
-    model: "Compass"
+    model: "Compass",
+    initialOdometerKm: 39800,
+    currentOdometerKm: 42080
   },
   {
     id: "demo-onix",
     vehicleType: "Carro",
     nickname: "Onix",
     brand: "Chevrolet",
-    model: "Onix Plus"
+    model: "Onix Plus",
+    initialOdometerKm: 24400,
+    currentOdometerKm: 26010
   },
   {
     id: "demo-hilux",
     vehicleType: "Caminhonete",
     nickname: "Hilux",
     brand: "Toyota",
-    model: "Hilux"
+    model: "Hilux",
+    initialOdometerKm: 70400,
+    currentOdometerKm: 72890
   }
 ];
 

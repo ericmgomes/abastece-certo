@@ -20,6 +20,8 @@ type CarRow = {
   nickname: string;
   brand: string;
   model: string;
+  initial_odometer_km?: number | null;
+  current_odometer_km?: number | null;
 };
 
 type StationRow = {
@@ -222,7 +224,9 @@ export class SupabaseAppRepository {
       vehicleType: row.vehicle_type ?? "Carro",
       nickname: row.nickname,
       brand: row.brand,
-      model: row.model
+      model: row.model,
+      initialOdometerKm: row.initial_odometer_km ?? undefined,
+      currentOdometerKm: row.current_odometer_km ?? undefined
     };
   }
 
@@ -233,7 +237,9 @@ export class SupabaseAppRepository {
       vehicle_type: car.vehicleType ?? "Carro",
       nickname: car.nickname,
       brand: car.brand,
-      model: car.model
+      model: car.model,
+      initial_odometer_km: car.initialOdometerKm ?? null,
+      current_odometer_km: car.currentOdometerKm ?? null
     };
   }
 

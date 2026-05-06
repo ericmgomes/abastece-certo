@@ -77,7 +77,10 @@ export function RegisterFuel({
     }
 
     setCarId(selectedCar.id);
-  }, [editingLog, selectedCar?.id]);
+    if (selectedCar.currentOdometerKm && !odometerKm) {
+      setOdometerKm(String(selectedCar.currentOdometerKm).replace(".", ","));
+    }
+  }, [editingLog, odometerKm, selectedCar?.currentOdometerKm, selectedCar?.id]);
 
   useEffect(() => {
     if (!editingLog) {

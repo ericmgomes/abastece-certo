@@ -76,7 +76,7 @@ export function StationMap({
           numberedLogs.map(({ log, number }) => {
             const station = stations.find((item) => item.id === log.stationId);
             const car = cars.find((item) => item.id === log.carId);
-            const efficiency = FuelEfficiencyCalculator.valueForLog(log, allLogs);
+            const efficiency = FuelEfficiencyCalculator.valueForLog(log, allLogs, cars);
             return (
               <View key={log.id} style={styles.inlineEditGroup}>
                 <Pressable

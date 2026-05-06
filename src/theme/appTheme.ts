@@ -255,9 +255,27 @@ export function createStyles(theme: Theme) {
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.surfaceAlt,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14
+    paddingHorizontal: 14,
+    gap: 10
+  },
+  googleLogo: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#DADCE0"
+  },
+  googleLogoText: {
+    color: "#4285F4",
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: Platform.select({ ios: "Avenir", android: "sans-serif", default: "Arial" }) ?? "Arial"
   },
   googleButtonText: {
     color: theme.text,
