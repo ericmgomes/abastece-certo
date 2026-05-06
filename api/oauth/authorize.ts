@@ -14,5 +14,14 @@ export default async function handler(request: any, response: any) {
   }
 
   const currentUrl = new URL(request.url ?? "", `https://${request.headers.host}`);
-  response.redirect(302, `/oauth/consent${currentUrl.search}`);
+  const origin = publicOrigin(request);
+  response.redirect(302, `${origin}/oauth/consent${currentUrl.search}`);
+}
+
+function publicOrigin(request: any) {
+  const host = request.headers["x-forwarded-host"] ?? request.headers.host ?? "app.litrocerto.com.br";
+  const proto = request.headers["x-forwarded-proto"] ?? "https";
+  const hostValue = Array.isArray(host) ? host[0] : host;
+  const protoValue = Array.isArray(proto) ? proto[0] : proto;
+  return `${protoValue}://${hostValue}`;
 }

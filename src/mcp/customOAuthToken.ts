@@ -11,6 +11,9 @@ export type LitroCertoOAuthPayload = {
   ownerId: string;
   email: string;
   name: string;
+  codeChallenge?: string;
+  codeChallengeMethod?: string;
+  resource?: string;
   iat: number;
   exp: number;
   jti: string;

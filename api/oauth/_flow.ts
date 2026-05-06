@@ -1,4 +1,5 @@
 import { IncomingMessage, ServerResponse } from "http";
+import { createHash } from "crypto";
 import { contextFromBearerToken } from "../../src/mcp/supabaseAuth";
 import { oauthClientConfig, signOAuthPayload, verifyOAuthPayload } from "../../src/mcp/customOAuthToken";
 import { setCors } from "../_actions";
@@ -21,6 +22,10 @@ type OAuthParams = {
   redirect_uri?: string;
   state?: string;
   scope?: string;
+  code_challenge?: string;
+  code_challenge_method?: string;
+  code_verifier?: string;
+  resource?: string;
   supabase_access_token?: string;
 };
 
@@ -55,6 +60,9 @@ export async function handleOAuthApprove(request: VercelRequest, response: Verce
       ownerId: context.ownerId,
       email: context.email,
       name: context.name,
+      codeChallenge: body.code_challenge,
+      codeChallengeMethod: body.code_challenge_method,
+      resource: body.resource,
       exp: Math.floor(Date.now() / 1000) + 5 * 60
     });
     const redirectUrl = new URL(body.redirect_uri!);
@@ -110,6 +118,8 @@ export async function handleOAuthToken(request: VercelRequest, response: VercelR
       throw new Error("redirect_uri inválida.");
     }
 
+    validatePkce(body.code_verifier, code.codeChallenge, code.codeChallengeMethod);
+
     const accessToken = signOAuthPayload({
       typ: "access",
       clientId: code.clientId,
@@ -119,6 +129,7 @@ export async function handleOAuthToken(request: VercelRequest, response: VercelR
       ownerId: code.ownerId,
       email: code.email,
       name: code.name,
+      resource: code.resource,
       exp: Math.floor(Date.now() / 1000) + 60 * 60
     });
 
@@ -163,6 +174,10 @@ function validateAuthorizeRequest(body: OAuthParams) {
   if (!body.redirect_uri || !isAllowedRedirect(body.redirect_uri)) {
     throw new Error("redirect_uri inválida.");
   }
+
+  if (body.code_challenge_method && !["S256", "plain"].includes(body.code_challenge_method)) {
+    throw new Error("code_challenge_method inválido.");
+  }
 }
 
 function validateClient(request: VercelRequest, body: Record<string, string>) {
@@ -177,6 +192,28 @@ function validateClient(request: VercelRequest, body: Record<string, string>) {
 
   if (clientSecret && requestSecret !== clientSecret) {
     throw new Error("client_secret inválido.");
+  }
+}
+
+function validatePkce(codeVerifier?: string, codeChallenge?: string, codeChallengeMethod?: string) {
+  if (!codeChallenge) {
+    return;
+  }
+
+  if (!codeVerifier) {
+    throw new Error("code_verifier é obrigatório.");
+  }
+
+  if ((codeChallengeMethod ?? "plain") === "plain") {
+    if (codeVerifier !== codeChallenge) {
+      throw new Error("code_verifier inválido.");
+    }
+    return;
+  }
+
+  const digest = createHash("sha256").update(codeVerifier).digest("base64url");
+  if (digest !== codeChallenge) {
+    throw new Error("code_verifier inválido.");
   }
 }
 

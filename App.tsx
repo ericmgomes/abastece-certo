@@ -89,7 +89,10 @@ function oauthAuthorizeRequestFromUrl(): OAuthAuthorizeRequest | null {
     client_id: clientId,
     redirect_uri: redirectUri,
     state: params.get("state") ?? undefined,
-    scope: params.get("scope") ?? "openid email profile"
+    scope: params.get("scope") ?? "openid email profile",
+    code_challenge: params.get("code_challenge") ?? undefined,
+    code_challenge_method: params.get("code_challenge_method") ?? undefined,
+    resource: params.get("resource") ?? undefined
   };
 }
 
@@ -283,6 +286,13 @@ export default function App() {
         const sessionName = getAuthUserName(sessionUser.user_metadata);
         setAuthEmail(sessionEmail);
         setAuthName(sessionName);
+        if (oauthConsentRoute) {
+          setState(emptyAuthenticatedState(sessionName, sessionEmail));
+          setOwnerId(sessionUser.id);
+          setAuthScreenOpen(false);
+          return;
+        }
+
         await loadStateForOwner(sessionUser.id, sessionName, sessionEmail);
         setOwnerId(sessionUser.id);
         setAuthScreenOpen(false);
@@ -314,6 +324,13 @@ export default function App() {
       const sessionName = getAuthUserName(sessionUser.user_metadata);
       setAuthEmail(sessionEmail);
       setAuthName(sessionName);
+      if (oauthConsentRoute) {
+        setState(emptyAuthenticatedState(sessionName, sessionEmail));
+        setOwnerId(sessionUser.id);
+        setAuthScreenOpen(false);
+        return;
+      }
+
       loadStateForOwner(sessionUser.id, sessionName, sessionEmail)
         .then(() => {
           setOwnerId(sessionUser.id);
