@@ -50,7 +50,7 @@
     },
     {
       "source": "/oauth/consent",
-      "destination": "/"
+      "destination": "/api/oauth/consent"
     }
   ]
 }
