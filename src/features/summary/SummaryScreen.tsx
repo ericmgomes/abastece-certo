@@ -44,15 +44,15 @@ export function SummaryScreen({
   const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
   const currentMonthLogs = logsForMonth(logs, visibleMonth);
   const previousMonthLogs = logsForMonth(logs, previousMonth);
-  const last = currentMonthLogs[0];
+  const monthLiters = currentMonthLogs.reduce((sum, log) => sum + log.liters, 0);
+  const previousMonthLiters = previousMonthLogs.reduce((sum, log) => sum + log.liters, 0);
   const previousMetrics = new DashboardCalculator({ user: null, cars, stations, logs, selectedCarId: null }, previousMonth).calculate();
-  const previousLast = previousMonthLogs[0];
   const hasPreviousMonth = previousMonthLogs.length > 0;
   const monthTrend = hasPreviousMonth
     ? metricTrend(metrics.monthTotal, previousMetrics.monthTotal, "lower")
     : undefined;
-  const priceTrend = hasPreviousMonth && last && previousLast
-    ? metricTrend(last.pricePerLiter, previousLast.pricePerLiter, "lower")
+  const litersTrend = hasPreviousMonth
+    ? metricTrend(monthLiters, previousMonthLiters, "lower")
     : undefined;
   const efficiencyTrend = hasPreviousMonth && metrics.averageKmPerLiter && previousMetrics.averageKmPerLiter
     ? metricTrend(metrics.averageKmPerLiter, previousMetrics.averageKmPerLiter, "higher")
@@ -74,13 +74,12 @@ export function SummaryScreen({
 
         <View style={styles.grid}>
           <MetricCard styles={styles} label="Gasto mês" value={formatCurrency(metrics.monthTotal)} small={metrics.monthTotal >= 100} trend={monthTrend} />
-          <MetricCard styles={styles} label="Último R$/L" value={last ? formatCurrency(last.pricePerLiter) : ""} small trend={priceTrend} />
+          <MetricCard styles={styles} label="Litros" value={monthLiters ? formatLiters(monthLiters) : ""} small trend={litersTrend} />
           <MetricCard styles={styles} label="Média km/L" value={metrics.averageKmPerLiter ? metrics.averageKmPerLiter.toFixed(1) : ""} small trend={efficiencyTrend} />
         </View>
 
         <Bars data={metrics.monthlyTotals} styles={styles} Empty={Empty} />
 
-        <View style={styles.summaryBlockDivider} />
         {metrics.fuelAverages.length === 0 ? (
           <Empty text="Registre abastecimentos para comparar combustíveis." />
         ) : (
@@ -127,8 +126,7 @@ function MetricCard({
         <Text
           style={[
             styles.metricTrend,
-            trend.status === "good" && styles.metricTrendGood,
-            trend.status === "bad" && styles.metricTrendBad
+            trendStyle(trend.status, styles)
           ]}
         >
           {trend.label}
@@ -136,6 +134,18 @@ function MetricCard({
       ) : null}
     </View>
   );
+}
+
+function trendStyle(status: MetricTrend["status"], styles: SummaryStyles) {
+  if (status === "good") {
+    return styles.metricTrendGood;
+  }
+
+  if (status === "bad") {
+    return styles.metricTrendBad;
+  }
+
+  return styles.metricTrendNeutral;
 }
 
 function Bars({
@@ -198,6 +208,13 @@ function formatCurrency(value: number) {
     currency: "BRL",
     minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
     maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatLiters(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1
   }).format(value);
 }
 

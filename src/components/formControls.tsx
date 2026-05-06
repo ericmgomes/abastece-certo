@@ -31,12 +31,12 @@ export function FormControlsProvider({
   );
 }
 
-export function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
+export function Field(props: React.ComponentProps<typeof TextInput> & { label: string; compact?: boolean }) {
   const { styles, theme } = useFormControls();
-  const { label, style, ...inputProps } = props;
+  const { label, compact, style, ...inputProps } = props;
   return (
-    <View style={styles.inlineField}>
-      <Text style={styles.inlineLabel}>{label}</Text>
+    <View style={[styles.inlineField, compact && styles.compactInlineField]}>
+      <Text style={[styles.inlineLabel, compact && styles.compactInlineLabel]}>{label}</Text>
       <TextInput placeholderTextColor={theme.muted} style={[styles.input, style]} {...inputProps} />
     </View>
   );
@@ -196,6 +196,58 @@ export function TimeSelector({
           onFocus={onFocus}
           onChange={(nextMinute) => updateTime(parsedHour, nextMinute)}
         />
+      </View>
+    </View>
+  );
+}
+
+export function DateTimeSelector({
+  label,
+  date,
+  time,
+  onDateChange,
+  onTimeChange,
+  onFocus
+}: {
+  label: string;
+  date: string;
+  time: string;
+  onDateChange: (value: string) => void;
+  onTimeChange: (value: string) => void;
+  onFocus?: () => void;
+}) {
+  const { styles } = useFormControls();
+  const [day = "", month = "", year = ""] = date.split("-");
+  const [hour = "", minute = "", second = ""] = time.split(":");
+  const now = new Date();
+  const parsedDay = clampNumber(day, 1, 31, now.getDate());
+  const parsedMonth = clampNumber(month, 1, 12, now.getMonth() + 1);
+  const parsedYear = clampNumber(year, 1970, 2100, now.getFullYear());
+  const parsedHour = clampNumber(hour, 0, 23, now.getHours());
+  const parsedMinute = clampNumber(minute, 0, 59, now.getMinutes());
+  const parsedSecond = clampNumber(second, 0, 59, 0);
+  const maxDay = new Date(parsedYear, parsedMonth, 0).getDate();
+
+  function updateDate(nextDay: number, nextMonth: number, nextYear: number) {
+    const safeMonth = clamp(nextMonth, 1, 12);
+    const safeYear = clamp(nextYear, 1970, 2100);
+    const safeDay = clamp(nextDay, 1, new Date(safeYear, safeMonth, 0).getDate());
+    onDateChange(`${pad2(safeDay)}-${pad2(safeMonth)}-${safeYear}`);
+  }
+
+  function updateTime(nextHour: number, nextMinute: number) {
+    onTimeChange(`${pad2(clamp(nextHour, 0, 23))}:${pad2(clamp(nextMinute, 0, 59))}:${pad2(parsedSecond)}`);
+  }
+
+  return (
+    <View style={styles.inlineField}>
+      <Text style={styles.inlineLabel}>{label}</Text>
+      <View style={styles.dateTimeSelector}>
+        <NumberSelect value={parsedDay} min={1} max={maxDay} digits={2} onFocus={onFocus} onChange={(nextDay) => updateDate(nextDay, parsedMonth, parsedYear)} />
+        <NumberSelect value={parsedMonth} min={1} max={12} digits={1} onFocus={onFocus} onChange={(nextMonth) => updateDate(parsedDay, nextMonth, parsedYear)} />
+        <NumberSelect value={parsedYear} min={1970} max={2100} digits={4} wide onFocus={onFocus} onChange={(nextYear) => updateDate(parsedDay, parsedMonth, nextYear)} />
+        <NumberSelect value={parsedHour} min={0} max={23} digits={2} onFocus={onFocus} onChange={(nextHour) => updateTime(nextHour, parsedMinute)} />
+        <NumberSelect value={parsedMinute} min={0} max={59} digits={2} onFocus={onFocus} onChange={(nextMinute) => updateTime(parsedHour, nextMinute)} />
       </View>
     </View>
   );

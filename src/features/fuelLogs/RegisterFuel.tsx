@@ -15,7 +15,7 @@ import {
   fuels
 } from "../../domain";
 import { FieldToast, SideToast, ToastNotice, showFieldNotice } from "../../components/formFeedback";
-import { Choice, DateSelector, Field, TimeSelector } from "../../components/formControls";
+import { Choice, DateTimeSelector, Field } from "../../components/formControls";
 
 type SharedComponent = React.ComponentType<any>;
 type RegisterFuelStyles = Record<string, any> & {
@@ -67,7 +67,6 @@ export function RegisterFuel({
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<ToastNotice | null>(null);
   const [activeField, setActiveField] = useState("paid");
-  const [dirty, setDirty] = useState(false);
   const currentCar = cars.find((car) => car.id === carId) ?? selectedCar;
   const fuelOptions = visibleFuels;
 
@@ -77,10 +76,7 @@ export function RegisterFuel({
     }
 
     setCarId(selectedCar.id);
-    if (selectedCar.currentOdometerKm && !odometerKm) {
-      setOdometerKm(String(selectedCar.currentOdometerKm).replace(".", ","));
-    }
-  }, [editingLog, odometerKm, selectedCar?.currentOdometerKm, selectedCar?.id]);
+  }, [editingLog, selectedCar?.id]);
 
   useEffect(() => {
     if (!editingLog) {
@@ -100,7 +96,6 @@ export function RegisterFuel({
     setStationId(editingLog.stationId);
     setDraftLog(null);
     setSaveStatus(null);
-    setDirty(false);
   }, [editingLog?.id]);
 
   useEffect(() => {
@@ -138,7 +133,7 @@ export function RegisterFuel({
     const fuelPrice = new FuelPrice(paidNumber, litersNumber);
 
     if (!fuelPrice.isValid()) {
-      setSaveStatus("Preencha valor e litros para salvar automaticamente.");
+      setSaveStatus("Preencha valor e litros para registrar.");
       return undefined;
     }
 
@@ -166,39 +161,32 @@ export function RegisterFuel({
     };
   }
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!dirty) {
-        return;
-      }
+  function submitFuelLog() {
+    setSaveStatus(null);
+    const payload = buildPayload();
+    if (!payload) {
+      return;
+    }
 
-      const payload = buildPayload();
-      if (!payload) {
-        return;
-      }
+    if (editingLog) {
+      onUpdate(FuelLogFactory.update(editingLog, payload));
+      showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
+      return;
+    }
 
-      if (editingLog) {
-        onUpdate(FuelLogFactory.update(editingLog, payload));
-        showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
-        return;
-      }
+    if (draftLog) {
+      const updatedDraft = FuelLogFactory.update(draftLog, payload);
+      setDraftLog(updatedDraft);
+      onUpdate(updatedDraft);
+      showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
+      return;
+    }
 
-      if (draftLog) {
-        const updatedDraft = FuelLogFactory.update(draftLog, payload);
-        setDraftLog(updatedDraft);
-        onUpdate(updatedDraft);
-        showFieldNotice(setNotice, "Abastecimento atualizado.", activeField);
-        return;
-      }
-
-      const newLog = FuelLogFactory.create(payload);
-      setDraftLog(newLog);
-      onSave(newLog);
-      showFieldNotice(setNotice, "Abastecimento criado.", activeField);
-    }, 450);
-
-    return () => clearTimeout(timeout);
-  }, [dirty, carId, fuel, paid, liters, odometerKm, date, time, stationId, location.latitude, location.longitude, editingLog?.id, draftLog?.id]);
+    const newLog = FuelLogFactory.create(payload);
+    setDraftLog(newLog);
+    onSave(newLog);
+    showFieldNotice(setNotice, "Abastecimento criado.", activeField);
+  }
 
   return (
     <View style={styles.stack}>
@@ -216,6 +204,26 @@ export function RegisterFuel({
         ) : (
           <>
             <View style={styles.fieldToastAnchor}>
+              <DateTimeSelector
+                label="Data/hora"
+                date={date}
+                time={time}
+                onFocus={() => setActiveField("dateTime")}
+                onDateChange={(value: string) => {
+                  setActiveField("dateTime");
+
+                  setDate(value);
+                }}
+                onTimeChange={(value: string) => {
+                  setActiveField("dateTime");
+
+                  setTime(value);
+                }}
+              />
+              <FieldToast notice={notice} anchor="dateTime" styles={styles} />
+            </View>
+
+            <View style={styles.fieldToastAnchor}>
               <View style={styles.inlineField}>
                 <Text style={styles.inlineLabel}>Veículo</Text>
                 <View style={styles.choiceFieldWrap}>
@@ -226,7 +234,7 @@ export function RegisterFuel({
                       active={car.id === currentCar?.id}
                       onPress={() => {
                         setActiveField("car");
-                        setDirty(true);
+
                         setCarId(car.id);
                         onCarSelect(car.id);
                       }}
@@ -248,7 +256,7 @@ export function RegisterFuel({
                       active={item === fuel}
                       onPress={() => {
                         setActiveField("fuel");
-                        setDirty(true);
+
                         setFuel(item);
                       }}
                     />
@@ -258,74 +266,59 @@ export function RegisterFuel({
               <FieldToast notice={notice} anchor="fuel" styles={styles} />
             </View>
 
-            <View style={styles.fieldToastAnchor}>
-              <Field
-                label="Valor pago"
-                value={paid}
-                onFocus={() => setActiveField("paid")}
-                onChangeText={(value: string) => {
-                  setActiveField("paid");
-                  setDirty(true);
-                  setPaid(value);
-                }}
-                keyboardType="decimal-pad"
-              />
-              <FieldToast notice={notice} anchor="paid" styles={styles} />
-            </View>
-            <View style={styles.fieldToastAnchor}>
-              <Field
-                label="Litros"
-                value={liters}
-                onFocus={() => setActiveField("liters")}
-                onChangeText={(value: string) => {
-                  setActiveField("liters");
-                  setDirty(true);
-                  setLiters(value);
-                }}
-                keyboardType="decimal-pad"
-              />
-              <FieldToast notice={notice} anchor="liters" styles={styles} />
-            </View>
-            <View style={styles.fieldToastAnchor}>
-              <Field
-                label="Km atual"
-                value={odometerKm}
-                onFocus={() => setActiveField("odometerKm")}
-                onChangeText={(value: string) => {
-                  setActiveField("odometerKm");
-                  setDirty(true);
-                  setOdometerKm(value);
-                }}
-                keyboardType="decimal-pad"
-              />
-              <FieldToast notice={notice} anchor="odometerKm" styles={styles} />
-            </View>
+            <View style={styles.compactFieldRow}>
+              <View style={styles.compactFieldToastAnchor}>
+                <Field
+                  label="Valor"
+                  value={paid}
+                  onFocus={() => setActiveField("paid")}
+                  onChangeText={(value: string) => {
+                    setActiveField("paid");
 
-            <View style={styles.fieldToastAnchor}>
-              <DateSelector
-                label="Data"
-                value={date}
-                onFocus={() => setActiveField("date")}
-                onChange={(value: string) => {
-                  setActiveField("date");
-                  setDirty(true);
-                  setDate(value);
-                }}
-              />
-              <FieldToast notice={notice} anchor="date" styles={styles} />
+                    setPaid(value);
+                  }}
+                  keyboardType="decimal-pad"
+                  compact
+                />
+                <FieldToast notice={notice} anchor="paid" styles={styles} />
+              </View>
+              <View style={styles.compactFieldToastAnchor}>
+                <Field
+                  label="Litros"
+                  value={liters}
+                  onFocus={() => setActiveField("liters")}
+                  onChangeText={(value: string) => {
+                    setActiveField("liters");
+
+                    setLiters(value);
+                  }}
+                  keyboardType="decimal-pad"
+                  compact
+                />
+                <FieldToast notice={notice} anchor="liters" styles={styles} />
+              </View>
+              <View style={styles.compactFieldToastAnchor}>
+                <Field
+                  label="Km"
+                  value={odometerKm}
+                  onFocus={() => setActiveField("odometerKm")}
+                  onChangeText={(value: string) => {
+                    setActiveField("odometerKm");
+
+                    setOdometerKm(value);
+                  }}
+                  keyboardType="decimal-pad"
+                  compact
+                />
+                <FieldToast notice={notice} anchor="odometerKm" styles={styles} />
+              </View>
             </View>
-            <View style={styles.fieldToastAnchor}>
-              <TimeSelector
-                label="Hora"
-                value={time}
-                onFocus={() => setActiveField("time")}
-                onChange={(value: string) => {
-                  setActiveField("time");
-                  setDirty(true);
-                  setTime(value);
-                }}
-              />
-              <FieldToast notice={notice} anchor="time" styles={styles} />
+            <View style={styles.result}>
+              <Text style={styles.label}>Preço real por litro</Text>
+              <Text style={styles.bigValue}>{Number.isFinite(price) ? formatCurrency(price) : "R$ 0"}</Text>
+              {parsedOdometerKm ? (
+                <Text style={styles.muted}>Km atual: {parsedOdometerKm.toLocaleString("pt-BR")} km</Text>
+              ) : null}
             </View>
 
             <View style={styles.fieldToastAnchor}>
@@ -339,7 +332,7 @@ export function RegisterFuel({
                       active={station.id === stationId}
                       onPress={() => {
                         setActiveField("station");
-                        setDirty(true);
+
                         setStationId(station.id);
                       }}
                     />
@@ -348,15 +341,12 @@ export function RegisterFuel({
               </View>
               <FieldToast notice={notice} anchor="station" styles={styles} />
             </View>
-            <Text style={styles.muted}>Localização fake de teste: posto mais próximo selecionado pelo app.</Text>
-
-            <View style={styles.result}>
-              <Text style={styles.label}>Preço real por litro</Text>
-              <Text style={styles.bigValue}>{Number.isFinite(price) ? formatCurrency(price) : "R$ 0"}</Text>
-              <Text style={styles.muted}>
-                {parsedOdometerKm ? `Km atual: ${parsedOdometerKm.toLocaleString("pt-BR")} km` : "Informe a km atual para calcular km/L nos próximos abastecimentos."}
+            {saveStatus ? <Text style={styles.errorText}>{saveStatus}</Text> : null}
+            <Pressable style={styles.primaryButton} onPress={submitFuelLog}>
+              <Text style={styles.primaryButtonText}>
+                {editingLog || draftLog ? "Atualizar" : "Registrar"}
               </Text>
-            </View>
+            </Pressable>
           </>
         )}
       </Section>

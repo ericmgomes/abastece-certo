@@ -112,10 +112,12 @@ export function StationMap({
                     <Text style={styles.muted}>
                       {station?.name ?? "Posto"} - {car?.nickname ?? "Veículo"} - {log.fuel}
                     </Text>
-                    <Text style={styles.muted}>
-                      {log.odometerKm ? `${log.odometerKm.toLocaleString("pt-BR")} km` : "Km não informada"}
-                      {efficiency ? ` - ${efficiency.kmPerLiter.toFixed(1)} km/L` : ""}
-                    </Text>
+                    {log.odometerKm || efficiency ? (
+                      <Text style={styles.muted}>
+                        {log.odometerKm ? `${log.odometerKm.toLocaleString("pt-BR")} km` : ""}
+                        {efficiency ? `${log.odometerKm ? " - " : ""}${efficiency.kmPerLiter.toFixed(1)} km/L` : ""}
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={styles.right}>
                     <Text style={styles.itemTitle}>{formatCurrency(log.pricePerLiter)}/L</Text>

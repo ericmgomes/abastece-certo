@@ -517,7 +517,7 @@ export class DashboardCalculator {
   }
 
   private fuelAverage(fuel: FuelType): FuelAverage {
-    const fuelLogs = this.state.logs.filter((log) => log.fuel === fuel);
+    const fuelLogs = this.logsThisMonth().filter((log) => log.fuel === fuel);
     const average = fuelLogs.reduce((sum, log) => sum + log.pricePerLiter, 0) / Math.max(fuelLogs.length, 1);
 
     return { name: fuel, average, count: fuelLogs.length };

@@ -905,9 +905,12 @@ export function createStyles(theme: Theme) {
   metricTrendBad: {
     color: theme.mode === "dark" ? "#FF9A9A" : "#A31515"
   },
+  metricTrendNeutral: {
+    color: theme.muted
+  },
   bigValue: {
     color: theme.text,
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
@@ -949,6 +952,16 @@ export function createStyles(theme: Theme) {
   fieldToastAnchor: {
     position: "relative"
   },
+  compactFieldRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6
+  },
+  compactFieldToastAnchor: {
+    position: "relative",
+    flex: 1,
+    minWidth: 0
+  },
   inlineField: {
     flexDirection: "row",
     alignItems: "center",
@@ -985,8 +998,16 @@ export function createStyles(theme: Theme) {
     minWidth: 0,
     justifyContent: "flex-start"
   },
+  dateTimeSelector: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    minWidth: 0
+  },
   numberSelect: {
-    width: 56,
+    width: 49,
     minHeight: 36,
     borderWidth: 1,
     borderColor: theme.border,
@@ -998,8 +1019,18 @@ export function createStyles(theme: Theme) {
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
+  compactInlineField: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 4,
+    minHeight: 0
+  },
+  compactInlineLabel: {
+    width: "auto",
+    fontSize: 13
+  },
   numberSelectWide: {
-    width: 76
+    width: 68
   },
   stateSelect: {
     flex: 1,
@@ -1171,7 +1202,8 @@ export function createStyles(theme: Theme) {
   result: {
     backgroundColor: theme.primarySoft,
     borderRadius: 8,
-    padding: 12
+    paddingVertical: 8,
+    paddingHorizontal: 10
   },
   assistantDemoNotice: {
     borderRadius: 8,
