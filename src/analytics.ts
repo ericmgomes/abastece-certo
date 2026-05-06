@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-const GTM_ID = "GTM-NXSFBVPL";
+const GA4_MEASUREMENT_ID = "G-S83NNJLEYP";
 
 type AnalyticsValue = string | number | boolean | null | undefined;
 type AnalyticsPayload = Record<string, AnalyticsValue>;
@@ -8,6 +8,7 @@ type AnalyticsPayload = Record<string, AnalyticsValue>;
 declare global {
   interface Window {
     dataLayer?: Array<Record<string, unknown>>;
+    gtag?: (...args: unknown[]) => void;
   }
 }
 
@@ -20,14 +21,17 @@ export function initAnalytics() {
 
   initialized = true;
   window.dataLayer = window.dataLayer ?? [];
-  window.dataLayer.push({
-    "gtm.start": Date.now(),
-    event: "gtm.js"
+  window.gtag = window.gtag ?? function gtag() {
+    window.dataLayer?.push(arguments as unknown as Record<string, unknown>);
+  };
+  window.gtag("js", new Date());
+  window.gtag("config", GA4_MEASUREMENT_ID, {
+    send_page_view: false
   });
 
   const script = document.createElement("script");
   script.async = true;
-  script.src = `https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`;
   document.head.appendChild(script);
 }
 
@@ -44,38 +48,13 @@ export function trackEvent(event: string, payload: AnalyticsPayload = {}) {
   }
 
   const cleanEventPayload = cleanPayload(payload);
-  window.dataLayer = window.dataLayer ?? [];
-  window.dataLayer.push({
-    event,
+  window.gtag?.("event", event, {
     ...cleanEventPayload
   });
-
-  dispatchDomAnalyticsEvent(event, cleanEventPayload);
 }
 
 function cleanPayload(payload: AnalyticsPayload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined)
   );
-}
-
-function dispatchDomAnalyticsEvent(event: string, payload: Record<string, AnalyticsValue>) {
-  if (typeof window.CustomEvent !== "function") {
-    return;
-  }
-
-  const detail = {
-    event,
-    ...payload
-  };
-  const genericEvent = new window.CustomEvent("litrocerto:analytics", { detail });
-  const specificEvent = new window.CustomEvent(`litrocerto:${event}`, { detail });
-
-  window.dispatchEvent(genericEvent);
-  window.dispatchEvent(specificEvent);
-
-  if (typeof document !== "undefined") {
-    document.dispatchEvent(genericEvent);
-    document.dispatchEvent(specificEvent);
-  }
 }
