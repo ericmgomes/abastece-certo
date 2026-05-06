@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://litrocerto.com.br/sitemap.xml
+Sitemap: https://app.litrocerto.com.br/sitemap.xml

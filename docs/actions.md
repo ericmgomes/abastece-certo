@@ -15,7 +15,7 @@ GPT Actions acessam APIs REST descritas por OpenAPI. Elas nao chamam um MCP Serv
 Depois do deploy no Vercel:
 
 ```text
-https://litrocerto.com.br/openapi-actions.yaml
+https://app.litrocerto.com.br/openapi-actions.yaml
 ```
 
 ## Endpoints
@@ -38,15 +38,15 @@ Todos exigem `Authorization: Bearer <access_token_litrocerto>`.
 1. Abra o Builder do Custom GPT.
 2. Va em `Configure` > `Actions`.
 3. Crie ou edite uma Action.
-4. Importe `https://litrocerto.com.br/openapi-actions.yaml`.
+4. Importe `https://app.litrocerto.com.br/openapi-actions.yaml`.
 5. Em `Authentication`, escolha `OAuth`.
 
 Campos:
 
 - Client ID: mesmo valor de `LITROCERTO_OAUTH_CLIENT_ID`.
 - Client Secret: mesmo valor de `LITROCERTO_OAUTH_CLIENT_SECRET`.
-- Authorization URL: `https://litrocerto.com.br/api/oauth/authorize`
-- Token URL: `https://litrocerto.com.br/api/oauth/token`
+- Authorization URL: `https://app.litrocerto.com.br/api/oauth/authorize`
+- Token URL: `https://app.litrocerto.com.br/api/oauth/token`
 - Scope: `openid email profile`
 - Token Exchange Method: `Basic authorization header`
 
@@ -79,7 +79,7 @@ O `LITROCERTO_OAUTH_SECRET` nao aparece no Custom GPT. Ele serve apenas para o b
 Abra:
 
 ```text
-https://litrocerto.com.br/api/oauth/authorize?response_type=code&client_id=lc_8F3kP2vX9rM4Q1tW6yZ&redirect_uri=https%3A%2F%2Fchat.openai.com%2Faip%2Fg-9461ce0926db2c332be7b7d233b1d2e4320f42c9%2Foauth%2Fcallback&state=teste&scope=openid%20email%20profile
+https://app.litrocerto.com.br/api/oauth/authorize?response_type=code&client_id=lc_8F3kP2vX9rM4Q1tW6yZ&redirect_uri=https%3A%2F%2Fchat.openai.com%2Faip%2Fg-9461ce0926db2c332be7b7d233b1d2e4320f42c9%2Foauth%2Fcallback&state=teste&scope=openid%20email%20profile
 ```
 
 O esperado e abrir `/oauth/consent`, pedir login se necessario e depois mostrar `Autorizar acesso`.

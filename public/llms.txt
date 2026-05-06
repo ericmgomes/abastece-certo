@@ -4,8 +4,8 @@
 
 ## Site
 
-- URL principal: https://litrocerto.com.br/
-- OpenAPI Actions: https://litrocerto.com.br/openapi-actions.yaml
+- URL principal do app: https://app.litrocerto.com.br/
+- OpenAPI Actions: https://app.litrocerto.com.br/openapi-actions.yaml
 
 ## O que o app faz
 

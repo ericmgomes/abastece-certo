@@ -26,7 +26,7 @@ Depois de publicar na Vercel, preencha no Claude:
 
 ```text
 Nome: LitroCerto
-URL do servidor MCP remoto: https://litrocerto.com.br/mcp
+URL do servidor MCP remoto: https://app.litrocerto.com.br/mcp
 ID do Cliente OAuth: lc_8F3kP2vX9rM4Q1tW6yZ
 Client Secret OAuth: Y7nD4sL0pQ9xV2kF6cR1wT8mH3Z
 ```
@@ -34,8 +34,8 @@ Client Secret OAuth: Y7nD4sL0pQ9xV2kF6cR1wT8mH3Z
 O endpoint remoto usa Streamable HTTP e também publica discovery OAuth em:
 
 ```text
-https://litrocerto.com.br/.well-known/oauth-protected-resource/mcp
-https://litrocerto.com.br/.well-known/oauth-authorization-server
+https://app.litrocerto.com.br/.well-known/oauth-protected-resource/mcp
+https://app.litrocerto.com.br/.well-known/oauth-authorization-server
 ```
 
 ## Autenticação

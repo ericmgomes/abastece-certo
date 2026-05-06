@@ -8,7 +8,7 @@
           "value": "abastece-certo.vercel.app"
         }
       ],
-      "destination": "https://litrocerto.com.br/",
+      "destination": "https://app.litrocerto.com.br/",
       "permanent": true
     },
     {
@@ -19,7 +19,7 @@
           "value": "abastece-certo.vercel.app"
         }
       ],
-      "destination": "https://litrocerto.com.br/:path*",
+      "destination": "https://app.litrocerto.com.br/:path*",
       "permanent": true
     }
   ],
