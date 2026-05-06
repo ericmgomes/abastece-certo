@@ -165,7 +165,15 @@ export function AuthScreen({
       <View style={styles.authTop}>
         <Text style={styles.brand}>LitroCerto</Text>
         <View style={styles.headerSecondaryActions}>
-          <Pressable style={styles.headerSecondaryButton} onPress={onCancel}>
+          <Pressable
+            style={styles.headerSecondaryButton}
+            onPress={() => {
+              trackEvent("auth_dismissed", {
+                mode: authMode
+              });
+              onCancel();
+            }}
+          >
             <Text style={styles.headerSecondaryButtonText}>Agora não</Text>
           </Pressable>
           <PalettePicker onSelect={onThemePaletteSelect} />
@@ -178,7 +186,16 @@ export function AuthScreen({
         <Text style={styles.title}>Entre para manter seus abastecimentos salvos</Text>
         <Text style={styles.muted}>Use Google para entrar mais rápido ou continue com email e senha.</Text>
         <Text style={styles.privacyText}>O app não rastreia seus trajetos. A localização só ajuda a sugerir o posto no momento do registro.</Text>
-        <Pressable style={[styles.googleButton, styles.authButton]} onPress={signInWithGoogle} disabled={loading}>
+        <Pressable
+          style={[styles.googleButton, styles.authButton]}
+          onPress={() => {
+            trackEvent("login_google_clicked", {
+              mode: authMode
+            });
+            void signInWithGoogle();
+          }}
+          disabled={loading}
+        >
           <View style={styles.googleLogo}>
             <Image source={{ uri: GOOGLE_LOGO_URI }} style={styles.googleLogoImage} />
           </View>
@@ -194,13 +211,23 @@ export function AuthScreen({
         <View style={styles.authTabs}>
           <Pressable
             style={[styles.authTab, isSignIn && styles.authTabActive]}
-            onPress={() => setAuthMode("signIn")}
+            onPress={() => {
+              trackEvent("auth_mode_changed", {
+                mode: "signIn"
+              });
+              setAuthMode("signIn");
+            }}
           >
             <Text style={[styles.authTabText, isSignIn && styles.authTabTextActive]}>Login</Text>
           </Pressable>
           <Pressable
             style={[styles.authTab, !isSignIn && styles.authTabActive]}
-            onPress={() => setAuthMode("signUp")}
+            onPress={() => {
+              trackEvent("auth_mode_changed", {
+                mode: "signUp"
+              });
+              setAuthMode("signUp");
+            }}
           >
             <Text style={[styles.authTabText, !isSignIn && styles.authTabTextActive]}>Criar conta</Text>
           </Pressable>

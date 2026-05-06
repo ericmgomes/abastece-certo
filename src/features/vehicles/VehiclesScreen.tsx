@@ -12,6 +12,7 @@ import {
 import { FieldToast, ToastNotice, showFieldNotice } from "../../components/formFeedback";
 import { BrandSelect, Choice, Field } from "../../components/formControls";
 import { CarFuelLogDetails, EntityDetails } from "../../components/fuelLogDetails";
+import { trackEvent } from "../../analytics";
 
 type SharedComponent = React.ComponentType<any>;
 type VehicleStyles = Record<string, any> & {
@@ -55,16 +56,24 @@ export function Cars({
     .sort((a, b) => b.total - a.total);
 
   function openNewForm() {
+    trackEvent("vehicle_form_opened", { mode: "new" });
     setEditingCarId("new");
   }
 
   function selectCarDetails(car: Car) {
+    trackEvent("vehicle_details_toggled", {
+      open: selectedDetailsCarId !== car.id,
+      has_logs: logs.some((log) => log.carId === car.id)
+    });
     onSelect(car.id);
     setSelectedDetailsCarId((current) => (current === car.id ? null : car.id));
     setEditingCarId(null);
   }
 
   function closeForm() {
+    trackEvent("vehicle_form_closed", {
+      mode: editingCarId === "new" ? "new" : "edit"
+    });
     setEditingCarId(null);
   }
 
@@ -127,6 +136,9 @@ export function Cars({
                     style={styles.inlineIconButton}
                     onPress={(event) => {
                       event.stopPropagation();
+                      trackEvent("vehicle_form_opened", {
+                        mode: editingCarId === car.id ? "close_edit" : "edit"
+                      });
                       onSelect(car.id);
                       setSelectedDetailsCarId(car.id);
                       setEditingCarId((current) => (current === car.id ? null : car.id));
@@ -227,7 +239,7 @@ function CarEditor({
 
       const nickname = VehicleName.unique(brand, model, cars, car?.id ?? draftCar?.id);
       const parsedInitialOdometerKm = parseOptionalNumber(initialOdometerKm);
-      const parsedCurrentOdometerKm = parseOptionalNumber(currentOdometerKm);
+      const parsedCurrentOdometerKm = parseOptionalNumber(currentOdometerKm) ?? parsedInitialOdometerKm;
       if (car) {
         onUpdate(CarFactory.update(car, { vehicleType, nickname, brand, model, initialOdometerKm: parsedInitialOdometerKm, currentOdometerKm: parsedCurrentOdometerKm }));
         showFieldNotice(setNotice, "Veículo atualizado.", activeField);
@@ -254,8 +266,20 @@ function CarEditor({
   function updateCarField(anchor: string, update: (value: string) => void) {
     return (value: string) => {
       setActiveField(anchor);
+      trackEvent("vehicle_field_changed", {
+        field: anchor,
+        mode: car ? "edit" : draftCar ? "draft" : "new"
+      });
       update(value);
     };
+  }
+
+  function updateInitialOdometerKm(value: string) {
+    const sanitized = value.replace(/[^\d,.]/g, "");
+    setInitialOdometerKm(sanitized);
+    if (!currentOdometerKm.trim()) {
+      setCurrentOdometerKm(sanitized);
+    }
   }
 
   function confirmDelete() {
@@ -265,6 +289,9 @@ function CarEditor({
       return;
     }
 
+    trackEvent("vehicle_delete_clicked", {
+      mode: car ? "existing" : "draft"
+    });
     onDelete(carToDelete.id);
     onCancel();
   }
@@ -282,6 +309,10 @@ function CarEditor({
                 active={vehicleType === type}
                 onPress={() => {
                   setActiveField("vehicleType");
+                  trackEvent("vehicle_field_changed", {
+                    field: "vehicleType",
+                    mode: car ? "edit" : draftCar ? "draft" : "new"
+                  });
                   setVehicleType(type);
                 }}
               />
@@ -308,7 +339,7 @@ function CarEditor({
           value={initialOdometerKm}
           keyboardType="numeric"
           onFocus={() => setActiveField("initialOdometerKm")}
-          onChangeText={updateCarField("initialOdometerKm", (value) => setInitialOdometerKm(value.replace(/[^\d,.]/g, "")))}
+          onChangeText={updateCarField("initialOdometerKm", updateInitialOdometerKm)}
         />
         <FieldToast notice={notice} anchor="initialOdometerKm" styles={styles} />
       </View>

@@ -7,6 +7,7 @@ import {
   FuelLog,
   Station
 } from "../../domain";
+import { trackEvent } from "../../analytics";
 
 type SharedComponent = React.ComponentType<any>;
 type SummaryStyles = Record<string, any>;
@@ -85,7 +86,15 @@ export function SummaryScreen({
         ) : (
           <View style={styles.fuelGrid}>
             {metrics.fuelAverages.map((fuel) => (
-              <Pressable key={fuel.name} style={(state) => [styles.fuelCard, isHovered(state) && styles.listItemHover]}>
+              <Pressable
+                key={fuel.name}
+                style={(state) => [styles.fuelCard, isHovered(state) && styles.listItemHover]}
+                onPress={() => {
+                  trackEvent("fuel_average_clicked", {
+                    fuel_type: fuel.name
+                  });
+                }}
+              >
                 <Text style={styles.itemTitle}>{fuel.name}</Text>
                 <Text style={styles.itemTitle}>{formatCurrency(fuel.average)}/L</Text>
               </Pressable>

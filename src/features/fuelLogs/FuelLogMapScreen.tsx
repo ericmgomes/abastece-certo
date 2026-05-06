@@ -10,6 +10,7 @@ import {
   Station
 } from "../../domain";
 import { RegisterFuel } from "./RegisterFuel";
+import { trackEvent } from "../../analytics";
 
 type SharedComponent = React.ComponentType<any>;
 type FeatureStyles = Record<string, any> & {
@@ -65,7 +66,16 @@ export function StationMap({
       <Section
         title="Abastecimentos"
         rightAction={
-          <Pressable style={styles.addButton} onPress={onNew}>
+          <Pressable
+            style={styles.addButton}
+            onPress={() => {
+              trackEvent("fuel_log_form_opened", {
+                mode: "new",
+                source: "fuel_logs_screen"
+              });
+              onNew();
+            }}
+          >
             <Text style={styles.addButtonText}>+</Text>
           </Pressable>
         }
@@ -83,9 +93,16 @@ export function StationMap({
                   style={(state) => [
                     styles.listItem,
                     editingLogId === log.id && styles.selectedItem,
-                    isHovered(state) && styles.listItemHover
-                  ]}
-                  onPress={() => onEdit(log.id)}
+                  isHovered(state) && styles.listItemHover
+                ]}
+                  onPress={() => {
+                    trackEvent("fuel_log_item_clicked", {
+                      mode: editingLogId === log.id ? "close_edit" : "edit",
+                      fuel_type: log.fuel,
+                      has_odometer: Boolean(log.odometerKm)
+                    });
+                    onEdit(log.id);
+                  }}
                 >
                   <View style={styles.numberBadge}>
                     <Text style={styles.numberBadgeText}>{number}</Text>
@@ -134,7 +151,12 @@ export function StationMap({
           <Pressable
             accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
             style={styles.mapExpandButton}
-            onPress={() => setMapExpanded((current) => !current)}
+            onPress={() => {
+              trackEvent("fuel_log_map_toggled", {
+                expanded: !mapExpanded
+              });
+              setMapExpanded((current) => !current);
+            }}
           >
             <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
           </Pressable>

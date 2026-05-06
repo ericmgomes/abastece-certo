@@ -5,6 +5,7 @@ import { FieldToast, ToastNotice, showFieldNotice } from "../../components/formF
 import { Field, StateSelect } from "../../components/formControls";
 import { EntityDetails, StationDetails } from "../../components/fuelLogDetails";
 import { StationOverviewMap } from "../fuelLogs/FuelLogMapScreen";
+import { trackEvent } from "../../analytics";
 
 type SharedComponent = React.ComponentType<any>;
 type StationStyles = Record<string, any> & {
@@ -63,6 +64,9 @@ export function Stations({
     .sort((a, b) => (a.ranking?.average ?? Number.POSITIVE_INFINITY) - (b.ranking?.average ?? Number.POSITIVE_INFINITY));
 
   function openNewForm() {
+    trackEvent("station_form_opened", {
+      mode: "new"
+    });
     setEditingStationId("new");
   }
 
@@ -110,6 +114,10 @@ export function Stations({
                   isHovered(state) && styles.listItemHover
                 ]}
                 onPress={() => {
+                  trackEvent("station_details_toggled", {
+                    open: selectedStationId !== station.id,
+                    has_logs: count > 0
+                  });
                   setSelectedStationId((current) => (current === station.id ? null : station.id));
                   setEditingStationId(null);
                 }}
@@ -125,6 +133,9 @@ export function Stations({
                     style={styles.inlineIconButton}
                     onPress={(event) => {
                       event.stopPropagation();
+                      trackEvent("station_form_opened", {
+                        mode: editingStationId === station.id ? "close_edit" : "edit"
+                      });
                       setSelectedStationId(station.id);
                       setEditingStationId((current) => (current === station.id ? null : station.id));
                     }}
@@ -173,7 +184,12 @@ export function Stations({
           <Pressable
             accessibilityLabel={mapExpanded ? "Reduzir mapa" : "Maximizar mapa"}
             style={styles.mapExpandButton}
-            onPress={() => setMapExpanded((current) => !current)}
+            onPress={() => {
+              trackEvent("station_map_toggled", {
+                expanded: !mapExpanded
+              });
+              setMapExpanded((current) => !current);
+            }}
           >
             <Text style={styles.mapHeaderIconText}>{mapExpanded ? "↙" : "⛶"}</Text>
           </Pressable>
@@ -286,6 +302,9 @@ function StationEditor({
       return;
     }
 
+    trackEvent("station_delete_clicked", {
+      mode: station ? "existing" : "draft"
+    });
     onDelete(stationToDelete.id);
     onCancel();
   }
@@ -293,6 +312,10 @@ function StationEditor({
   function updateStationField(anchor: string, update: (value: string) => void) {
     return (value: string) => {
       setActiveField(anchor);
+      trackEvent("station_field_changed", {
+        field: anchor,
+        mode: station ? "edit" : draftStation ? "draft" : "new"
+      });
       update(value);
     };
   }
@@ -319,6 +342,10 @@ function StationEditor({
             onFocus={() => setActiveField("state")}
             onChange={(value: string) => {
               setActiveField("state");
+              trackEvent("station_field_changed", {
+                field: "state",
+                mode: station ? "edit" : draftStation ? "draft" : "new"
+              });
               setStateName(value);
             }}
           />

@@ -43,15 +43,39 @@ export function trackEvent(event: string, payload: AnalyticsPayload = {}) {
     return;
   }
 
+  const cleanEventPayload = cleanPayload(payload);
   window.dataLayer = window.dataLayer ?? [];
   window.dataLayer.push({
     event,
-    ...cleanPayload(payload)
+    ...cleanEventPayload
   });
+
+  dispatchDomAnalyticsEvent(event, cleanEventPayload);
 }
 
 function cleanPayload(payload: AnalyticsPayload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined)
   );
+}
+
+function dispatchDomAnalyticsEvent(event: string, payload: Record<string, AnalyticsValue>) {
+  if (typeof window.CustomEvent !== "function") {
+    return;
+  }
+
+  const detail = {
+    event,
+    ...payload
+  };
+  const genericEvent = new window.CustomEvent("litrocerto:analytics", { detail });
+  const specificEvent = new window.CustomEvent(`litrocerto:${event}`, { detail });
+
+  window.dispatchEvent(genericEvent);
+  window.dispatchEvent(specificEvent);
+
+  if (typeof document !== "undefined") {
+    document.dispatchEvent(genericEvent);
+    document.dispatchEvent(specificEvent);
+  }
 }

@@ -433,6 +433,10 @@ export default function App() {
   }
 
   function moveMonth(offset: number) {
+    trackEvent("month_changed", {
+      direction: offset < 0 ? "previous" : "next",
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
   }
 
@@ -512,6 +516,12 @@ export default function App() {
   }
 
   function closeFuelForm() {
+    if (fuelFormMode !== "closed") {
+      trackEvent("fuel_log_form_closed", {
+        mode: fuelFormMode,
+        auth_state: ownerId ? "authenticated" : "guest"
+      });
+    }
     setEditingLogId(null);
     setFuelFormMode("closed");
   }
