@@ -7,6 +7,12 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://app.litrocerto.com.br/llms.txt</loc>
+    <lastmod>2026-05-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://app.litrocerto.com.br/openapi-actions.yaml</loc>
     <lastmod>2026-05-06</lastmod>
     <changefreq>monthly</changefreq>

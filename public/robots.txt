@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /mcp
+Disallow: /oauth/
 
 Sitemap: https://app.litrocerto.com.br/sitemap.xml
