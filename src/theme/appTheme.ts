@@ -739,6 +739,13 @@ export function createStyles(theme: Theme) {
     marginTop: 16,
     marginBottom: 10
   },
+  periodTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily,
+    textAlign: "center"
+  },
   section: {
     position: "relative",
     backgroundColor: "transparent",
@@ -862,6 +869,22 @@ export function createStyles(theme: Theme) {
   metricCard: {
     flex: 1,
     minHeight: 82,
+    backgroundColor: theme.surface,
+    borderRadius: 8,
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.border,
+    gap: 4
+  },
+  metricCardActive: {
+    borderColor: theme.primary,
+    backgroundColor: theme.primarySoft
+  },
+  periodMetricCard: {
+    flex: 1,
+    minHeight: 70,
     backgroundColor: theme.surface,
     borderRadius: 8,
     padding: 6,
@@ -1552,12 +1575,25 @@ export function createStyles(theme: Theme) {
     backgroundColor: theme.primarySoft,
     borderRadius: 8,
     justifyContent: "flex-end",
-    overflow: "hidden"
+    overflow: "hidden",
+    position: "relative"
   },
   barFill: {
     backgroundColor: theme.primary,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8
+  },
+  barValue: {
+    position: "absolute",
+    left: 3,
+    right: 3,
+    bottom: 8,
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily,
+    textAlign: "center"
   },
   barLabel: {
     color: theme.muted,
