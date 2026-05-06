@@ -73,7 +73,7 @@ export function Stations({
   return (
     <View style={styles.stack}>
       <Section
-        title="Postos"
+        title={`${stations.length} ${stations.length === 1 ? "Posto" : "Postos"}`}
         rightAction={
           <Pressable style={styles.addButton} onPress={openNewForm}>
             <Text style={styles.addButtonText}>+</Text>

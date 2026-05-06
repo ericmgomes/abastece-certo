@@ -64,7 +64,7 @@ export function StationMap({
   return (
     <View style={styles.stack}>
       <Section
-        title="Abastecimentos"
+        title={`${numberedLogs.length} ${numberedLogs.length === 1 ? "Abastecimento" : "Abastecimentos"}`}
         rightAction={
           <Pressable
             style={styles.addButton}

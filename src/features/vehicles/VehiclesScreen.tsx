@@ -80,7 +80,7 @@ export function Cars({
   return (
     <View style={styles.stack}>
       <Section
-        title="Veículos"
+        title={`${cars.length} ${cars.length === 1 ? "Veículo" : "Veículos"}`}
         rightAction={
           <Pressable style={styles.addButton} onPress={openNewForm}>
             <Text style={styles.addButtonText}>+</Text>
