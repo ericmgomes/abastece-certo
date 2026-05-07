@@ -831,6 +831,11 @@ export function createStyles(theme: Theme) {
     flexDirection: "row",
     gap: 8
   },
+  summaryMetricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
   periodGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -872,7 +877,9 @@ export function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   metricCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "47%",
     minHeight: 82,
     backgroundColor: theme.surface,
     borderRadius: 8,

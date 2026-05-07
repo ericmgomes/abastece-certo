@@ -17,7 +17,7 @@ type MetricTrend = {
   status: "good" | "bad" | "neutral";
 };
 
-type ChartMetric = "spent" | "liters" | "efficiency";
+type ChartMetric = "spent" | "liters" | "efficiency" | "costPerKm";
 
 export function SummaryScreen({
   logs,
@@ -49,6 +49,8 @@ export function SummaryScreen({
   const previousMonthLogs = logsForMonth(logs, previousMonth);
   const monthLiters = currentMonthLogs.reduce((sum, log) => sum + log.liters, 0);
   const previousMonthLiters = previousMonthLogs.reduce((sum, log) => sum + log.liters, 0);
+  const monthCostPerKm = costPerKmForMonth(logs, visibleMonth);
+  const previousMonthCostPerKm = costPerKmForMonth(logs, previousMonth);
   const previousMetrics = new DashboardCalculator({ user: null, cars, stations, logs, selectedCarId: null }, previousMonth).calculate();
   const hasPreviousMonth = previousMonthLogs.length > 0;
   const monthTrend = hasPreviousMonth
@@ -56,6 +58,9 @@ export function SummaryScreen({
     : undefined;
   const litersTrend = hasPreviousMonth
     ? metricTrend(monthLiters, previousMonthLiters, "lower")
+    : undefined;
+  const costPerKmTrend = hasPreviousMonth && monthCostPerKm !== null && previousMonthCostPerKm !== null
+    ? metricTrend(monthCostPerKm, previousMonthCostPerKm, "lower")
     : undefined;
   const monthLabel = visibleMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const chartData = monthlyChartData(logs, visibleMonth, chartMetric);
@@ -74,7 +79,7 @@ export function SummaryScreen({
           </Pressable>
         </View>
 
-        <View style={styles.grid}>
+        <View style={styles.summaryMetricGrid}>
           <MetricCard
             styles={styles}
             label="Gasto mês"
@@ -97,6 +102,18 @@ export function SummaryScreen({
             onPress={() => {
               trackEvent("summary_chart_metric_changed", { metric: "liters" });
               setChartMetric("liters");
+            }}
+          />
+          <MetricCard
+            styles={styles}
+            label="R$/km"
+            value={monthCostPerKm === null ? "-" : `${formatCurrency(monthCostPerKm)}/km`}
+            small
+            trend={costPerKmTrend}
+            active={chartMetric === "costPerKm"}
+            onPress={() => {
+              trackEvent("summary_chart_metric_changed", { metric: "costPerKm" });
+              setChartMetric("costPerKm");
             }}
           />
           <MetricCard
@@ -252,7 +269,9 @@ function monthlyChartData(logs: FuelLog[], visibleMonth: Date, metric: ChartMetr
     new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - (2 - index), 1)
   ).map((month) => {
     const monthLogs = logsForMonth(logs, month);
-    const value = monthlyMetricValue(monthLogs, metric);
+    const value = metric === "costPerKm"
+      ? costPerKmForMonth(logs, month) ?? 0
+      : monthlyMetricValue(monthLogs, metric);
     return {
       label: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
       value,
@@ -290,7 +309,63 @@ function formatChartValue(value: number, metric: ChartMetric) {
     return `${formatLiters(value)} L`;
   }
 
+  if (metric === "costPerKm") {
+    return `${formatCurrency(value)}/km`;
+  }
+
   return "";
+}
+
+function costPerKmForMonth(logs: FuelLog[], referenceDate: Date) {
+  const value = costPerKmForLogs(logs, referenceDate);
+  return value > 0 ? value : null;
+}
+
+function costPerKmForLogs(logs: FuelLog[], referenceDate?: Date) {
+  const logsByCar = new Map<string, FuelLog[]>();
+  logs.forEach((log) => {
+    if (typeof log.odometerKm !== "number") {
+      return;
+    }
+
+    const carLogs = logsByCar.get(log.carId) ?? [];
+    carLogs.push(log);
+    logsByCar.set(log.carId, carLogs);
+  });
+
+  let totalCost = 0;
+  let totalKm = 0;
+  logsByCar.forEach((carLogs) => {
+    const sortedLogs = carLogs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    sortedLogs.forEach((log, index) => {
+      const previous = sortedLogs[index - 1];
+      if (!previous || typeof previous.odometerKm !== "number" || typeof log.odometerKm !== "number") {
+        return;
+      }
+
+      const distance = log.odometerKm - previous.odometerKm;
+      if (distance <= 0) {
+        return;
+      }
+
+      if (referenceDate && !isSameMonth(new Date(log.createdAt), referenceDate)) {
+        return;
+      }
+
+      totalKm += distance;
+      totalCost += log.paid;
+    });
+  });
+
+  if (totalKm <= 0) {
+    return 0;
+  }
+
+  return totalCost / totalKm;
+}
+
+function isSameMonth(date: Date, referenceDate: Date) {
+  return date.getMonth() === referenceDate.getMonth() && date.getFullYear() === referenceDate.getFullYear();
 }
 
 function fullPeriodStats(logs: FuelLog[]) {
