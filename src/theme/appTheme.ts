@@ -165,6 +165,7 @@ export function createStyles(theme: Theme) {
     shadowOffset: { width: 0, height: 6 },
     elevation: 3
   };
+  const actionFill = theme.mode === "dark" && theme.palette === "blue" ? "#4A9BFF" : theme.primary;
 
   return StyleSheet.create({
   shell: {
@@ -369,7 +370,7 @@ export function createStyles(theme: Theme) {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
+    backgroundColor: actionFill,
     alignItems: "center",
     justifyContent: "center",
     gap: 0
@@ -394,12 +395,12 @@ export function createStyles(theme: Theme) {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
+    backgroundColor: actionFill,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 35,
     elevation: 16,
-    shadowColor: theme.mode === "dark" ? theme.accent : theme.primary,
+    shadowColor: actionFill,
     shadowOpacity: 0.28,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 }
@@ -930,7 +931,7 @@ export function createStyles(theme: Theme) {
     paddingVertical: 5
   },
   summaryPeriodChipActive: {
-    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
+    backgroundColor: actionFill,
     borderColor: theme.primary
   },
   summaryPeriodText: {
@@ -1972,7 +1973,7 @@ export function createStyles(theme: Theme) {
     top: "75%"
   },
   barFill: {
-    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
+    backgroundColor: actionFill,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     zIndex: 2
