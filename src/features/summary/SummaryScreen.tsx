@@ -28,7 +28,7 @@ const periodOptions: { label: string; value: SummaryPeriod }[] = [
   { label: "Trimestral", value: "quarterly" },
   { label: "Semestral", value: "semiannual" },
   { label: "Anual", value: "yearly" },
-  { label: "Todo", value: "all" }
+  { label: "Todo período", value: "all" }
 ];
 
 export function SummaryScreen({
@@ -59,6 +59,7 @@ export function SummaryScreen({
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>("monthly");
   const [vehicleFilterOpen, setVehicleFilterOpen] = useState(false);
   const [fuelFilterOpen, setFuelFilterOpen] = useState(false);
+  const [periodFilterOpen, setPeriodFilterOpen] = useState(false);
   const [selectedFuel, setSelectedFuel] = useState<FuelLog["fuel"] | null>(null);
   const availableFuels = fuelTypesForLogs(logs);
   const effectiveFuel = selectedFuel && availableFuels.includes(selectedFuel) ? selectedFuel : null;
@@ -100,6 +101,7 @@ export function SummaryScreen({
               style={[styles.summaryFilterChip, styles.pressableNoOutline]}
               onPress={() => {
                 setFuelFilterOpen(false);
+                setPeriodFilterOpen(false);
                 setVehicleFilterOpen((current) => !current);
               }}
             >
@@ -131,45 +133,83 @@ export function SummaryScreen({
             ) : null}
           </View>
         ) : null}
-        {availableFuels.length > 1 ? (
-          <View style={[styles.summaryFilterBox, { zIndex: 20 }]}>
+        <View style={styles.summaryInlineFilters}>
+          {availableFuels.length > 1 ? (
+            <View style={[styles.summaryFilterBox, styles.summaryInlineFilterItem, { zIndex: 20 }]}>
+              <Pressable
+                style={[styles.summaryFilterChip, styles.summaryInlineFilterChip, styles.pressableNoOutline]}
+                onPress={() => {
+                  setVehicleFilterOpen(false);
+                  setPeriodFilterOpen(false);
+                  setFuelFilterOpen((current) => !current);
+                }}
+              >
+                <Text style={styles.summaryFilterIcon}>⛽</Text>
+                <Text style={styles.summaryFilterText} numberOfLines={1}>{fuelFilterLabel(effectiveFuel)}</Text>
+                <Text style={styles.summaryFilterArrow}>{fuelFilterOpen ? "⌃" : "⌄"}</Text>
+              </Pressable>
+              {fuelFilterOpen ? (
+                <View style={styles.summaryFilterMenu}>
+                  <Pressable
+                    style={[styles.summaryFilterOption, styles.pressableNoOutline, !effectiveFuel && styles.summaryFilterOptionActive]}
+                    onPress={() => {
+                      trackEvent("fuel_filter_changed_from_summary", { fuel_type: "all" });
+                      setSelectedFuel(null);
+                      setFuelFilterOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.summaryFilterOptionText, !effectiveFuel && styles.summaryFilterOptionTextActive]}>Todos os combustíveis</Text>
+                    <Text style={[styles.summaryFilterCheck, !effectiveFuel && styles.summaryFilterOptionTextActive]}>{!effectiveFuel ? "✓" : ""}</Text>
+                  </Pressable>
+                  {availableFuels.map((fuel) => {
+                    const active = fuel === effectiveFuel;
+                    return (
+                      <Pressable
+                        key={fuel}
+                        style={[styles.summaryFilterOption, styles.pressableNoOutline, active && styles.summaryFilterOptionActive]}
+                        onPress={() => {
+                          trackEvent("fuel_filter_changed_from_summary", { fuel_type: fuel });
+                          setSelectedFuel(fuel);
+                          setFuelFilterOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{fuel}</Text>
+                        <Text style={[styles.summaryFilterCheck, active && styles.summaryFilterOptionTextActive]}>{active ? "✓" : ""}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          <View style={[styles.summaryFilterBox, styles.summaryInlineFilterItem, { zIndex: 10 }]}>
             <Pressable
-              style={[styles.summaryFilterChip, styles.pressableNoOutline]}
+              style={[styles.summaryFilterChip, styles.summaryInlineFilterChip, styles.pressableNoOutline]}
               onPress={() => {
                 setVehicleFilterOpen(false);
-                setFuelFilterOpen((current) => !current);
+                setFuelFilterOpen(false);
+                setPeriodFilterOpen((current) => !current);
               }}
             >
-              <Text style={styles.summaryFilterIcon}>⛽</Text>
-              <Text style={styles.summaryFilterText}>{fuelFilterLabel(effectiveFuel)}</Text>
-              <Text style={styles.summaryFilterArrow}>{fuelFilterOpen ? "⌃" : "⌄"}</Text>
+              <Text style={styles.summaryFilterIcon}>📅</Text>
+              <Text style={styles.summaryFilterText} numberOfLines={1}>{periodFilterLabel(summaryPeriod)}</Text>
+              <Text style={styles.summaryFilterArrow}>{periodFilterOpen ? "⌃" : "⌄"}</Text>
             </Pressable>
-            {fuelFilterOpen ? (
+            {periodFilterOpen ? (
               <View style={styles.summaryFilterMenu}>
-                <Pressable
-                  style={[styles.summaryFilterOption, styles.pressableNoOutline, !effectiveFuel && styles.summaryFilterOptionActive]}
-                  onPress={() => {
-                    trackEvent("fuel_filter_changed_from_summary", { fuel_type: "all" });
-                    setSelectedFuel(null);
-                    setFuelFilterOpen(false);
-                  }}
-                >
-                  <Text style={[styles.summaryFilterOptionText, !effectiveFuel && styles.summaryFilterOptionTextActive]}>Todos os combustíveis</Text>
-                  <Text style={[styles.summaryFilterCheck, !effectiveFuel && styles.summaryFilterOptionTextActive]}>{!effectiveFuel ? "✓" : ""}</Text>
-                </Pressable>
-                {availableFuels.map((fuel) => {
-                  const active = fuel === effectiveFuel;
+                {periodOptions.map((option) => {
+                  const active = option.value === summaryPeriod;
                   return (
                     <Pressable
-                      key={fuel}
+                      key={option.value}
                       style={[styles.summaryFilterOption, styles.pressableNoOutline, active && styles.summaryFilterOptionActive]}
                       onPress={() => {
-                        trackEvent("fuel_filter_changed_from_summary", { fuel_type: fuel });
-                        setSelectedFuel(fuel);
-                        setFuelFilterOpen(false);
+                        trackEvent("summary_period_changed", { period: option.value });
+                        setSummaryPeriod(option.value);
+                        setPeriodFilterOpen(false);
                       }}
                     >
-                      <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{fuel}</Text>
+                      <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{option.label}</Text>
                       <Text style={[styles.summaryFilterCheck, active && styles.summaryFilterOptionTextActive]}>{active ? "✓" : ""}</Text>
                     </Pressable>
                   );
@@ -177,23 +217,6 @@ export function SummaryScreen({
               </View>
             ) : null}
           </View>
-        ) : null}
-        <View style={styles.summaryPeriodSelector}>
-          {periodOptions.map((option) => {
-            const active = option.value === summaryPeriod;
-            return (
-              <Pressable
-                key={option.value}
-                style={[styles.summaryPeriodChip, styles.pressableNoOutline, active && styles.summaryPeriodChipActive]}
-                onPress={() => {
-                  trackEvent("summary_period_changed", { period: option.value });
-                  setSummaryPeriod(option.value);
-                }}
-              >
-                <Text style={[styles.summaryPeriodText, active && styles.summaryPeriodTextActive]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
         </View>
         <View style={styles.monthSwitcher}>
           {showPreviousPeriod ? (
@@ -654,6 +677,10 @@ function fuelFilterLabel(fuel: FuelLog["fuel"] | null) {
   }
 
   return fuel;
+}
+
+function periodFilterLabel(period: SummaryPeriod) {
+  return periodOptions.find((option) => option.value === period)?.label ?? "Mensal";
 }
 
 class SummaryInsightBuilder {

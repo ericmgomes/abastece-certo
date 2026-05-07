@@ -913,37 +913,6 @@ export function createStyles(theme: Theme) {
     flexWrap: "wrap",
     gap: 8
   },
-  summaryPeriodSelector: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 6
-  },
-  summaryPeriodChip: {
-    minHeight: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: glassSurface,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5
-  },
-  summaryPeriodChipActive: {
-    backgroundColor: actionFill,
-    borderColor: theme.primary
-  },
-  summaryPeriodText: {
-    color: theme.muted,
-    fontSize: 12,
-    lineHeight: 14,
-    fontWeight: "900",
-    fontFamily: theme.fontFamily
-  },
-  summaryPeriodTextActive: {
-    color: "#FFFFFF"
-  },
   periodGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -979,6 +948,16 @@ export function createStyles(theme: Theme) {
     alignItems: "center",
     zIndex: 10
   },
+  summaryInlineFilters: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    zIndex: 20
+  },
+  summaryInlineFilterItem: {
+    flex: 1,
+    maxWidth: 190
+  },
   summaryFilterChip: {
     minHeight: 34,
     maxWidth: "92%",
@@ -991,6 +970,11 @@ export function createStyles(theme: Theme) {
     justifyContent: "center",
     gap: 7,
     paddingHorizontal: 12
+  },
+  summaryInlineFilterChip: {
+    maxWidth: "100%",
+    alignSelf: "stretch",
+    paddingHorizontal: 9
   },
   summaryFilterIcon: {
     color: theme.primary,
