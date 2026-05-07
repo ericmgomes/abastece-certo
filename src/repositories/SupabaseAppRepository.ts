@@ -95,7 +95,7 @@ export class SupabaseAppRepository {
       selectedCarId: profile?.selected_car_id ?? null,
       filteredCarIds: profile?.filtered_car_ids ?? [],
       themeMode: profile?.theme_mode ?? "light",
-      themePalette: profile?.theme_palette ?? "green",
+      themePalette: profile?.theme_palette ?? "blue",
       demoDataLoaded: profile?.demo_data_loaded ?? true,
       cars: (carsResult.data ?? []).map((row) => this.carFromRow(row as CarRow)),
       stations: (stationsResult.data ?? []).map((row) => this.stationFromRow(row as StationRow)),
@@ -115,7 +115,7 @@ export class SupabaseAppRepository {
       selected_car_id: state.selectedCarId,
       filtered_car_ids: state.filteredCarIds ?? [],
       theme_mode: state.themeMode ?? "light",
-      theme_palette: state.themePalette ?? "green",
+      theme_palette: state.themePalette ?? "blue",
       demo_data_loaded: state.demoDataLoaded ?? false,
       updated_at: new Date().toISOString()
     };

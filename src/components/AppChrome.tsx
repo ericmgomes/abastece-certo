@@ -230,9 +230,9 @@ export function ThemePalettePicker({
   onSelect: (palette: ThemePalette) => void;
 }) {
   const options: Array<{ value: ThemePalette; color: string; label: string }> = [
+    { value: "blue", color: "#1D6FD6", label: "Azul" },
     { value: "green", color: "#178A4A", label: "Verde" },
     { value: "pink", color: "#D63384", label: "Rosa" },
-    { value: "blue", color: "#1D6FD6", label: "Azul" },
     { value: "orange", color: "#D66A1D", label: "Laranja" }
   ];
 

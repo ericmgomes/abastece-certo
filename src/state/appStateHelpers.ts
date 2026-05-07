@@ -122,7 +122,7 @@ export const demoState: AppState = {
   stations: initialStations,
   logs: demoLogs,
   themeMode: "light",
-  themePalette: "green",
+  themePalette: "blue",
   demoDataLoaded: true
 };
 
@@ -213,6 +213,7 @@ export const starterState: AppState = {
   stations: initialStations,
   logs: [],
   themeMode: "light",
-  themePalette: "green",
+  themePalette: "blue",
   demoDataLoaded: false
 };
+

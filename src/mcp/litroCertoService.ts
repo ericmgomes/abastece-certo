@@ -280,7 +280,7 @@ export class LitroCertoMcpService {
       stations,
       logs,
       themeMode: profile?.theme_mode ?? "light",
-      themePalette: profile?.theme_palette ?? "green",
+      themePalette: profile?.theme_palette ?? "blue",
       demoDataLoaded: profile?.demo_data_loaded ?? false
     };
   }
@@ -303,7 +303,7 @@ export class LitroCertoMcpService {
       selected_car_id: null,
       filtered_car_ids: [],
       theme_mode: "light",
-      theme_palette: "green",
+      theme_palette: "blue",
       demo_data_loaded: false,
       updated_at: new Date().toISOString()
     };

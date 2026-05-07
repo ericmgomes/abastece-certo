@@ -1796,7 +1796,8 @@ export function createStyles(theme: Theme) {
     color: theme.text,
     fontSize: 17,
     fontWeight: "800",
-    fontFamily: theme.headingFontFamily
+    fontFamily: theme.headingFontFamily,
+    textAlign: "center"
   },
   rankingInfo: {
     flex: 1,

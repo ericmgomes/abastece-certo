@@ -136,7 +136,7 @@ export default function App() {
   const scrollRef = useRef<ScrollView>(null);
   const saveErrorShownRef = useRef(false);
   const themeMode = state.themeMode ?? "light";
-  const themePalette = state.themePalette ?? "green";
+  const themePalette = state.themePalette ?? "blue";
   const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const oauthConsentRoute = isOAuthConsentRoute();
