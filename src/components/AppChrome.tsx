@@ -141,12 +141,9 @@ export function Header({
           />
         </Pressable>
         <View style={styles.headerTools}>
-          <View style={styles.colorControlCluster}>
-            <ThemePalettePicker palette={palette} styles={styles} onSelect={onThemePaletteSelect} />
-            <Pressable style={styles.themeButton} onPress={onToggleTheme}>
-              <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.themeButton} onPress={onToggleTheme}>
+            <Text style={styles.themeButtonText}>{mode === "light" ? "☾" : "☼"}</Text>
+          </Pressable>
           <View style={styles.accountBox}>
             <Pressable style={styles.accountButton} onPress={() => setAccountOpen((current) => !current)}>
               <View style={styles.accountIcon}>
@@ -181,6 +178,10 @@ export function Header({
                       {authEmail ?? "Faça login para salvar seus dados."}
                     </Text>
                   </View>
+                  <View style={styles.accountThemeRow}>
+                    <Text style={styles.accountThemeLabel}>Tema</Text>
+                    <ThemePalettePicker palette={palette} styles={styles} onSelect={onThemePaletteSelect} />
+                  </View>
                   <AccountMenuItem label="Ajuda" styles={styles} onPress={() => {
                     setAccountOpen(false);
                     onOpenHelp();
@@ -213,11 +214,7 @@ export function Header({
         </View>
       </View>
       {showNewFuelButton ? (
-        <Pressable style={styles.headerPrimaryButton} onPress={onNewFuel}>
-          <View style={styles.headerPrimaryButtonCircle}>
-            <Text style={styles.headerPrimaryButtonPlus}>+</Text>
-          </View>
-        </Pressable>
+        <View />
       ) : null}
     </View>
   );
@@ -275,6 +272,13 @@ export function Tabs({
     Veículos: "Veículos",
     IA: "IA"
   };
+  const icons: Record<AppTab, string> = {
+    Resumo: "▥",
+    IA: "✦",
+    Abastecimentos: "▣",
+    Postos: "⌖",
+    Veículos: "◉"
+  };
 
   return (
     <View style={styles.tabsBar}>
@@ -285,6 +289,7 @@ export function Tabs({
             style={[styles.tab, { flexGrow: labels[tab].length, flexBasis: 0 }, active === tab && styles.activeTab]}
             onPress={() => onChange(tab)}
           >
+            <Text style={[styles.tabIcon, active === tab && styles.activeTabText]}>{icons[tab]}</Text>
             <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{labels[tab]}</Text>
           </Pressable>
         ))}
@@ -313,7 +318,7 @@ function HeaderCarFilter({
         style={styles.headerFilterButton}
         onPress={() => setOpen((current) => !current)}
       >
-        <Text style={styles.wheelsIcon}>⚙</Text>
+        <Text style={styles.wheelsIcon}>◉</Text>
       </Pressable>
       {open ? (
         <>

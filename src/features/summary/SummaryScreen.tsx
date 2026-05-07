@@ -27,6 +27,8 @@ export function SummaryScreen({
   visibleMonth,
   onPreviousMonth,
   onNextMonth,
+  activeCarIds,
+  onToggleCar,
   styles,
   Section,
   Empty
@@ -38,12 +40,15 @@ export function SummaryScreen({
   visibleMonth: Date;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
+  activeCarIds: string[];
+  onToggleCar: (carId: string) => void;
   onEditLog: (logId: string) => void;
   styles: SummaryStyles;
   Section: SharedComponent;
   Empty: SharedComponent;
 }) {
   const [chartMetric, setChartMetric] = useState<ChartMetric>("spent");
+  const [vehicleFilterOpen, setVehicleFilterOpen] = useState(false);
   const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
   const currentMonthLogs = logsForMonth(logs, visibleMonth);
   const previousMonthLogs = logsForMonth(logs, previousMonth);
@@ -62,13 +67,48 @@ export function SummaryScreen({
   const costPerKmTrend = hasPreviousMonth && monthCostPerKm !== null && previousMonthCostPerKm !== null
     ? metricTrend(monthCostPerKm, previousMonthCostPerKm, "lower")
     : undefined;
-  const monthLabel = visibleMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const monthLabel = formatMonthTitle(visibleMonth);
   const chartData = monthlyChartData(logs, visibleMonth, chartMetric);
   const periodStats = fullPeriodStats(logs);
+  const insight = summaryInsight(monthTrend, metrics.monthTotal, previousMetrics.monthTotal);
 
   return (
     <View style={styles.summaryStack}>
       <Section title="">
+        {cars.length > 1 ? (
+          <View style={styles.summaryFilterBox}>
+            <Pressable
+              style={[styles.summaryFilterChip, styles.pressableNoOutline]}
+              onPress={() => setVehicleFilterOpen((current) => !current)}
+            >
+              <Text style={styles.summaryFilterIcon}>◉</Text>
+              <Text style={styles.summaryFilterText}>{vehicleFilterLabel(cars, activeCarIds)}</Text>
+              <Text style={styles.summaryFilterArrow}>{vehicleFilterOpen ? "⌃" : "⌄"}</Text>
+            </Pressable>
+            {vehicleFilterOpen ? (
+              <View style={styles.summaryFilterMenu}>
+                {cars.map((car) => {
+                  const active = activeCarIds.includes(car.id);
+                  return (
+                    <Pressable
+                      key={car.id}
+                      style={[styles.summaryFilterOption, styles.pressableNoOutline, active && styles.summaryFilterOptionActive]}
+                      onPress={() => {
+                        trackEvent("vehicle_filter_changed_from_summary", {
+                          selected: !active
+                        });
+                        onToggleCar(car.id);
+                      }}
+                    >
+                      <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{car.nickname}</Text>
+                      <Text style={[styles.summaryFilterCheck, active && styles.summaryFilterOptionTextActive]}>{active ? "✓" : ""}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.monthSwitcher}>
           <Pressable style={styles.iconButton} onPress={onPreviousMonth}>
             <Text style={styles.iconButtonText}>‹</Text>
@@ -119,9 +159,10 @@ export function SummaryScreen({
           <MetricCard
             styles={styles}
             label="Média km/L"
-            value="-"
+            value="Sem dados"
             small
             trend={undefined}
+            muted
             active={chartMetric === "efficiency"}
             onPress={() => {
               trackEvent("summary_chart_metric_changed", { metric: "efficiency" });
@@ -130,26 +171,39 @@ export function SummaryScreen({
           />
         </View>
 
+        {insight ? (
+          <View style={styles.aiInsightCard}>
+            <View style={styles.aiInsightHeader}>
+              <Text style={styles.aiInsightIcon}>✦</Text>
+              <Text style={styles.aiInsightBadge}>IA · Insight</Text>
+            </View>
+            <Text style={styles.aiInsightText}>{insight}</Text>
+          </View>
+        ) : null}
+
         <Bars data={chartData} styles={styles} Empty={Empty} />
 
         {metrics.fuelAverages.length === 0 ? (
           <Empty text="Registre abastecimentos para comparar combustíveis." />
         ) : (
-          <View style={styles.fuelGrid}>
-            {metrics.fuelAverages.map((fuel) => (
-              <Pressable
-                key={fuel.name}
-                style={(state) => [styles.fuelCard, isHovered(state) && styles.listItemHover]}
-                onPress={() => {
-                  trackEvent("fuel_average_clicked", {
-                    fuel_type: fuel.name
-                  });
-                }}
-              >
-                <Text style={styles.itemTitle}>{fuel.name}</Text>
-                <Text style={styles.itemTitle}>{formatCurrency(fuel.average)}/L</Text>
-              </Pressable>
-            ))}
+          <View style={styles.fuelGridFrame}>
+            <View style={styles.fuelGrid}>
+              {metrics.fuelAverages.map((fuel) => (
+                <Pressable
+                  key={fuel.name}
+                  style={(state) => [styles.fuelCard, styles.pressableNoOutline, isHovered(state) && styles.listItemHover]}
+                  onPress={() => {
+                    trackEvent("fuel_average_clicked", {
+                      fuel_type: fuel.name
+                    });
+                  }}
+                >
+                  <Text style={styles.itemTitle}>{fuel.name}</Text>
+                  <Text style={styles.itemTitle}>{formatCurrency(fuel.average)}/L</Text>
+                </Pressable>
+              ))}
+            </View>
+            {metrics.fuelAverages.length > 2 ? <View style={styles.fuelGridFade} /> : null}
           </View>
         )}
 
@@ -178,6 +232,7 @@ function MetricCard({
   small,
   trend,
   active,
+  muted,
   onPress,
   styles
 }: {
@@ -186,13 +241,14 @@ function MetricCard({
   small?: boolean;
   trend?: MetricTrend;
   active?: boolean;
+  muted?: boolean;
   onPress: () => void;
   styles: SummaryStyles;
 }) {
   return (
-    <Pressable style={[styles.metricCard, active && styles.metricCardActive]} onPress={onPress}>
+    <Pressable style={[styles.metricCard, styles.pressableNoOutline, active && styles.metricCardActive]} onPress={onPress}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, small && styles.metricValueSmall]}>{value}</Text>
+      <Text style={[styles.metricValue, small && styles.metricValueSmall, muted && styles.metricValueMuted]}>{value}</Text>
       {trend ? (
         <Text
           style={[
@@ -255,6 +311,9 @@ function Bars({
       {data.map((item) => (
         <View style={styles.barColumn} key={item.label}>
           <View style={styles.barTrack}>
+            <View style={[styles.barGridLine, styles.barGridLineTop]} />
+            <View style={[styles.barGridLine, styles.barGridLineMiddle]} />
+            <View style={[styles.barGridLine, styles.barGridLineBottom]} />
             <View style={[styles.barFill, { height: item.value > 0 ? `${Math.max(10, (item.value / max) * 100)}%` : "0%" }]} />
             {item.display ? <Text style={[styles.barValue, item.value <= 0 && styles.barValueEmpty]}>{item.display}</Text> : null}
           </View>
@@ -295,7 +354,7 @@ function monthlyMetricValue(monthLogs: FuelLog[], metric: ChartMetric) {
 
 function formatChartValue(value: number, metric: ChartMetric) {
   if (metric === "efficiency") {
-    return "-";
+    return "—";
   }
 
   if (!value) {
@@ -315,6 +374,39 @@ function formatChartValue(value: number, metric: ChartMetric) {
   }
 
   return "";
+}
+
+function formatMonthTitle(date: Date) {
+  const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function vehicleFilterLabel(cars: Car[], activeCarIds: string[]) {
+  if (activeCarIds.length === cars.length) {
+    return "Todos os veículos";
+  }
+
+  if (activeCarIds.length === 1) {
+    return cars.find((car) => car.id === activeCarIds[0])?.nickname ?? "1 veículo";
+  }
+
+  return `${activeCarIds.length} veículos`;
+}
+
+function summaryInsight(monthTrend: MetricTrend | undefined, current: number, previous: number) {
+  if (!monthTrend || previous <= 0 || current <= 0) {
+    return null;
+  }
+
+  const percentage = Math.abs(((current - previous) / previous) * 100).toLocaleString("pt-BR", {
+    maximumFractionDigits: 0
+  });
+
+  if (current < previous) {
+    return `Você gastou ${percentage}% menos que no mês anterior. Continue assim para manter o combustível sob controle.`;
+  }
+
+  return `Você gastou ${percentage}% mais que no mês anterior. Vale revisar posto, combustível e frequência dos abastecimentos.`;
 }
 
 function costPerKmForMonth(logs: FuelLog[], referenceDate: Date) {
@@ -424,9 +516,10 @@ function metricTrend(current: number, previous: number, betterWhen: "higher" | "
   const improved = betterWhen === "higher" ? change > 0 : change < 0;
   const status = Math.abs(change) < 0.5 ? "neutral" : improved ? "good" : "bad";
   const prefix = change > 0 ? "+" : change < 0 ? "-" : "";
+  const arrow = change > 0 ? "↑ " : change < 0 ? "↓ " : "";
 
   return {
-    label: `${prefix}${rounded}% vs mês anterior`,
+    label: `${arrow}${prefix}${rounded}% vs mês anterior`,
     status
   };
 }

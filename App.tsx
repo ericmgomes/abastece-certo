@@ -5,6 +5,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   View
@@ -737,6 +738,8 @@ export default function App() {
           visibleMonth={visibleMonth}
           onPreviousMonth={() => moveMonth(-1)}
           onNextMonth={() => moveMonth(1)}
+          activeCarIds={activeCarIds}
+          onToggleCar={toggleFilterCar}
           onEditLog={openEditFuelForm}
           styles={styles}
           Section={Section}
@@ -899,13 +902,21 @@ export default function App() {
                   showNewFuelButton={fuelFormMode !== "new"}
                   cars={state.cars}
                   activeCarIds={activeCarIds}
-                  showCarFilter={state.cars.length > 1 && tab !== "Veículos" && fuelFormMode !== "new" && !utilityScreen}
+                  showCarFilter={false}
                   onToggleCar={toggleFilterCar}
                   mode={themeMode}
                   palette={themePalette}
                   styles={styles}
                   theme={theme}
                 />
+                <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+                  {renderContent()}
+                </ScrollView>
+                {fuelFormMode !== "new" ? (
+                  <Pressable style={styles.floatingFuelButton} onPress={openNewFuelForm}>
+                    <Text style={styles.floatingFuelButtonText}>+</Text>
+                  </Pressable>
+                ) : null}
                 {!ownerId ? (
                   <DemoBanner onOpenAuth={() => {
                     trackEvent("login_opened", {
@@ -914,9 +925,6 @@ export default function App() {
                     setAuthScreenOpen(true);
                   }} styles={styles} />
                 ) : null}
-                <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-                  {renderContent()}
-                </ScrollView>
                 <Tabs active={utilityScreen || fuelFormMode === "new" ? null : tab} onChange={changeTab} styles={styles} />
               </KeyboardAvoidingView>
             </SafeAreaView>

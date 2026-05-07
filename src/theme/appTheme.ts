@@ -154,6 +154,18 @@ export function buildTheme(mode: ThemeMode, palette: ThemePalette) {
 export type Theme = ReturnType<typeof buildTheme>;
 
 export function createStyles(theme: Theme) {
+  const glassSurface = theme.mode === "dark" ? "rgba(16, 35, 58, 0.78)" : "rgba(255, 255, 255, 0.68)";
+  const glassSurfaceAlt = theme.mode === "dark" ? "rgba(21, 48, 79, 0.66)" : "rgba(255, 255, 255, 0.46)";
+  const glassBorder = theme.mode === "dark" ? "rgba(255, 255, 255, 0.13)" : "rgba(255, 255, 255, 0.74)";
+  const softBorder = theme.mode === "dark" ? "rgba(255, 255, 255, 0.10)" : "rgba(16, 32, 24, 0.10)";
+  const softShadow = {
+    shadowColor: "#000000",
+    shadowOpacity: theme.mode === "dark" ? 0.22 : 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3
+  };
+
   return StyleSheet.create({
   shell: {
     flex: 1,
@@ -268,6 +280,10 @@ export function createStyles(theme: Theme) {
     paddingHorizontal: 14,
     gap: 10
   },
+  pressableNoOutline: Platform.OS === "web" ? {
+    outlineWidth: 0,
+    outlineStyle: "none"
+  } as never : {},
   googleLogo: {
     width: 24,
     height: 24,
@@ -288,8 +304,8 @@ export function createStyles(theme: Theme) {
   header: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 8,
-    gap: 7,
+    paddingBottom: 4,
+    gap: 4,
     zIndex: 20
   },
   headerTop: {
@@ -320,7 +336,7 @@ export function createStyles(theme: Theme) {
   headerTools: {
     position: "relative",
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "flex-end",
     gap: 8,
     flexShrink: 0,
@@ -371,6 +387,30 @@ export function createStyles(theme: Theme) {
     lineHeight: 15,
     fontFamily: theme.fontFamily
   },
+  floatingFuelButton: {
+    position: "absolute",
+    right: 18,
+    bottom: 76,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 35,
+    elevation: 16,
+    shadowColor: theme.primary,
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 }
+  },
+  floatingFuelButtonText: {
+    color: "#FFFFFF",
+    fontSize: 38,
+    lineHeight: 40,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
   headerSecondaryButton: {
     minHeight: 30,
     borderRadius: 8,
@@ -388,17 +428,22 @@ export function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   demoBanner: {
-    marginHorizontal: 16,
-    marginBottom: 6,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: theme.primary,
-    backgroundColor: theme.primarySoft,
-    padding: 10,
+    position: "absolute",
+    left: 12,
+    right: 82,
+    bottom: 70,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: glassSurface,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10
+    gap: 8,
+    zIndex: 30,
+    elevation: 12
   },
   demoBannerTextGroup: {
     flex: 1,
@@ -407,14 +452,14 @@ export function createStyles(theme: Theme) {
   },
   demoBannerTitle: {
     color: theme.text,
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "900",
     fontFamily: theme.headingFontFamily
   },
   demoBannerText: {
     color: theme.text,
-    fontSize: 15,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 16,
     fontFamily: theme.fontFamily
   },
   demoBannerButton: {
@@ -467,9 +512,9 @@ export function createStyles(theme: Theme) {
     right: 0,
     minWidth: 230,
     borderRadius: 8,
-    backgroundColor: theme.surface,
+    backgroundColor: glassSurface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     padding: 6,
     gap: 5,
     zIndex: 1001,
@@ -547,6 +592,21 @@ export function createStyles(theme: Theme) {
     alignItems: "flex-end",
     paddingHorizontal: 2,
     paddingBottom: 2
+  },
+  accountThemeRow: {
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 2
+  },
+  accountThemeLabel: {
+    color: theme.muted,
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   accountName: {
     color: theme.text,
@@ -665,10 +725,12 @@ export function createStyles(theme: Theme) {
     backgroundColor: theme.primary
   },
   themeButton: {
-    width: 30,
-    minHeight: 28,
-    borderRadius: 14,
-    backgroundColor: "transparent",
+    width: 34,
+    minHeight: 34,
+    borderRadius: 17,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 0
@@ -724,7 +786,7 @@ export function createStyles(theme: Theme) {
   },
   content: {
     padding: 8,
-    paddingBottom: 88
+    paddingBottom: 138
   },
   stack: {
     gap: 10
@@ -844,13 +906,14 @@ export function createStyles(theme: Theme) {
   monthSwitcher: {
     minHeight: 48,
     borderRadius: 8,
-    backgroundColor: theme.surface,
+    backgroundColor: glassSurface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 10
+    paddingHorizontal: 10,
+    ...softShadow
   },
   monthTitle: {
     flex: 1,
@@ -858,8 +921,85 @@ export function createStyles(theme: Theme) {
     color: theme.text,
     fontSize: 18,
     fontWeight: "900",
-    textTransform: "capitalize",
     fontFamily: theme.headingFontFamily
+  },
+  summaryFilterBox: {
+    position: "relative",
+    alignItems: "center",
+    zIndex: 10
+  },
+  summaryFilterChip: {
+    minHeight: 34,
+    maxWidth: "92%",
+    borderRadius: 999,
+    backgroundColor: glassSurface,
+    borderWidth: 1,
+    borderColor: glassBorder,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 12
+  },
+  summaryFilterIcon: {
+    color: theme.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  summaryFilterText: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  summaryFilterArrow: {
+    color: theme.muted,
+    fontSize: 15,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  summaryFilterMenu: {
+    position: "absolute",
+    top: 39,
+    minWidth: 250,
+    borderRadius: 12,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: glassBorder,
+    padding: 6,
+    gap: 5,
+    zIndex: 20,
+    elevation: 18
+  },
+  summaryFilterOption: {
+    minHeight: 38,
+    borderRadius: 8,
+    backgroundColor: glassSurfaceAlt,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    gap: 10
+  },
+  summaryFilterOptionActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary
+  },
+  summaryFilterOptionText: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
+  },
+  summaryFilterOptionTextActive: {
+    color: "#FFFFFF"
+  },
+  summaryFilterCheck: {
+    color: theme.primary,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
   },
   iconButton: {
     width: 38,
@@ -881,32 +1021,36 @@ export function createStyles(theme: Theme) {
     flexShrink: 1,
     flexBasis: "47%",
     minHeight: 82,
-    backgroundColor: theme.surface,
+    backgroundColor: glassSurface,
     borderRadius: 8,
     padding: 6,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: theme.border,
-    gap: 4
+    borderColor: glassBorder,
+    gap: 4,
+    ...softShadow
   },
   metricCardActive: {
     borderColor: theme.primary,
-    backgroundColor: theme.primarySoft
+    backgroundColor: theme.primarySoft,
+    shadowOpacity: theme.mode === "dark" ? 0.28 : 0.12,
+    elevation: 5,
   },
   periodMetricCard: {
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: "30%",
     minHeight: 70,
-    backgroundColor: theme.surface,
+    backgroundColor: glassSurface,
     borderRadius: 8,
     padding: 6,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: theme.border,
-    gap: 4
+    borderColor: glassBorder,
+    gap: 4,
+    ...softShadow
   },
   metricLabel: {
     color: theme.muted,
@@ -928,9 +1072,15 @@ export function createStyles(theme: Theme) {
     fontSize: 16,
     lineHeight: 19
   },
+  metricValueMuted: {
+    color: theme.muted,
+    opacity: 0.72,
+    fontSize: 14,
+    lineHeight: 17
+  },
   metricTrend: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 15,
     fontWeight: "900",
     fontFamily: theme.fontFamily,
@@ -941,6 +1091,43 @@ export function createStyles(theme: Theme) {
   },
   metricTrendBad: {
     color: theme.mode === "dark" ? "#FF9A9A" : "#A31515"
+  },
+  aiInsightCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: glassBorder,
+    backgroundColor: glassSurface,
+    padding: 12,
+    gap: 8,
+    ...softShadow
+  },
+  aiInsightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  aiInsightIcon: {
+    color: theme.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  aiInsightBadge: {
+    color: theme.primary,
+    backgroundColor: theme.primarySoft,
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    fontFamily: theme.fontFamily
+  },
+  aiInsightText: {
+    color: theme.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: theme.fontFamily
   },
   metricTrendNeutral: {
     color: theme.muted
@@ -1047,7 +1234,7 @@ export function createStyles(theme: Theme) {
     width: 49,
     minHeight: 36,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     borderRadius: 8,
     backgroundColor: theme.input,
     color: theme.text,
@@ -1448,12 +1635,13 @@ export function createStyles(theme: Theme) {
     minHeight: 64,
     borderRadius: 8,
     padding: 10,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: glassSurfaceAlt,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8
+    gap: 8,
+    ...softShadow
   },
   logInfo: {
     flex: 1,
@@ -1470,7 +1658,9 @@ export function createStyles(theme: Theme) {
   },
   listItemHover: {
     borderColor: theme.primary,
-    backgroundColor: theme.primarySoft
+    backgroundColor: theme.primarySoft,
+    shadowOpacity: theme.mode === "dark" ? 0.28 : 0.12,
+    elevation: 5,
   },
   fuelGrid: {
     flexDirection: "row",
@@ -1478,29 +1668,44 @@ export function createStyles(theme: Theme) {
     gap: 8,
     marginTop: 2
   },
+  fuelGridFrame: {
+    position: "relative"
+  },
+  fuelGridFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -1,
+    height: 18,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    backgroundColor: theme.mode === "dark" ? "rgba(7, 21, 39, 0.34)" : "rgba(255, 255, 255, 0.42)"
+  },
   fuelCard: {
     width: "48%",
     minHeight: 58,
     borderRadius: 8,
     padding: 8,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: glassSurfaceAlt,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     justifyContent: "center",
     alignItems: "center",
-    gap: 6
+    gap: 6,
+    ...softShadow
   },
   selectedItem: {
     borderColor: theme.primary,
-    backgroundColor: theme.primarySoft
+    backgroundColor: theme.primarySoft,
   },
   historyItem: {
     borderRadius: 8,
     padding: 10,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: glassSurfaceAlt,
     borderWidth: 1,
-    borderColor: theme.border,
-    gap: 8
+    borderColor: glassBorder,
+    gap: 8,
+    ...softShadow
   },
   stationDetails: {
     gap: 6,
@@ -1519,13 +1724,14 @@ export function createStyles(theme: Theme) {
     minHeight: 54,
     borderRadius: 8,
     padding: 9,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: glassSurfaceAlt,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 10
+    gap: 10,
+    ...softShadow
   },
   listItemActions: {
     flexDirection: "row",
@@ -1644,22 +1850,42 @@ export function createStyles(theme: Theme) {
     overflow: "hidden",
     position: "relative"
   },
+  barGridLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: theme.border,
+    opacity: 0.65,
+    zIndex: 1
+  },
+  barGridLineTop: {
+    top: "25%"
+  },
+  barGridLineMiddle: {
+    top: "50%"
+  },
+  barGridLineBottom: {
+    top: "75%"
+  },
   barFill: {
     backgroundColor: theme.primary,
     borderTopLeftRadius: 8,
-    borderTopRightRadius: 8
+    borderTopRightRadius: 8,
+    zIndex: 2
   },
   barValue: {
     position: "absolute",
     left: 3,
     right: 3,
-    bottom: 8,
+    top: 7,
     color: "#FFFFFF",
     fontSize: 12,
     lineHeight: 14,
     fontWeight: "900",
     fontFamily: theme.fontFamily,
-    textAlign: "center"
+    textAlign: "center",
+    zIndex: 3
   },
   barValueEmpty: {
     color: theme.text
@@ -1675,9 +1901,10 @@ export function createStyles(theme: Theme) {
     borderRadius: 8,
     backgroundColor: theme.map,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: glassBorder,
     overflow: "hidden",
-    position: "relative"
+    position: "relative",
+    ...softShadow
   },
   mapPanelExpanded: {
     height: Platform.OS === "web" ? "calc(100vh - 240px)" as never : 560,
@@ -1762,7 +1989,7 @@ export function createStyles(theme: Theme) {
     bottom: 0,
     minHeight: 68,
     paddingTop: 6,
-    paddingBottom: 8,
+    paddingBottom: 6,
     backgroundColor: theme.surface,
     borderTopWidth: 1,
     borderTopColor: theme.border,
@@ -1776,19 +2003,28 @@ export function createStyles(theme: Theme) {
     gap: 5
   },
   tab: {
-    minHeight: 48,
+    minHeight: 56,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 7
+    paddingHorizontal: 6,
+    gap: 2
   },
   activeTab: {
     backgroundColor: theme.primaryDark
   },
   tabText: {
     color: theme.muted,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
+    textAlign: "center",
+    fontFamily: theme.fontFamily
+  },
+  tabIcon: {
+    color: theme.muted,
+    fontSize: 19,
+    lineHeight: 21,
+    fontWeight: "900",
     textAlign: "center",
     fontFamily: theme.fontFamily
   },
