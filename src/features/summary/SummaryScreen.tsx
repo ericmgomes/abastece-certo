@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   Car,
-  DashboardCalculator,
-  DashboardMetrics,
   FuelLog,
   Station
 } from "../../domain";
@@ -18,15 +16,27 @@ type MetricTrend = {
 };
 
 type ChartMetric = "spent" | "liters" | "efficiency" | "costPerKm";
+type SummaryPeriod = "monthly" | "quarterly" | "semiannual" | "yearly" | "all";
+type DateRange = {
+  start: Date;
+  end: Date;
+  label: string;
+};
+
+const periodOptions: { label: string; value: SummaryPeriod }[] = [
+  { label: "Mensal", value: "monthly" },
+  { label: "Trimestral", value: "quarterly" },
+  { label: "Semestral", value: "semiannual" },
+  { label: "Anual", value: "yearly" },
+  { label: "Todo", value: "all" }
+];
 
 export function SummaryScreen({
   logs,
   cars,
   stations,
-  metrics,
   visibleMonth,
-  onPreviousMonth,
-  onNextMonth,
+  onMovePeriod,
   activeCarIds,
   onToggleCar,
   styles,
@@ -36,10 +46,8 @@ export function SummaryScreen({
   logs: FuelLog[];
   cars: Car[];
   stations: Station[];
-  metrics: DashboardMetrics;
   visibleMonth: Date;
-  onPreviousMonth: () => void;
-  onNextMonth: () => void;
+  onMovePeriod: (offsetMonths: number) => void;
   activeCarIds: string[];
   onToggleCar: (carId: string) => void;
   onEditLog: (logId: string) => void;
@@ -48,29 +56,34 @@ export function SummaryScreen({
   Empty: SharedComponent;
 }) {
   const [chartMetric, setChartMetric] = useState<ChartMetric>("spent");
+  const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>("monthly");
   const [vehicleFilterOpen, setVehicleFilterOpen] = useState(false);
-  const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
-  const currentMonthLogs = logsForMonth(logs, visibleMonth);
-  const previousMonthLogs = logsForMonth(logs, previousMonth);
-  const monthLiters = currentMonthLogs.reduce((sum, log) => sum + log.liters, 0);
-  const previousMonthLiters = previousMonthLogs.reduce((sum, log) => sum + log.liters, 0);
-  const monthCostPerKm = costPerKmForMonth(logs, visibleMonth);
-  const previousMonthCostPerKm = costPerKmForMonth(logs, previousMonth);
-  const previousMetrics = new DashboardCalculator({ user: null, cars, stations, logs, selectedCarId: null }, previousMonth).calculate();
-  const hasPreviousMonth = previousMonthLogs.length > 0;
-  const monthTrend = hasPreviousMonth
-    ? metricTrend(metrics.monthTotal, previousMetrics.monthTotal, "lower")
+  const periodRange = selectedPeriodRange(logs, visibleMonth, summaryPeriod);
+  const previousPeriodRangeValue = previousPeriodRange(logs, visibleMonth, summaryPeriod);
+  const periodLogs = logsForRange(logs, periodRange);
+  const previousPeriodLogs = previousPeriodRangeValue ? logsForRange(logs, previousPeriodRangeValue) : [];
+  const periodTotal = periodLogs.reduce((sum, log) => sum + log.paid, 0);
+  const previousPeriodTotal = previousPeriodLogs.reduce((sum, log) => sum + log.paid, 0);
+  const periodLiters = periodLogs.reduce((sum, log) => sum + log.liters, 0);
+  const previousPeriodLiters = previousPeriodLogs.reduce((sum, log) => sum + log.liters, 0);
+  const periodCostPerKm = costPerKmForRange(logs, periodRange);
+  const previousPeriodCostPerKm = previousPeriodRangeValue ? costPerKmForRange(logs, previousPeriodRangeValue) : null;
+  const hasPreviousPeriod = previousPeriodLogs.length > 0;
+  const monthTrend = hasPreviousPeriod
+    ? metricTrend(periodTotal, previousPeriodTotal, "lower")
     : undefined;
-  const litersTrend = hasPreviousMonth
-    ? metricTrend(monthLiters, previousMonthLiters, "lower")
+  const litersTrend = hasPreviousPeriod
+    ? metricTrend(periodLiters, previousPeriodLiters, "lower")
     : undefined;
-  const costPerKmTrend = hasPreviousMonth && monthCostPerKm !== null && previousMonthCostPerKm !== null
-    ? metricTrend(monthCostPerKm, previousMonthCostPerKm, "lower")
+  const costPerKmTrend = hasPreviousPeriod && periodCostPerKm !== null && previousPeriodCostPerKm !== null
+    ? metricTrend(periodCostPerKm, previousPeriodCostPerKm, "lower")
     : undefined;
-  const monthLabel = formatMonthTitle(visibleMonth);
   const chartData = monthlyChartData(logs, visibleMonth, chartMetric);
-  const periodStats = fullPeriodStats(logs);
-  const insight = summaryInsight(monthTrend, metrics.monthTotal, previousMetrics.monthTotal);
+  const fuelAverages = fuelAveragesForLogs(periodLogs);
+  const insight = new SummaryInsightBuilder(periodLogs, previousPeriodLogs, stations).build();
+  const periodStep = periodStepMonths(summaryPeriod);
+  const showPreviousPeriod = summaryPeriod !== "all" && hasLogBeforeRange(logs, periodRange);
+  const showNextPeriod = summaryPeriod !== "all" && hasLogAfterRange(logs, periodRange);
 
   return (
     <View style={styles.summaryStack}>
@@ -109,22 +122,47 @@ export function SummaryScreen({
             ) : null}
           </View>
         ) : null}
+        <View style={styles.summaryPeriodSelector}>
+          {periodOptions.map((option) => {
+            const active = option.value === summaryPeriod;
+            return (
+              <Pressable
+                key={option.value}
+                style={[styles.summaryPeriodChip, styles.pressableNoOutline, active && styles.summaryPeriodChipActive]}
+                onPress={() => {
+                  trackEvent("summary_period_changed", { period: option.value });
+                  setSummaryPeriod(option.value);
+                }}
+              >
+                <Text style={[styles.summaryPeriodText, active && styles.summaryPeriodTextActive]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
         <View style={styles.monthSwitcher}>
-          <Pressable style={styles.iconButton} onPress={onPreviousMonth}>
-            <Text style={styles.iconButtonText}>‹</Text>
-          </Pressable>
-          <Text style={styles.monthTitle}>{monthLabel}</Text>
-          <Pressable style={styles.iconButton} onPress={onNextMonth}>
-            <Text style={styles.iconButtonText}>›</Text>
-          </Pressable>
+          {showPreviousPeriod ? (
+            <Pressable style={styles.iconButton} onPress={() => onMovePeriod(-periodStep)}>
+              <Text style={styles.iconButtonText}>‹</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.iconButtonSpacer} />
+          )}
+          <Text style={styles.monthTitle}>{periodRange.label}</Text>
+          {showNextPeriod ? (
+            <Pressable style={styles.iconButton} onPress={() => onMovePeriod(periodStep)}>
+              <Text style={styles.iconButtonText}>›</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.iconButtonSpacer} />
+          )}
         </View>
 
         <View style={styles.summaryMetricGrid}>
           <MetricCard
             styles={styles}
-            label="Gasto mês"
-            value={formatCurrency(metrics.monthTotal)}
-            small={metrics.monthTotal >= 100}
+            label="Gasto"
+            value={formatCurrency(periodTotal)}
+            small={periodTotal >= 100}
             trend={monthTrend}
             active={chartMetric === "spent"}
             onPress={() => {
@@ -135,7 +173,7 @@ export function SummaryScreen({
           <MetricCard
             styles={styles}
             label="Litros"
-            value={monthLiters ? formatLiters(monthLiters) : ""}
+            value={periodLiters ? formatLiters(periodLiters) : ""}
             small
             trend={litersTrend}
             active={chartMetric === "liters"}
@@ -147,7 +185,7 @@ export function SummaryScreen({
           <MetricCard
             styles={styles}
             label="R$/km"
-            value={monthCostPerKm === null ? "-" : `${formatCurrency(monthCostPerKm)}/km`}
+            value={periodCostPerKm === null ? "-" : `${formatCurrency(periodCostPerKm)}/km`}
             small
             trend={costPerKmTrend}
             active={chartMetric === "costPerKm"}
@@ -183,12 +221,12 @@ export function SummaryScreen({
 
         <Bars data={chartData} styles={styles} Empty={Empty} />
 
-        {metrics.fuelAverages.length === 0 ? (
+        {fuelAverages.length === 0 ? (
           <Empty text="Registre abastecimentos para comparar combustíveis." />
         ) : (
           <View style={styles.fuelGridFrame}>
             <View style={styles.fuelGrid}>
-              {metrics.fuelAverages.map((fuel) => (
+              {fuelAverages.map((fuel) => (
                 <Pressable
                   key={fuel.name}
                   style={(state) => [styles.fuelCard, styles.pressableNoOutline, isHovered(state) && styles.listItemHover]}
@@ -203,24 +241,9 @@ export function SummaryScreen({
                 </Pressable>
               ))}
             </View>
-            {metrics.fuelAverages.length > 2 ? <View style={styles.fuelGridFade} /> : null}
+            {fuelAverages.length > 2 ? <View style={styles.fuelGridFade} /> : null}
           </View>
         )}
-
-        {periodStats ? (
-          <>
-            <View style={styles.summaryBlockDivider} />
-            <Text style={styles.periodTitle}>{periodStats.label}</Text>
-            <View style={styles.periodGrid}>
-              <PeriodMetricCard styles={styles} label="Gasto total" value={formatCurrency(periodStats.totalSpent)} />
-              <PeriodMetricCard styles={styles} label="Litros" value={formatLiters(periodStats.totalLiters)} />
-              <PeriodMetricCard styles={styles} label="Média km/L" value="-" />
-              <PeriodMetricCard styles={styles} label="R$/km" value={periodStats.costPerKm === null ? "-" : `${formatCurrency(periodStats.costPerKm)}/km`} />
-              <PeriodMetricCard styles={styles} label="Média gasto mensal" value={formatCurrency(periodStats.averageMonthlySpent)} />
-              <PeriodMetricCard styles={styles} label="Média litros mensal" value={formatLiters(periodStats.averageMonthlyLiters)} />
-            </View>
-          </>
-        ) : null}
       </Section>
     </View>
   );
@@ -246,7 +269,15 @@ function MetricCard({
   styles: SummaryStyles;
 }) {
   return (
-    <Pressable style={[styles.metricCard, styles.pressableNoOutline, active && styles.metricCardActive]} onPress={onPress}>
+    <Pressable
+      style={(state) => [
+        styles.metricCard,
+        styles.pressableNoOutline,
+        isHovered(state) && !active && styles.metricCardHover,
+        active && styles.metricCardActive
+      ]}
+      onPress={onPress}
+    >
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, small && styles.metricValueSmall, muted && styles.metricValueMuted]}>{value}</Text>
       {trend ? (
@@ -273,23 +304,6 @@ function trendStyle(status: MetricTrend["status"], styles: SummaryStyles) {
   }
 
   return styles.metricTrendNeutral;
-}
-
-function PeriodMetricCard({
-  label,
-  value,
-  styles
-}: {
-  label: string;
-  value: string;
-  styles: SummaryStyles;
-}) {
-  return (
-    <View style={styles.periodMetricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, styles.metricValueSmall]}>{value}</Text>
-    </View>
-  );
 }
 
 function Bars({
@@ -381,6 +395,102 @@ function formatMonthTitle(date: Date) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+function selectedPeriodRange(logs: FuelLog[], visibleMonth: Date, period: SummaryPeriod): DateRange {
+  if (period === "all") {
+    return allPeriodRange(logs, visibleMonth);
+  }
+
+  const start = periodStart(visibleMonth, period);
+  const end = endOfMonth(new Date(start.getFullYear(), start.getMonth() + periodStepMonths(period) - 1, 1));
+
+  return {
+    start,
+    end,
+    label: periodRangeLabel(start, end, period)
+  };
+}
+
+function previousPeriodRange(logs: FuelLog[], visibleMonth: Date, period: SummaryPeriod) {
+  if (period === "all") {
+    return null;
+  }
+
+  return selectedPeriodRange(logs, addMonths(visibleMonth, -periodStepMonths(period)), period);
+}
+
+function allPeriodRange(logs: FuelLog[], visibleMonth: Date): DateRange {
+  if (logs.length === 0) {
+    const start = startOfMonth(visibleMonth);
+    return {
+      start,
+      end: endOfMonth(visibleMonth),
+      label: "Todo período"
+    };
+  }
+
+  const sortedLogs = [...logs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const first = new Date(sortedLogs[0].createdAt);
+  const last = new Date(sortedLogs[sortedLogs.length - 1].createdAt);
+
+  return {
+    start: startOfDay(first),
+    end: endOfDay(last),
+    label: `de ${formatShortDate(sortedLogs[0].createdAt)} a ${formatShortDate(sortedLogs[sortedLogs.length - 1].createdAt)}`
+  };
+}
+
+function periodStart(visibleMonth: Date, period: SummaryPeriod) {
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+
+  if (period === "quarterly") {
+    return new Date(year, Math.floor(month / 3) * 3, 1);
+  }
+
+  if (period === "semiannual") {
+    return new Date(year, month < 6 ? 0 : 6, 1);
+  }
+
+  if (period === "yearly") {
+    return new Date(year, 0, 1);
+  }
+
+  return startOfMonth(visibleMonth);
+}
+
+function periodStepMonths(period: SummaryPeriod) {
+  if (period === "quarterly") {
+    return 3;
+  }
+
+  if (period === "semiannual") {
+    return 6;
+  }
+
+  if (period === "yearly") {
+    return 12;
+  }
+
+  return 1;
+}
+
+function periodRangeLabel(start: Date, end: Date, period: SummaryPeriod) {
+  if (period === "monthly") {
+    return formatMonthTitle(start);
+  }
+
+  if (period === "yearly") {
+    return String(start.getFullYear());
+  }
+
+  return `${formatShortMonthYear(start)} a ${formatShortMonthYear(end)}`;
+}
+
+function formatShortMonthYear(date: Date) {
+  const month = date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  return `${month}. de ${String(date.getFullYear()).slice(-2)}`;
+}
+
 function vehicleFilterLabel(cars: Car[], activeCarIds: string[]) {
   if (activeCarIds.length === cars.length) {
     return "Todos os veículos";
@@ -393,28 +503,154 @@ function vehicleFilterLabel(cars: Car[], activeCarIds: string[]) {
   return `${activeCarIds.length} veículos`;
 }
 
-function summaryInsight(monthTrend: MetricTrend | undefined, current: number, previous: number) {
-  if (!monthTrend || previous <= 0 || current <= 0) {
-    return null;
+class SummaryInsightBuilder {
+  constructor(
+    private readonly currentLogs: FuelLog[],
+    private readonly previousLogs: FuelLog[],
+    private readonly stations: Station[]
+  ) {}
+
+  build() {
+    if (this.currentLogs.length === 0) {
+      return null;
+    }
+
+    if (this.previousLogs.length === 0) {
+      return this.firstPeriodInsight();
+    }
+
+    const currentSpent = this.totalSpent(this.currentLogs);
+    const previousSpent = this.totalSpent(this.previousLogs);
+    const spentChange = percentChange(currentSpent, previousSpent);
+    if (spentChange === null) {
+      return null;
+    }
+
+    const litersChange = percentChange(this.totalLiters(this.currentLogs), this.totalLiters(this.previousLogs));
+    const priceChange = percentChange(this.averagePrice(this.currentLogs), this.averagePrice(this.previousLogs));
+    const stationHint = this.cheapestStationHint();
+
+    if (spentChange < -0.5) {
+      return this.lowerSpendInsight(spentChange, litersChange, priceChange, stationHint);
+    }
+
+    if (spentChange > 0.5) {
+      return this.higherSpendInsight(spentChange, litersChange, priceChange, stationHint);
+    }
+
+    return stationHint
+      ? `Seu gasto ficou praticamente estável. ${stationHint}`
+      : "Seu gasto ficou praticamente estável em relação ao período anterior.";
   }
 
-  const percentage = Math.abs(((current - previous) / previous) * 100).toLocaleString("pt-BR", {
-    maximumFractionDigits: 0
-  });
+  private firstPeriodInsight() {
+    const stationHint = this.cheapestStationHint();
+    if (stationHint) {
+      return `${this.currentLogs.length} abastecimentos registrados neste período. ${stationHint}`;
+    }
 
-  if (current < previous) {
-    return `Você gastou ${percentage}% menos que no mês anterior. Continue assim para manter o combustível sob controle.`;
+    return `${this.currentLogs.length} abastecimentos registrados neste período. Conforme você preencher outros períodos, eu comparo a evolução.`;
   }
 
-  return `Você gastou ${percentage}% mais que no mês anterior. Vale revisar posto, combustível e frequência dos abastecimentos.`;
+  private lowerSpendInsight(
+    spentChange: number,
+    litersChange: number | null,
+    priceChange: number | null,
+    stationHint: string | null
+  ) {
+    const spentText = formatPercent(Math.abs(spentChange));
+
+    if (priceChange !== null && priceChange < -0.5) {
+      return `Você gastou ${spentText} menos e o preço médio por litro caiu ${formatPercent(Math.abs(priceChange))}. ${stationHint ?? "Boa direção."}`;
+    }
+
+    if (litersChange !== null && litersChange < -0.5) {
+      return `Você gastou ${spentText} menos, principalmente porque abasteceu ${formatPercent(Math.abs(litersChange))} menos litros.`;
+    }
+
+    return `Você gastou ${spentText} menos mesmo sem grande queda nos litros. ${stationHint ?? "Vale manter esse padrão."}`;
+  }
+
+  private higherSpendInsight(
+    spentChange: number,
+    litersChange: number | null,
+    priceChange: number | null,
+    stationHint: string | null
+  ) {
+    const spentText = formatPercent(spentChange);
+
+    if (priceChange !== null && priceChange > 0.5) {
+      return `Você gastou ${spentText} mais e o preço médio por litro subiu ${formatPercent(priceChange)}. ${stationHint ?? "Vale comparar os postos antes de abastecer."}`;
+    }
+
+    if (litersChange !== null && litersChange > 0.5) {
+      return `Você gastou ${spentText} mais porque abasteceu ${formatPercent(litersChange)} mais litros. O preço médio não parece ser o principal vilão.`;
+    }
+
+    return `Você gastou ${spentText} mais. ${stationHint ?? "Vale revisar posto, combustível e frequência dos abastecimentos."}`;
+  }
+
+  private cheapestStationHint() {
+    const averages = this.stationAverages();
+    if (averages.length < 2) {
+      return null;
+    }
+
+    const cheapest = averages[0];
+    return `${cheapest.name} foi o posto mais barato do período: ${formatCurrency(cheapest.average)}/L.`;
+  }
+
+  private stationAverages() {
+    const stationTotals = new Map<string, { paid: number; liters: number }>();
+    this.currentLogs.forEach((log) => {
+      const current = stationTotals.get(log.stationId) ?? { paid: 0, liters: 0 };
+      current.paid += log.paid;
+      current.liters += log.liters;
+      stationTotals.set(log.stationId, current);
+    });
+
+    return Array.from(stationTotals.entries())
+      .filter(([_stationId, values]) => values.liters > 0)
+      .map(([stationId, values]) => ({
+        name: this.stations.find((station) => station.id === stationId)?.name ?? "Posto",
+        average: values.paid / values.liters
+      }))
+      .sort((a, b) => a.average - b.average);
+  }
+
+  private totalSpent(logs: FuelLog[]) {
+    return logs.reduce((sum, log) => sum + log.paid, 0);
+  }
+
+  private totalLiters(logs: FuelLog[]) {
+    return logs.reduce((sum, log) => sum + log.liters, 0);
+  }
+
+  private averagePrice(logs: FuelLog[]) {
+    const liters = this.totalLiters(logs);
+    if (liters <= 0) {
+      return 0;
+    }
+
+    return this.totalSpent(logs) / liters;
+  }
 }
 
 function costPerKmForMonth(logs: FuelLog[], referenceDate: Date) {
-  const value = costPerKmForLogs(logs, referenceDate);
+  const value = costPerKmForRange(logs, {
+    start: startOfMonth(referenceDate),
+    end: endOfMonth(referenceDate),
+    label: formatMonthTitle(referenceDate)
+  });
+  return value;
+}
+
+function costPerKmForRange(logs: FuelLog[], range: DateRange) {
+  const value = costPerKmForLogs(logs, range);
   return value > 0 ? value : null;
 }
 
-function costPerKmForLogs(logs: FuelLog[], referenceDate?: Date) {
+function costPerKmForLogs(logs: FuelLog[], range: DateRange) {
   const logsByCar = new Map<string, FuelLog[]>();
   logs.forEach((log) => {
     if (typeof log.odometerKm !== "number") {
@@ -441,7 +677,7 @@ function costPerKmForLogs(logs: FuelLog[], referenceDate?: Date) {
         return;
       }
 
-      if (referenceDate && !isSameMonth(new Date(log.createdAt), referenceDate)) {
+      if (!isDateInsideRange(new Date(log.createdAt), range)) {
         return;
       }
 
@@ -457,39 +693,6 @@ function costPerKmForLogs(logs: FuelLog[], referenceDate?: Date) {
   return totalCost / totalKm;
 }
 
-function isSameMonth(date: Date, referenceDate: Date) {
-  return date.getMonth() === referenceDate.getMonth() && date.getFullYear() === referenceDate.getFullYear();
-}
-
-function fullPeriodStats(logs: FuelLog[]) {
-  if (logs.length === 0) {
-    return null;
-  }
-
-  const sortedLogs = [...logs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  const first = sortedLogs[0];
-  const last = sortedLogs[sortedLogs.length - 1];
-  const totalSpent = sortedLogs.reduce((sum, log) => sum + log.paid, 0);
-  const totalLiters = sortedLogs.reduce((sum, log) => sum + log.liters, 0);
-  const monthCount = inclusiveMonthCount(new Date(first.createdAt), new Date(last.createdAt));
-  const costPerKm = costPerKmForLogs(sortedLogs);
-
-  return {
-    label: `de ${formatShortDate(first.createdAt)} a ${formatShortDate(last.createdAt)}`,
-    totalSpent,
-    totalLiters,
-    costPerKm: costPerKm > 0 ? costPerKm : null,
-    averageMonthlySpent: totalSpent / monthCount,
-    averageMonthlyLiters: totalLiters / monthCount
-  };
-}
-
-function inclusiveMonthCount(first: Date, last: Date) {
-  const firstMonth = first.getFullYear() * 12 + first.getMonth();
-  const lastMonth = last.getFullYear() * 12 + last.getMonth();
-  return Math.max(1, lastMonth - firstMonth + 1);
-}
-
 function formatShortDate(value: string) {
   const date = new Date(value);
   const month = date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
@@ -502,6 +705,61 @@ function logsForMonth(logs: FuelLog[], referenceDate: Date) {
     const date = new Date(log.createdAt);
     return date.getMonth() === referenceDate.getMonth() && date.getFullYear() === referenceDate.getFullYear();
   });
+}
+
+function logsForRange(logs: FuelLog[], range: DateRange) {
+  return logs.filter((log) => isDateInsideRange(new Date(log.createdAt), range));
+}
+
+function hasLogBeforeRange(logs: FuelLog[], range: DateRange) {
+  return logs.some((log) => new Date(log.createdAt).getTime() < range.start.getTime());
+}
+
+function hasLogAfterRange(logs: FuelLog[], range: DateRange) {
+  return logs.some((log) => new Date(log.createdAt).getTime() > range.end.getTime());
+}
+
+function isDateInsideRange(date: Date, range: DateRange) {
+  const timestamp = date.getTime();
+  return timestamp >= range.start.getTime() && timestamp <= range.end.getTime();
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return endOfDay(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function addMonths(date: Date, offset: number) {
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
+}
+
+function fuelAveragesForLogs(logs: FuelLog[]) {
+  const fuels = new Map<string, { paid: number; liters: number }>();
+  logs.forEach((log) => {
+    const current = fuels.get(log.fuel) ?? { paid: 0, liters: 0 };
+    current.paid += log.paid;
+    current.liters += log.liters;
+    fuels.set(log.fuel, current);
+  });
+
+  return Array.from(fuels.entries())
+    .filter(([_fuel, values]) => values.liters > 0)
+    .map(([name, values]) => ({
+      name,
+      average: values.paid / values.liters
+    }))
+    .sort((a, b) => a.average - b.average);
 }
 
 function metricTrend(current: number, previous: number, betterWhen: "higher" | "lower"): MetricTrend | undefined {
@@ -522,6 +780,18 @@ function metricTrend(current: number, previous: number, betterWhen: "higher" | "
     label: `${arrow}${prefix}${rounded}% vs mês anterior`,
     status
   };
+}
+
+function percentChange(current: number, previous: number) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) {
+    return null;
+  }
+
+  return ((current - previous) / previous) * 100;
+}
+
+function formatPercent(value: number) {
+  return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%`;
 }
 
 function formatCurrency(value: number) {

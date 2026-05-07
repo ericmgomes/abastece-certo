@@ -369,7 +369,7 @@ export function createStyles(theme: Theme) {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: theme.primary,
+    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
     alignItems: "center",
     justifyContent: "center",
     gap: 0
@@ -394,12 +394,12 @@ export function createStyles(theme: Theme) {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: theme.primary,
+    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 35,
     elevation: 16,
-    shadowColor: theme.primary,
+    shadowColor: theme.mode === "dark" ? theme.accent : theme.primary,
     shadowOpacity: 0.28,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 }
@@ -597,8 +597,8 @@ export function createStyles(theme: Theme) {
     minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
+    justifyContent: "flex-end",
+    gap: 10,
     paddingVertical: 4,
     paddingHorizontal: 2
   },
@@ -808,6 +808,17 @@ export function createStyles(theme: Theme) {
     fontFamily: theme.headingFontFamily,
     textAlign: "center"
   },
+  periodTitleBox: {
+    minHeight: 42,
+    borderRadius: 8,
+    backgroundColor: glassSurface,
+    borderWidth: 1,
+    borderColor: glassBorder,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    ...softShadow
+  },
   section: {
     position: "relative",
     backgroundColor: "transparent",
@@ -818,10 +829,13 @@ export function createStyles(theme: Theme) {
     borderColor: "transparent"
   },
   sectionTitle: {
+    flex: 1,
     fontSize: 19,
     fontWeight: "800",
     color: theme.text,
-    fontFamily: theme.headingFontFamily
+    fontFamily: theme.headingFontFamily,
+    textAlign: "left",
+    paddingLeft: "20%"
   },
   sectionHint: {
     color: theme.muted,
@@ -898,7 +912,43 @@ export function createStyles(theme: Theme) {
     flexWrap: "wrap",
     gap: 8
   },
+  summaryPeriodSelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 6
+  },
+  summaryPeriodChip: {
+    minHeight: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: glassSurface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5
+  },
+  summaryPeriodChipActive: {
+    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
+    borderColor: theme.primary
+  },
+  summaryPeriodText: {
+    color: theme.muted,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  summaryPeriodTextActive: {
+    color: "#FFFFFF"
+  },
   periodGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  periodSummaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
@@ -1009,6 +1059,10 @@ export function createStyles(theme: Theme) {
     justifyContent: "center",
     backgroundColor: theme.primarySoft
   },
+  iconButtonSpacer: {
+    width: 38,
+    height: 38
+  },
   iconButtonText: {
     color: theme.primary,
     fontSize: 28,
@@ -1037,6 +1091,12 @@ export function createStyles(theme: Theme) {
     shadowOpacity: theme.mode === "dark" ? 0.28 : 0.12,
     elevation: 5,
   },
+  metricCardHover: {
+    borderColor: theme.primary,
+    backgroundColor: theme.primarySoft,
+    shadowOpacity: theme.mode === "dark" ? 0.24 : 0.1,
+    elevation: 4
+  },
   periodMetricCard: {
     flexGrow: 1,
     flexShrink: 1,
@@ -1051,6 +1111,48 @@ export function createStyles(theme: Theme) {
     borderColor: glassBorder,
     gap: 4,
     ...softShadow
+  },
+  periodSummaryCard: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "47%",
+    minHeight: 96,
+    backgroundColor: glassSurface,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: glassBorder,
+    gap: 7,
+    ...softShadow
+  },
+  periodSummaryTitle: {
+    color: theme.text,
+    fontSize: 15,
+    lineHeight: 17,
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily,
+    textAlign: "center"
+  },
+  periodSummaryGroup: {
+    alignItems: "center",
+    gap: 0
+  },
+  periodSummaryInlineText: {
+    color: theme.text,
+    textAlign: "center",
+    fontFamily: theme.fontFamily,
+    fontSize: 13,
+    lineHeight: 17
+  },
+  periodSummaryInlineLabel: {
+    color: theme.muted,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   metricLabel: {
     color: theme.muted,
@@ -1870,7 +1972,7 @@ export function createStyles(theme: Theme) {
     top: "75%"
   },
   barFill: {
-    backgroundColor: theme.primary,
+    backgroundColor: theme.mode === "dark" ? theme.accent : theme.primary,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     zIndex: 2
@@ -2010,6 +2112,9 @@ export function createStyles(theme: Theme) {
     justifyContent: "center",
     paddingHorizontal: 6,
     gap: 2
+  },
+  tabHover: {
+    backgroundColor: theme.primarySoft
   },
   activeTab: {
     backgroundColor: theme.primaryDark

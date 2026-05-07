@@ -734,10 +734,8 @@ export default function App() {
           logs={filteredLogs}
           cars={state.cars}
           stations={state.stations}
-          metrics={metrics}
           visibleMonth={visibleMonth}
-          onPreviousMonth={() => moveMonth(-1)}
-          onNextMonth={() => moveMonth(1)}
+          onMovePeriod={moveMonth}
           activeCarIds={activeCarIds}
           onToggleCar={toggleFilterCar}
           onEditLog={openEditFuelForm}

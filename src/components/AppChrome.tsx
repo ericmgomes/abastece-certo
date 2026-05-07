@@ -286,7 +286,12 @@ export function Tabs({
         {tabs.map((tab) => (
           <Pressable
             key={tab}
-            style={[styles.tab, { flexGrow: labels[tab].length, flexBasis: 0 }, active === tab && styles.activeTab]}
+            style={(state) => [
+              styles.tab,
+              { flexGrow: labels[tab].length, flexBasis: 0 },
+              isHovered(state) && active !== tab && styles.tabHover,
+              active === tab && styles.activeTab
+            ]}
             onPress={() => onChange(tab)}
           >
             <Text style={[styles.tabIcon, active === tab && styles.activeTabText]}>{icons[tab]}</Text>
@@ -296,6 +301,11 @@ export function Tabs({
       </View>
     </View>
   );
+}
+
+function isHovered(state: unknown) {
+  const maybeState = state as { hovered?: boolean; pressed?: boolean };
+  return Boolean(maybeState.hovered || maybeState.pressed);
 }
 
 function HeaderCarFilter({
