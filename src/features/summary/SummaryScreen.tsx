@@ -161,6 +161,7 @@ export function SummaryScreen({
               <PeriodMetricCard styles={styles} label="Gasto total" value={formatCurrency(periodStats.totalSpent)} />
               <PeriodMetricCard styles={styles} label="Litros" value={formatLiters(periodStats.totalLiters)} />
               <PeriodMetricCard styles={styles} label="Média km/L" value="-" />
+              <PeriodMetricCard styles={styles} label="R$/km" value={periodStats.costPerKm === null ? "-" : `${formatCurrency(periodStats.costPerKm)}/km`} />
               <PeriodMetricCard styles={styles} label="Média gasto mensal" value={formatCurrency(periodStats.averageMonthlySpent)} />
               <PeriodMetricCard styles={styles} label="Média litros mensal" value={formatLiters(periodStats.averageMonthlyLiters)} />
             </View>
@@ -379,11 +380,13 @@ function fullPeriodStats(logs: FuelLog[]) {
   const totalSpent = sortedLogs.reduce((sum, log) => sum + log.paid, 0);
   const totalLiters = sortedLogs.reduce((sum, log) => sum + log.liters, 0);
   const monthCount = inclusiveMonthCount(new Date(first.createdAt), new Date(last.createdAt));
+  const costPerKm = costPerKmForLogs(sortedLogs);
 
   return {
     label: `de ${formatShortDate(first.createdAt)} a ${formatShortDate(last.createdAt)}`,
     totalSpent,
     totalLiters,
+    costPerKm: costPerKm > 0 ? costPerKm : null,
     averageMonthlySpent: totalSpent / monthCount,
     averageMonthlyLiters: totalLiters / monthCount
   };
