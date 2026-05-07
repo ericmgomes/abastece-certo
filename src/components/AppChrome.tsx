@@ -267,17 +267,17 @@ export function Tabs({
   const tabs: AppTab[] = ["Resumo", "IA", "Abastecimentos", "Postos", "Veículos"];
   const labels: Record<AppTab, string> = {
     Resumo: "Resumo",
-    Abastecimentos: "Abastecimentos",
+    Abastecimentos: "Abastec.",
     Postos: "Postos",
     Veículos: "Veículos",
     IA: "IA"
   };
   const icons: Record<AppTab, string> = {
-    Resumo: "▥",
-    IA: "✦",
-    Abastecimentos: "▣",
-    Postos: "⌖",
-    Veículos: "◉"
+    Resumo: "📊",
+    IA: "✨",
+    Abastecimentos: "⛽",
+    Postos: "📍",
+    Veículos: "🚗"
   };
 
   return (

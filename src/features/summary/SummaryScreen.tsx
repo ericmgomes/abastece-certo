@@ -15,7 +15,7 @@ type MetricTrend = {
   status: "good" | "bad" | "neutral";
 };
 
-type ChartMetric = "spent" | "liters" | "efficiency" | "costPerKm";
+type ChartMetric = "spent" | "liters" | "efficiency" | "costPerKm" | "pricePerLiter";
 type SummaryPeriod = "monthly" | "quarterly" | "semiannual" | "yearly" | "all";
 type DateRange = {
   start: Date;
@@ -58,16 +58,21 @@ export function SummaryScreen({
   const [chartMetric, setChartMetric] = useState<ChartMetric>("spent");
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>("monthly");
   const [vehicleFilterOpen, setVehicleFilterOpen] = useState(false);
-  const periodRange = selectedPeriodRange(logs, visibleMonth, summaryPeriod);
-  const previousPeriodRangeValue = previousPeriodRange(logs, visibleMonth, summaryPeriod);
-  const periodLogs = logsForRange(logs, periodRange);
-  const previousPeriodLogs = previousPeriodRangeValue ? logsForRange(logs, previousPeriodRangeValue) : [];
+  const [fuelFilterOpen, setFuelFilterOpen] = useState(false);
+  const [selectedFuel, setSelectedFuel] = useState<FuelLog["fuel"] | null>(null);
+  const availableFuels = fuelTypesForLogs(logs);
+  const effectiveFuel = selectedFuel && availableFuels.includes(selectedFuel) ? selectedFuel : null;
+  const summaryLogs = effectiveFuel ? logs.filter((log) => log.fuel === effectiveFuel) : logs;
+  const periodRange = selectedPeriodRange(summaryLogs, visibleMonth, summaryPeriod);
+  const previousPeriodRangeValue = previousPeriodRange(summaryLogs, visibleMonth, summaryPeriod);
+  const periodLogs = logsForRange(summaryLogs, periodRange);
+  const previousPeriodLogs = previousPeriodRangeValue ? logsForRange(summaryLogs, previousPeriodRangeValue) : [];
   const periodTotal = periodLogs.reduce((sum, log) => sum + log.paid, 0);
   const previousPeriodTotal = previousPeriodLogs.reduce((sum, log) => sum + log.paid, 0);
   const periodLiters = periodLogs.reduce((sum, log) => sum + log.liters, 0);
   const previousPeriodLiters = previousPeriodLogs.reduce((sum, log) => sum + log.liters, 0);
-  const periodCostPerKm = costPerKmForRange(logs, periodRange);
-  const previousPeriodCostPerKm = previousPeriodRangeValue ? costPerKmForRange(logs, previousPeriodRangeValue) : null;
+  const periodCostPerKm = costPerKmForRange(summaryLogs, periodRange);
+  const previousPeriodCostPerKm = previousPeriodRangeValue ? costPerKmForRange(summaryLogs, previousPeriodRangeValue) : null;
   const hasPreviousPeriod = previousPeriodLogs.length > 0;
   const monthTrend = hasPreviousPeriod
     ? metricTrend(periodTotal, previousPeriodTotal, "lower")
@@ -78,23 +83,27 @@ export function SummaryScreen({
   const costPerKmTrend = hasPreviousPeriod && periodCostPerKm !== null && previousPeriodCostPerKm !== null
     ? metricTrend(periodCostPerKm, previousPeriodCostPerKm, "lower")
     : undefined;
-  const chartData = monthlyChartData(logs, visibleMonth, chartMetric);
+  const chartData = monthlyChartData(summaryLogs, visibleMonth, chartMetric);
   const fuelAverages = fuelAveragesForLogs(periodLogs);
+  const averageFuelPrice = periodLiters > 0 ? periodTotal / periodLiters : null;
   const insight = new SummaryInsightBuilder(periodLogs, previousPeriodLogs, stations).build();
   const periodStep = periodStepMonths(summaryPeriod);
-  const showPreviousPeriod = summaryPeriod !== "all" && hasLogBeforeRange(logs, periodRange);
-  const showNextPeriod = summaryPeriod !== "all" && hasLogAfterRange(logs, periodRange);
+  const showPreviousPeriod = summaryPeriod !== "all" && hasLogBeforeRange(summaryLogs, periodRange);
+  const showNextPeriod = summaryPeriod !== "all" && hasLogAfterRange(summaryLogs, periodRange);
 
   return (
     <View style={styles.summaryStack}>
       <Section title="">
         {cars.length > 1 ? (
-          <View style={styles.summaryFilterBox}>
+          <View style={[styles.summaryFilterBox, { zIndex: 30 }]}>
             <Pressable
               style={[styles.summaryFilterChip, styles.pressableNoOutline]}
-              onPress={() => setVehicleFilterOpen((current) => !current)}
+              onPress={() => {
+                setFuelFilterOpen(false);
+                setVehicleFilterOpen((current) => !current);
+              }}
             >
-              <Text style={styles.summaryFilterIcon}>◉</Text>
+              <Text style={styles.summaryFilterIcon}>🚗</Text>
               <Text style={styles.summaryFilterText}>{vehicleFilterLabel(cars, activeCarIds)}</Text>
               <Text style={styles.summaryFilterArrow}>{vehicleFilterOpen ? "⌃" : "⌄"}</Text>
             </Pressable>
@@ -114,6 +123,53 @@ export function SummaryScreen({
                       }}
                     >
                       <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{car.nickname}</Text>
+                      <Text style={[styles.summaryFilterCheck, active && styles.summaryFilterOptionTextActive]}>{active ? "✓" : ""}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        {availableFuels.length > 1 ? (
+          <View style={[styles.summaryFilterBox, { zIndex: 20 }]}>
+            <Pressable
+              style={[styles.summaryFilterChip, styles.pressableNoOutline]}
+              onPress={() => {
+                setVehicleFilterOpen(false);
+                setFuelFilterOpen((current) => !current);
+              }}
+            >
+              <Text style={styles.summaryFilterIcon}>⛽</Text>
+              <Text style={styles.summaryFilterText}>{fuelFilterLabel(effectiveFuel)}</Text>
+              <Text style={styles.summaryFilterArrow}>{fuelFilterOpen ? "⌃" : "⌄"}</Text>
+            </Pressable>
+            {fuelFilterOpen ? (
+              <View style={styles.summaryFilterMenu}>
+                <Pressable
+                  style={[styles.summaryFilterOption, styles.pressableNoOutline, !effectiveFuel && styles.summaryFilterOptionActive]}
+                  onPress={() => {
+                    trackEvent("fuel_filter_changed_from_summary", { fuel_type: "all" });
+                    setSelectedFuel(null);
+                    setFuelFilterOpen(false);
+                  }}
+                >
+                  <Text style={[styles.summaryFilterOptionText, !effectiveFuel && styles.summaryFilterOptionTextActive]}>Todos os combustíveis</Text>
+                  <Text style={[styles.summaryFilterCheck, !effectiveFuel && styles.summaryFilterOptionTextActive]}>{!effectiveFuel ? "✓" : ""}</Text>
+                </Pressable>
+                {availableFuels.map((fuel) => {
+                  const active = fuel === effectiveFuel;
+                  return (
+                    <Pressable
+                      key={fuel}
+                      style={[styles.summaryFilterOption, styles.pressableNoOutline, active && styles.summaryFilterOptionActive]}
+                      onPress={() => {
+                        trackEvent("fuel_filter_changed_from_summary", { fuel_type: fuel });
+                        setSelectedFuel(fuel);
+                        setFuelFilterOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{fuel}</Text>
                       <Text style={[styles.summaryFilterCheck, active && styles.summaryFilterOptionTextActive]}>{active ? "✓" : ""}</Text>
                     </Pressable>
                   );
@@ -207,7 +263,45 @@ export function SummaryScreen({
               setChartMetric("efficiency");
             }}
           />
+          <MetricCard
+            styles={styles}
+            label="Preço/L"
+            value={averageFuelPrice === null ? "-" : `${formatCurrency(averageFuelPrice)}/L`}
+            small
+            trend={undefined}
+            active={chartMetric === "pricePerLiter"}
+            compact
+            onPress={() => {
+              trackEvent("summary_chart_metric_changed", { metric: "pricePerLiter" });
+              setChartMetric("pricePerLiter");
+            }}
+          />
+          {fuelAverages.slice(0, 4).map((fuel) => (
+            <MetricCard
+              key={fuel.name}
+              styles={styles}
+              label={fuel.name}
+              value={`${formatCurrency(fuel.average)}/L`}
+              small
+              trend={undefined}
+              active={chartMetric === "pricePerLiter" && effectiveFuel === fuel.name}
+              compact
+              onPress={() => {
+                trackEvent("fuel_average_clicked", {
+                  fuel_type: fuel.name
+                });
+                setSelectedFuel(fuel.name);
+                setChartMetric("pricePerLiter");
+              }}
+            />
+          ))}
         </View>
+
+        {chartMetric === "pricePerLiter" ? (
+          <FuelPriceEvolutionChart data={fuelPriceEvolutionData(summaryLogs, visibleMonth)} styles={styles} Empty={Empty} />
+        ) : (
+          <Bars data={chartData} styles={styles} Empty={Empty} />
+        )}
 
         {insight ? (
           <View style={styles.aiInsightCard}>
@@ -218,32 +312,6 @@ export function SummaryScreen({
             <Text style={styles.aiInsightText}>{insight}</Text>
           </View>
         ) : null}
-
-        <Bars data={chartData} styles={styles} Empty={Empty} />
-
-        {fuelAverages.length === 0 ? (
-          <Empty text="Registre abastecimentos para comparar combustíveis." />
-        ) : (
-          <View style={styles.fuelGridFrame}>
-            <View style={styles.fuelGrid}>
-              {fuelAverages.map((fuel) => (
-                <Pressable
-                  key={fuel.name}
-                  style={(state) => [styles.fuelCard, styles.pressableNoOutline, isHovered(state) && styles.listItemHover]}
-                  onPress={() => {
-                    trackEvent("fuel_average_clicked", {
-                      fuel_type: fuel.name
-                    });
-                  }}
-                >
-                  <Text style={styles.itemTitle}>{fuel.name}</Text>
-                  <Text style={styles.itemTitle}>{formatCurrency(fuel.average)}/L</Text>
-                </Pressable>
-              ))}
-            </View>
-            {fuelAverages.length > 2 ? <View style={styles.fuelGridFade} /> : null}
-          </View>
-        )}
       </Section>
     </View>
   );
@@ -256,6 +324,7 @@ function MetricCard({
   trend,
   active,
   muted,
+  compact,
   onPress,
   styles
 }: {
@@ -265,6 +334,7 @@ function MetricCard({
   trend?: MetricTrend;
   active?: boolean;
   muted?: boolean;
+  compact?: boolean;
   onPress: () => void;
   styles: SummaryStyles;
 }) {
@@ -273,6 +343,7 @@ function MetricCard({
       style={(state) => [
         styles.metricCard,
         styles.pressableNoOutline,
+        compact && styles.metricCardCompact,
         isHovered(state) && !active && styles.metricCardHover,
         active && styles.metricCardActive
       ]}
@@ -336,6 +407,76 @@ function Bars({
       ))}
     </View>
   );
+}
+
+function FuelPriceEvolutionChart({
+  data,
+  styles,
+  Empty
+}: {
+  data: {
+    fuel: string;
+    points: { label: string; value: number; display: string }[];
+  }[];
+  styles: SummaryStyles;
+  Empty: SharedComponent;
+}) {
+  if (data.length === 0) {
+    return <Empty text="Registre mais abastecimentos para ver a evolução por combustível." />;
+  }
+
+  const max = Math.max(...data.flatMap((fuel) => fuel.points.map((point) => point.value)), 1);
+
+  return (
+    <View style={styles.fuelEvolutionChart}>
+      {data.map((fuel) => (
+        <View key={fuel.fuel} style={styles.fuelEvolutionRow}>
+          <Text style={styles.fuelEvolutionTitle}>{fuel.fuel}</Text>
+          <View style={styles.fuelEvolutionBars}>
+            {fuel.points.map((point) => (
+              <View key={point.label} style={styles.fuelEvolutionColumn}>
+                <View style={styles.fuelEvolutionTrack}>
+                  <View
+                    style={[
+                      styles.fuelEvolutionFill,
+                      { height: point.value > 0 ? `${Math.max(12, (point.value / max) * 100)}%` : "0%" }
+                    ]}
+                  />
+                  <Text style={[styles.fuelEvolutionValue, point.value <= 0 && styles.barValueEmpty]}>{point.display}</Text>
+                </View>
+                <Text style={styles.fuelEvolutionLabel}>{point.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function fuelPriceEvolutionData(logs: FuelLog[], visibleMonth: Date) {
+  const months = Array.from({ length: 3 }, (_item, index) =>
+    new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - (2 - index), 1)
+  );
+  const fuels = Array.from(new Set(months.flatMap((month) => logsForMonth(logs, month).map((log) => log.fuel)))).sort();
+
+  return fuels
+    .map((fuel) => ({
+      fuel,
+      points: months.map((month) => {
+        const monthFuelLogs = logsForMonth(logs, month).filter((log) => log.fuel === fuel);
+        const paid = monthFuelLogs.reduce((sum, log) => sum + log.paid, 0);
+        const liters = monthFuelLogs.reduce((sum, log) => sum + log.liters, 0);
+        const value = liters > 0 ? paid / liters : 0;
+
+        return {
+          label: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+          value,
+          display: value > 0 ? `${formatCurrency(value)}/L` : "—"
+        };
+      })
+    }))
+    .filter((fuel) => fuel.points.some((point) => point.value > 0));
 }
 
 function monthlyChartData(logs: FuelLog[], visibleMonth: Date, metric: ChartMetric) {
@@ -501,6 +642,18 @@ function vehicleFilterLabel(cars: Car[], activeCarIds: string[]) {
   }
 
   return `${activeCarIds.length} veículos`;
+}
+
+function fuelTypesForLogs(logs: FuelLog[]): FuelLog["fuel"][] {
+  return Array.from(new Set(logs.map((log) => log.fuel))).sort();
+}
+
+function fuelFilterLabel(fuel: FuelLog["fuel"] | null) {
+  if (!fuel) {
+    return "Todos os combustíveis";
+  }
+
+  return fuel;
 }
 
 class SummaryInsightBuilder {
@@ -744,8 +897,8 @@ function addMonths(date: Date, offset: number) {
   return new Date(date.getFullYear(), date.getMonth() + offset, 1);
 }
 
-function fuelAveragesForLogs(logs: FuelLog[]) {
-  const fuels = new Map<string, { paid: number; liters: number }>();
+function fuelAveragesForLogs(logs: FuelLog[]): { name: FuelLog["fuel"]; average: number }[] {
+  const fuels = new Map<FuelLog["fuel"], { paid: number; liters: number }>();
   logs.forEach((log) => {
     const current = fuels.get(log.fuel) ?? { paid: 0, liters: 0 };
     current.paid += log.paid;

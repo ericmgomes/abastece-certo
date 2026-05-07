@@ -1086,6 +1086,11 @@ export function createStyles(theme: Theme) {
     gap: 4,
     ...softShadow
   },
+  metricCardCompact: {
+    flexBasis: "30%",
+    minHeight: 70,
+    paddingHorizontal: 4
+  },
   metricCardActive: {
     borderColor: theme.primary,
     backgroundColor: theme.primarySoft,
@@ -2000,6 +2005,71 @@ export function createStyles(theme: Theme) {
     fontWeight: "700",
     fontFamily: theme.fontFamily
   },
+  fuelEvolutionChart: {
+    gap: 8
+  },
+  fuelEvolutionRow: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: glassBorder,
+    backgroundColor: glassSurface,
+    padding: 8,
+    gap: 7,
+    ...softShadow
+  },
+  fuelEvolutionTitle: {
+    color: theme.text,
+    fontSize: 15,
+    lineHeight: 17,
+    fontWeight: "900",
+    textAlign: "center",
+    fontFamily: theme.headingFontFamily
+  },
+  fuelEvolutionBars: {
+    minHeight: 104,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8
+  },
+  fuelEvolutionColumn: {
+    flex: 1,
+    alignItems: "center",
+    gap: 5
+  },
+  fuelEvolutionTrack: {
+    width: "100%",
+    height: 78,
+    borderRadius: 8,
+    backgroundColor: theme.primarySoft,
+    overflow: "hidden",
+    justifyContent: "flex-end",
+    position: "relative"
+  },
+  fuelEvolutionFill: {
+    backgroundColor: actionFill,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8
+  },
+  fuelEvolutionValue: {
+    position: "absolute",
+    left: 2,
+    right: 2,
+    top: 5,
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "900",
+    textAlign: "center",
+    fontFamily: theme.fontFamily
+  },
+  fuelEvolutionLabel: {
+    color: theme.muted,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "800",
+    textAlign: "center",
+    fontFamily: theme.fontFamily
+  },
   mapPanel: {
     height: 230,
     borderRadius: 8,
@@ -2107,6 +2177,7 @@ export function createStyles(theme: Theme) {
     gap: 5
   },
   tab: {
+    minWidth: 58,
     minHeight: 56,
     borderRadius: 8,
     alignItems: "center",
