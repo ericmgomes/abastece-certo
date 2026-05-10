@@ -7,6 +7,7 @@ export type WhatsAppLinkRow = {
   link_token: string;
   token_expires_at: string;
   conversation: WhatsAppConversationItem[] | null;
+  pending_fuel_log: WhatsAppPendingFuelLog | null;
   linked_at: string | null;
   last_message_at: string | null;
   created_at: string;
@@ -17,6 +18,17 @@ export type WhatsAppConversationItem = {
   role: "user" | "assistant";
   text: string;
   at: string;
+};
+
+export type WhatsAppPendingFuelLog = {
+  carId?: string;
+  stationId?: string;
+  fuel?: string;
+  paid?: number;
+  liters?: number;
+  odometerKm?: number;
+  createdAt?: string;
+  missingFields?: string[];
 };
 
 const fallbackSupabaseUrl = "https://ffqykwpkzofkbnvtbfsn.supabase.co";
@@ -90,14 +102,33 @@ export class WhatsAppLinksRepository {
   }
 
   async saveConversation(phoneNumber: string, conversation: WhatsAppConversationItem[]) {
+    await this.saveSession(phoneNumber, { conversation });
+  }
+
+  async saveSession(
+    phoneNumber: string,
+    input: {
+      conversation?: WhatsAppConversationItem[];
+      pendingFuelLog?: WhatsAppPendingFuelLog | null;
+    }
+  ) {
     const now = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      last_message_at: now,
+      updated_at: now
+    };
+
+    if (input.conversation) {
+      update.conversation = input.conversation.slice(-16);
+    }
+
+    if ("pendingFuelLog" in input) {
+      update.pending_fuel_log = input.pendingFuelLog;
+    }
+
     const result = await this.supabase
       .from("whatsapp_links")
-      .update({
-        conversation: conversation.slice(-16),
-        last_message_at: now,
-        updated_at: now
-      })
+      .update(update)
       .eq("phone_number", phoneNumber);
     throwIfError(result.error);
   }

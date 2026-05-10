@@ -1,10 +1,11 @@
-import { AppState } from "../../src/domain";
+import { AppState, FuelType, fuels } from "../../src/domain";
 import { LitroCertoMcpService } from "../../src/mcp/litroCertoService";
 import { McpUserContext } from "../../src/mcp/supabaseAuth";
 import {
   WhatsAppConversationItem,
   WhatsAppLinkRow,
   WhatsAppLinksRepository,
+  WhatsAppPendingFuelLog,
   whatsappServiceSupabase
 } from "../../src/whatsapp/whatsappLinks";
 import { assistantResponse } from "../assistant";
@@ -14,6 +15,7 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     return "Faça login pelo link de conexão antes de conversar comigo pelo WhatsApp.";
   }
 
+  const links = new WhatsAppLinksRepository();
   const service = new LitroCertoMcpService({
     token: "whatsapp",
     ownerId: link.owner_id,
@@ -39,18 +41,129 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     themePalette: "blue",
     demoDataLoaded: false
   };
+  const pending = normalizedPendingFuelLog(link.pending_fuel_log);
+  if (isConfirmation(text)) {
+    if (!pending) {
+      return "Não encontrei um abastecimento preparado para confirmar. Envie os dados do abastecimento primeiro.";
+    }
+
+    const validation = validatePendingFuelLog(pending);
+    if (validation.length) {
+      return `Ainda falta informar: ${validation.join(", ")}.`;
+    }
+
+    const log = await service.createFuelLog({
+      carId: pending.carId!,
+      stationId: pending.stationId!,
+      fuel: pending.fuel as FuelType,
+      paid: pending.paid!,
+      liters: pending.liters!,
+      odometerKm: pending.odometerKm,
+      createdAt: pending.createdAt
+    });
+    const answer = `Abastecimento #${log.sequence ?? ""} registrado: R$ ${formatNumber(log.paid)} em ${formatNumber(log.liters)} L (${formatNumber(log.pricePerLiter)}/L).`;
+    await links.saveSession(link.phone_number, {
+      conversation: nextConversation(normalizedConversation(link.conversation), text, answer),
+      pendingFuelLog: null
+    });
+    return answer;
+  }
+
   const conversation = normalizedConversation(link.conversation);
   const response = await assistantResponse(text, state, conversation);
-  await new WhatsAppLinksRepository().saveConversation(
-    link.phone_number,
-    nextConversation(conversation, text, response.answer)
-  );
+  const pendingFuelLog = mergePendingFuelLog(pending, response.draftFuelLog);
+  await links.saveSession(link.phone_number, {
+    conversation: nextConversation(conversation, text, response.answer),
+    pendingFuelLog
+  });
 
   if (!response.draftFuelLog) {
     return response.answer;
   }
 
   return `${response.answer}\n\nAinda não salvei pelo WhatsApp. Confira no app antes de registrar.`;
+}
+
+function isConfirmation(text: string) {
+  return /^(confirmar|confirmo|confirma|pode salvar|salvar|registra|registrar|ok|sim)$/i.test(text.trim());
+}
+
+function normalizedPendingFuelLog(value: WhatsAppLinkRow["pending_fuel_log"]): WhatsAppPendingFuelLog | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const pending: WhatsAppPendingFuelLog = {};
+  if (typeof value.carId === "string") {
+    pending.carId = value.carId;
+  }
+
+  if (typeof value.stationId === "string") {
+    pending.stationId = value.stationId;
+  }
+
+  if (typeof value.fuel === "string" && fuels.includes(value.fuel as FuelType)) {
+    pending.fuel = value.fuel;
+  }
+
+  pending.paid = positiveNumber(value.paid);
+  pending.liters = positiveNumber(value.liters);
+  pending.odometerKm = nonNegativeNumber(value.odometerKm);
+
+  if (typeof value.createdAt === "string" && Number.isFinite(new Date(value.createdAt).getTime())) {
+    pending.createdAt = new Date(value.createdAt).toISOString();
+  }
+
+  return pending;
+}
+
+function mergePendingFuelLog(
+  current: WhatsAppPendingFuelLog | null,
+  draft: WhatsAppPendingFuelLog | undefined
+): WhatsAppPendingFuelLog | null {
+  if (!draft) {
+    return current;
+  }
+
+  const next = normalizedPendingFuelLog({
+    ...(current ?? {}),
+    ...draft
+  });
+
+  if (!next) {
+    return null;
+  }
+
+  const missingFields = validatePendingFuelLog(next);
+  return {
+    ...next,
+    missingFields: missingFields.length ? missingFields : undefined
+  };
+}
+
+function validatePendingFuelLog(pending: WhatsAppPendingFuelLog) {
+  return [
+    !pending.carId ? "veículo" : null,
+    !pending.stationId ? "posto" : null,
+    !pending.fuel ? "combustível" : null,
+    !pending.paid ? "valor pago" : null,
+    !pending.liters ? "litros" : null
+  ].filter((field): field is string => Boolean(field));
+}
+
+function positiveNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function nonNegativeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function formatNumber(value: number) {
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function normalizedConversation(conversation: WhatsAppLinkRow["conversation"]) {
