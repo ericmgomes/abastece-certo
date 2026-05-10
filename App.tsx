@@ -102,6 +102,46 @@ function isOAuthConsentRoute() {
   return location?.pathname === "/oauth/consent";
 }
 
+function whatsappTokenFromUrl() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  if (!location) {
+    return null;
+  }
+
+  return new URLSearchParams(location.search).get("whatsapp_token");
+}
+
+function hasWhatsappTokenRoute() {
+  return Boolean(whatsappTokenFromUrl());
+}
+
+function clearWhatsappTokenFromUrl() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  const history = (globalThis as unknown as { history?: History }).history;
+  if (!location || !history) {
+    return;
+  }
+
+  const url = new URL(location.href);
+  url.searchParams.delete("whatsapp_token");
+  history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function currentHashRoute() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  return location?.hash ?? "";
+}
+
+function clearHashRoute() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  const history = (globalThis as unknown as { history?: History }).history;
+  if (!location || !history) {
+    return;
+  }
+
+  history.replaceState({}, "", `${location.pathname}${location.search}`);
+}
+
 type ThemeContextValue = {
   mode: ThemeMode;
   palette: ThemePalette;
@@ -135,6 +175,7 @@ export default function App() {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const scrollRef = useRef<ScrollView>(null);
   const saveErrorShownRef = useRef(false);
+  const whatsappTokenHandledRef = useRef<string | null>(null);
   const themeMode = state.themeMode ?? "light";
   const themePalette = state.themePalette ?? "blue";
   const theme = useMemo(() => buildTheme(themeMode, themePalette), [themeMode, themePalette]);
@@ -149,6 +190,29 @@ export default function App() {
       initAnalytics();
       trackEvent("app_loaded");
     }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      return undefined;
+    }
+
+    function openUtilityFromHash() {
+      if (currentHashRoute() !== "#help") {
+        return;
+      }
+
+      closeFuelForm();
+      setAuthScreenOpen(false);
+      setUtilityScreen("help");
+      trackEvent("help_opened", {
+        source: "hash"
+      });
+    }
+
+    openUtilityFromHash();
+    globalThis.addEventListener?.("hashchange", openUtilityFromHash);
+    return () => globalThis.removeEventListener?.("hashchange", openUtilityFromHash);
   }, []);
 
   useEffect(() => {
@@ -273,7 +337,15 @@ export default function App() {
         const sessionUser = data.session?.user;
 
         if (!sessionUser) {
-          enterGuestMode();
+          if (hasWhatsappTokenRoute()) {
+            setOwnerId(null);
+            setAuthEmail(null);
+            setAuthName(null);
+            await loadGuestState();
+            setAuthScreenOpen(true);
+          } else {
+            enterGuestMode();
+          }
           return;
         }
 
@@ -311,13 +383,29 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const sessionUser = session?.user;
       if (!sessionUser) {
-        enterGuestMode();
+        if (hasWhatsappTokenRoute()) {
+          setOwnerId(null);
+          setAuthEmail(null);
+          setAuthName(null);
+          void loadGuestState();
+          setAuthScreenOpen(true);
+        } else {
+          enterGuestMode();
+        }
         return;
       }
 
       if (!sessionUser.email) {
         supabase.auth.signOut().catch(() => undefined);
-        enterGuestMode();
+        if (hasWhatsappTokenRoute()) {
+          setOwnerId(null);
+          setAuthEmail(null);
+          setAuthName(null);
+          void loadGuestState();
+          setAuthScreenOpen(true);
+        } else {
+          enterGuestMode();
+        }
         return;
       }
 
@@ -379,6 +467,25 @@ export default function App() {
 
     return () => clearTimeout(timeout);
   }, [ownerId, ready, state]);
+
+  useEffect(() => {
+    if (!ready || Platform.OS !== "web") {
+      return;
+    }
+
+    const token = whatsappTokenFromUrl();
+    if (!token || whatsappTokenHandledRef.current === token) {
+      return;
+    }
+
+    if (!ownerId) {
+      setAuthScreenOpen(true);
+      return;
+    }
+
+    whatsappTokenHandledRef.current = token;
+    connectWhatsAppToken(token);
+  }, [ownerId, ready]);
 
   const selectedCar = state.cars.find((car) => car.id === state.selectedCarId) ?? state.cars[0];
   const activeCarIds = validFilteredCarIds(state.cars, state.filteredCarIds);
@@ -462,6 +569,38 @@ export default function App() {
     enterGuestMode();
   }
 
+  async function connectWhatsAppToken(token: string) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        setAuthScreenOpen(true);
+        return;
+      }
+
+      const response = await fetch("/api/whatsapp/link", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ token })
+      });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Não foi possível conectar o WhatsApp.");
+      }
+
+      trackEvent("whatsapp_connected", {
+        auth_state: "authenticated"
+      });
+      clearWhatsappTokenFromUrl();
+      Alert.alert("WhatsApp conectado", "Agora este WhatsApp está vinculado à sua conta LitroCerto.");
+    } catch (error) {
+      Alert.alert("WhatsApp", error instanceof Error ? error.message : "Não foi possível conectar o WhatsApp.");
+    }
+  }
+
   function confirmSignOut() {
     if (Platform.OS === "web") {
       const confirmed = globalThis.confirm?.("Deseja sair da sua conta?");
@@ -539,7 +678,12 @@ export default function App() {
 
   function renderContent() {
     if (utilityScreen === "help") {
-      return <HelpScreen onClose={() => setUtilityScreen(null)} styles={styles} components={{ Section }} />;
+      return <HelpScreen onClose={() => {
+        setUtilityScreen(null);
+        if (currentHashRoute() === "#help") {
+          clearHashRoute();
+        }
+      }} styles={styles} components={{ Section }} />;
     }
 
     if (utilityScreen === "privacy") {
@@ -817,7 +961,7 @@ export default function App() {
               onToggleTheme={toggleTheme}
               onThemePaletteSelect={selectThemePalette}
               onCancel={() => setAuthScreenOpen(false)}
-              authRedirectTo={oauthConsentRoute ? currentBrowserUrl() : undefined}
+              authRedirectTo={oauthConsentRoute || hasWhatsappTokenRoute() ? currentBrowserUrl() : undefined}
             />
           </SafeAreaView>
         </ThemeContext.Provider>

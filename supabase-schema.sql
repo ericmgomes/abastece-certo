@@ -59,14 +59,29 @@ create table if not exists fuel_logs (
   updated_at timestamp with time zone not null default now()
 );
 
+create table if not exists whatsapp_links (
+  phone_number text primary key,
+  owner_id text references profiles(owner_id) on delete cascade,
+  display_name text,
+  link_token text not null unique,
+  token_expires_at timestamp with time zone not null,
+  linked_at timestamp with time zone,
+  last_message_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
 create index if not exists cars_owner_id_idx on cars(owner_id);
 create index if not exists stations_owner_id_idx on stations(owner_id);
 create index if not exists fuel_logs_owner_id_created_at_idx on fuel_logs(owner_id, created_at desc);
+create index if not exists whatsapp_links_owner_id_idx on whatsapp_links(owner_id);
+create index if not exists whatsapp_links_link_token_idx on whatsapp_links(link_token);
 
 alter table profiles enable row level security;
 alter table cars enable row level security;
 alter table stations enable row level security;
 alter table fuel_logs enable row level security;
+alter table whatsapp_links enable row level security;
 
 drop policy if exists "MVP public profiles access" on profiles;
 drop policy if exists "MVP public cars access" on cars;
@@ -80,6 +95,8 @@ drop policy if exists "Users can manage own stations" on stations;
 drop policy if exists "Admin can read stations" on stations;
 drop policy if exists "Users can manage own fuel logs" on fuel_logs;
 drop policy if exists "Admin can read fuel logs" on fuel_logs;
+drop policy if exists "Users can read own whatsapp links" on whatsapp_links;
+drop policy if exists "Admin can read whatsapp links" on whatsapp_links;
 
 create policy "Users can manage own profile"
   on profiles for all
@@ -115,4 +132,12 @@ create policy "Users can manage own fuel logs"
 
 create policy "Admin can read fuel logs"
   on fuel_logs for select
+  using (auth.jwt() ->> 'email' = 'ericgomes@gmail.com');
+
+create policy "Users can read own whatsapp links"
+  on whatsapp_links for select
+  using (owner_id = auth.uid()::text);
+
+create policy "Admin can read whatsapp links"
+  on whatsapp_links for select
   using (auth.jwt() ->> 'email' = 'ericgomes@gmail.com');

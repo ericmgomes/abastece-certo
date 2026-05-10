@@ -354,7 +354,31 @@ function validateAssistantDraft(draft: AssistantDraftFuelLog, state: AppState) {
     return { valid: false, message: "Esse combustível ainda não está habilitado no app." };
   }
 
+  if (!isBoundedNumber(draft.paid, 0.01, 10000)) {
+    return { valid: false, message: "Valor pago precisa ser maior que zero e plausível." };
+  }
+
+  if (!isBoundedNumber(draft.liters, 0.01, 1000)) {
+    return { valid: false, message: "Litros precisam ser maiores que zero e plausíveis." };
+  }
+
+  if (draft.odometerKm !== undefined && !isBoundedNumber(draft.odometerKm, 0, 2000000)) {
+    return { valid: false, message: "Km atual precisa ser um número plausível." };
+  }
+
+  if (draft.createdAt && !isValidDate(draft.createdAt)) {
+    return { valid: false, message: "Data do abastecimento inválida." };
+  }
+
   return { valid: true, message: "" };
+}
+
+function isBoundedNumber(value: unknown, min: number, max: number) {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function isValidDate(value: string) {
+  return Number.isFinite(new Date(value).getTime());
 }
 
 function assistantStateSnapshot(state: AppState) {
