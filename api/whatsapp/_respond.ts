@@ -1,7 +1,12 @@
 import { AppState } from "../../src/domain";
 import { LitroCertoMcpService } from "../../src/mcp/litroCertoService";
 import { McpUserContext } from "../../src/mcp/supabaseAuth";
-import { WhatsAppLinkRow, whatsappServiceSupabase } from "../../src/whatsapp/whatsappLinks";
+import {
+  WhatsAppConversationItem,
+  WhatsAppLinkRow,
+  WhatsAppLinksRepository,
+  whatsappServiceSupabase
+} from "../../src/whatsapp/whatsappLinks";
 import { assistantResponse } from "../assistant";
 
 export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text: string) {
@@ -34,7 +39,13 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     themePalette: "blue",
     demoDataLoaded: false
   };
-  const response = await assistantResponse(text, state, []);
+  const conversation = normalizedConversation(link.conversation);
+  const response = await assistantResponse(text, state, conversation);
+  await new WhatsAppLinksRepository().saveConversation(
+    link.phone_number,
+    nextConversation(conversation, text, response.answer)
+  );
+
   if (!response.draftFuelLog) {
     return response.answer;
   }
@@ -42,3 +53,52 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
   return `${response.answer}\n\nAinda não salvei pelo WhatsApp. Confira no app antes de registrar.`;
 }
 
+function normalizedConversation(conversation: WhatsAppLinkRow["conversation"]) {
+  if (!Array.isArray(conversation)) {
+    return [];
+  }
+
+  return conversation
+    .filter((message): message is WhatsAppConversationItem =>
+      (message?.role === "user" || message?.role === "assistant") &&
+      typeof message.text === "string"
+    )
+    .slice(-12)
+    .map((message) => ({
+      role: message.role,
+      text: message.text.slice(0, 800)
+    }));
+}
+
+function nextConversation(
+  conversation: Array<{ role?: "assistant" | "user"; text?: string }>,
+  userText: string,
+  assistantText: string
+): WhatsAppConversationItem[] {
+  const now = new Date().toISOString();
+  return [
+    ...conversation.map((message) => ({
+      role: message.role === "assistant" ? "assistant" as const : "user" as const,
+      text: sanitizeConversationText(message.text),
+      at: now
+    })),
+    {
+      role: "user" as const,
+      text: sanitizeConversationText(userText),
+      at: now
+    },
+    {
+      role: "assistant" as const,
+      text: sanitizeConversationText(assistantText),
+      at: now
+    }
+  ].slice(-16);
+}
+
+function sanitizeConversationText(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, 800);
+}

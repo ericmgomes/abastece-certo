@@ -6,10 +6,17 @@ export type WhatsAppLinkRow = {
   display_name: string | null;
   link_token: string;
   token_expires_at: string;
+  conversation: WhatsAppConversationItem[] | null;
   linked_at: string | null;
   last_message_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type WhatsAppConversationItem = {
+  role: "user" | "assistant";
+  text: string;
+  at: string;
 };
 
 const fallbackSupabaseUrl = "https://ffqykwpkzofkbnvtbfsn.supabase.co";
@@ -80,6 +87,19 @@ export class WhatsAppLinksRepository {
       .single();
     throwIfError(result.error);
     return result.data as WhatsAppLinkRow;
+  }
+
+  async saveConversation(phoneNumber: string, conversation: WhatsAppConversationItem[]) {
+    const now = new Date().toISOString();
+    const result = await this.supabase
+      .from("whatsapp_links")
+      .update({
+        conversation: conversation.slice(-16),
+        last_message_at: now,
+        updated_at: now
+      })
+      .eq("phone_number", phoneNumber);
+    throwIfError(result.error);
   }
 }
 
