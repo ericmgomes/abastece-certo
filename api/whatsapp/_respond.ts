@@ -10,7 +10,7 @@ import {
 } from "../../src/whatsapp/whatsappLinks";
 import { assistantResponse } from "../assistant";
 
-export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text: string) {
+export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text: string, commandText = text) {
   if (!link.owner_id) {
     return "Faça login pelo link de conexão antes de conversar comigo pelo WhatsApp.";
   }
@@ -42,7 +42,7 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     demoDataLoaded: false
   };
   const pending = normalizedPendingFuelLog(link.pending_fuel_log);
-  const intent = confirmationIntent(text);
+  const intent = confirmationIntent(commandText);
   if (intent === "deny") {
     await links.saveSession(link.phone_number, {
       conversation: nextConversation(normalizedConversation(link.conversation), text, "Tudo bem. Cancelei esse rascunho."),

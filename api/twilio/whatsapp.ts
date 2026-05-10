@@ -35,7 +35,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const links = new WhatsAppLinksRepository();
     const existing = await links.findByPhone(message.from);
     if (existing?.owner_id) {
-      sendTwiML(response, await answerConnectedWhatsAppMessage(existing, message.text));
+      sendTwiML(response, await answerConnectedWhatsAppMessage(existing, message.text, message.commandText));
       return;
     }
 
@@ -59,6 +59,7 @@ async function readTwilioMessage(request: VercelRequest) {
   return {
     from: normalizePhone(String(body.From ?? "")),
     text,
+    commandText: bodyText,
     name: typeof body.ProfileName === "string" ? body.ProfileName : undefined
   };
 }
