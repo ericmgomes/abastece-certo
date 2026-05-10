@@ -42,7 +42,16 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     demoDataLoaded: false
   };
   const pending = normalizedPendingFuelLog(link.pending_fuel_log);
-  if (isConfirmation(text)) {
+  const intent = confirmationIntent(text);
+  if (intent === "deny") {
+    await links.saveSession(link.phone_number, {
+      conversation: nextConversation(normalizedConversation(link.conversation), text, "Tudo bem. Cancelei esse rascunho."),
+      pendingFuelLog: null
+    });
+    return "Tudo bem. Cancelei esse rascunho.";
+  }
+
+  if (intent === "confirm") {
     if (!pending) {
       return "Não encontrei um abastecimento preparado para confirmar. Envie os dados do abastecimento primeiro.";
     }
@@ -69,13 +78,26 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     return answer;
   }
 
+  if (intent === "unclear" && pending && validatePendingFuelLog(pending).length === 0) {
+    const answer = `${readyToConfirmText(pending, state)}\n\nQuer que eu salve? Responda sim ou não.`;
+    await links.saveSession(link.phone_number, {
+      conversation: nextConversation(normalizedConversation(link.conversation), text, answer),
+      pendingFuelLog: pending
+    });
+    return answer;
+  }
+
   const conversation = normalizedConversation(link.conversation);
-  const response = await assistantResponse(text, state, conversation);
+  const response = await assistantResponse(text, state, conversationWithPendingDraft(conversation, pending));
   const pendingFuelLog = mergePendingFuelLog(pending, response.draftFuelLog);
   await links.saveSession(link.phone_number, {
     conversation: nextConversation(conversation, text, response.answer),
     pendingFuelLog
   });
+
+  if (pendingFuelLog && validatePendingFuelLog(pendingFuelLog).length === 0) {
+    return `${readyToConfirmText(pendingFuelLog, state)}\n\nResponda confirmar para salvar.`;
+  }
 
   if (!response.draftFuelLog) {
     return response.answer;
@@ -84,8 +106,51 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
   return `${response.answer}\n\nResponda confirmar para salvar.`;
 }
 
-function isConfirmation(text: string) {
-  return /^(confirmar|confirmo|confirma|pode salvar|salvar|registra|registrar|ok|sim)$/i.test(text.trim());
+function confirmationIntent(text: string): "confirm" | "deny" | "unclear" | "none" {
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  if (!normalized) {
+    return "none";
+  }
+
+  if (/\b(nao|cancela|cancelar|errado|espera|pera|calma)\b/.test(normalized)) {
+    return "deny";
+  }
+
+  const confirmationCommands = [
+    "confirm",
+    "confirma",
+    "confirmado",
+    "confirmar",
+    "confirmo",
+    "manda",
+    "ok",
+    "pode registrar",
+    "pode salvar",
+    "registra",
+    "registrar",
+    "salva",
+    "salvar",
+    "sim",
+    "vai",
+    "yep"
+  ];
+
+  if (confirmationCommands.some((command) => normalized === command || normalized.startsWith(`${command} `))) {
+    return "confirm";
+  }
+
+  if (/\b(salv|registr|confirm|pode|vai|manda|fechou|beleza|blz|certo)\b/.test(normalized)) {
+    return "unclear";
+  }
+
+  return "none";
 }
 
 function normalizedPendingFuelLog(value: WhatsAppLinkRow["pending_fuel_log"]): WhatsAppPendingFuelLog | null {
@@ -139,6 +204,49 @@ function mergePendingFuelLog(
     ...next,
     missingFields: missingFields.length ? missingFields : undefined
   };
+}
+
+function conversationWithPendingDraft(
+  conversation: Array<{ role?: "assistant" | "user"; text?: string }>,
+  pending: WhatsAppPendingFuelLog | null
+) {
+  if (!pending) {
+    return conversation;
+  }
+
+  return [
+    ...conversation,
+    {
+      role: "assistant" as const,
+      text: `Rascunho atual ainda não salvo: ${pendingSummary(pending)}. Use esses dados na próxima resposta e peça só o que ainda faltar.`
+    }
+  ];
+}
+
+function readyToConfirmText(pending: WhatsAppPendingFuelLog, state: AppState) {
+  const car = state.cars.find((item) => item.id === pending.carId);
+  const station = state.stations.find((item) => item.id === pending.stationId);
+  return [
+    "Pronto para salvar:",
+    car?.nickname ?? "veículo informado",
+    station ? `posto ${station.name}` : "posto informado",
+    pending.fuel,
+    `${formatNumber(pending.liters!)} L`,
+    `R$ ${formatNumber(pending.paid!)}`,
+    pending.odometerKm !== undefined ? `${formatNumber(pending.odometerKm)} km` : null
+  ].filter(Boolean).join(", ");
+}
+
+function pendingSummary(pending: WhatsAppPendingFuelLog) {
+  return [
+    pending.carId ? `carId ${pending.carId}` : null,
+    pending.stationId ? `stationId ${pending.stationId}` : null,
+    pending.fuel ? `combustível ${pending.fuel}` : null,
+    pending.paid ? `valor R$ ${formatNumber(pending.paid)}` : null,
+    pending.liters ? `${formatNumber(pending.liters)} litros` : null,
+    pending.odometerKm !== undefined ? `odômetro ${formatNumber(pending.odometerKm)} km` : null,
+    pending.createdAt ? `data ${pending.createdAt}` : null
+  ].filter(Boolean).join(", ");
 }
 
 function validatePendingFuelLog(pending: WhatsAppPendingFuelLog) {
