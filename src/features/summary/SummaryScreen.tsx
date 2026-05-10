@@ -87,7 +87,8 @@ export function SummaryScreen({
   const chartData = monthlyChartData(summaryLogs, visibleMonth, chartMetric);
   const fuelAverages = fuelAveragesForLogs(periodLogs);
   const averageFuelPrice = periodLiters > 0 ? periodTotal / periodLiters : null;
-  const insight = new SummaryInsightBuilder(periodLogs, previousPeriodLogs, stations).build();
+  const visibleCars = cars.filter((car) => activeCarIds.includes(car.id));
+  const insight = new SummaryInsightBuilder(periodLogs, previousPeriodLogs, stations, visibleCars, summaryLogs).build();
   const periodStep = periodStepMonths(summaryPeriod);
   const showPreviousPeriod = summaryPeriod !== "all" && hasLogBeforeRange(summaryLogs, periodRange);
   const showNextPeriod = summaryPeriod !== "all" && hasLogAfterRange(summaryLogs, periodRange);
@@ -687,12 +688,19 @@ class SummaryInsightBuilder {
   constructor(
     private readonly currentLogs: FuelLog[],
     private readonly previousLogs: FuelLog[],
-    private readonly stations: Station[]
+    private readonly stations: Station[],
+    private readonly cars: Car[],
+    private readonly allLogs: FuelLog[]
   ) {}
 
   build() {
+    const dataQualityInsight = this.dataQualityInsight();
+    if (dataQualityInsight) {
+      return dataQualityInsight;
+    }
+
     if (this.currentLogs.length === 0) {
-      return null;
+      return this.emptyPeriodInsight();
     }
 
     if (this.previousLogs.length === 0) {
@@ -721,6 +729,96 @@ class SummaryInsightBuilder {
     return stationHint
       ? `Seu gasto ficou praticamente estável. ${stationHint}`
       : "Seu gasto ficou praticamente estável em relação ao período anterior.";
+  }
+
+  private dataQualityInsight() {
+    const suspiciousLog = this.suspiciousFuelLog();
+    if (suspiciousLog) {
+      return suspiciousLog;
+    }
+
+    const duplicatedStation = this.duplicatedStationAddress();
+    if (duplicatedStation) {
+      return duplicatedStation;
+    }
+
+    const neverFueledCar = this.carWithoutFuelLogs();
+    if (neverFueledCar) {
+      return `Você já pode registrar o primeiro abastecimento do ${neverFueledCar.nickname}. Isso libera histórico, médias e comparações para esse veículo.`;
+    }
+
+    const missingOdometerCount = this.allLogs.filter((log) => typeof log.odometerKm !== "number").length;
+    if (this.allLogs.length >= 3 && missingOdometerCount / this.allLogs.length >= 0.6) {
+      return "Muitos abastecimentos estão sem km atual. Preencher esse campo ajuda o LitroCerto a calcular consumo e R$/km.";
+    }
+
+    return null;
+  }
+
+  private suspiciousFuelLog() {
+    const suspicious = [...this.allLogs]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .find((log) => this.isSuspiciousLog(log));
+
+    if (!suspicious) {
+      return null;
+    }
+
+    const vehicle = this.cars.find((car) => car.id === suspicious.carId)?.nickname ?? "veículo";
+    const station = this.stations.find((item) => item.id === suspicious.stationId)?.name ?? "posto";
+    return `Revise o abastecimento #${suspicious.sequence ?? suspicious.id}: ${vehicle}, ${station}, ${formatCurrency(suspicious.pricePerLiter)}/L. Esse preço parece fora do padrão.`;
+  }
+
+  private isSuspiciousLog(log: FuelLog) {
+    if (!Number.isFinite(log.paid) || !Number.isFinite(log.liters) || log.paid <= 0 || log.liters <= 0) {
+      return true;
+    }
+
+    if (!Number.isFinite(log.pricePerLiter) || log.pricePerLiter < 1.5 || log.pricePerLiter > 20) {
+      return true;
+    }
+
+    const comparableLogs = this.allLogs
+      .filter((item) => item.id !== log.id && item.fuel === log.fuel && item.pricePerLiter > 0)
+      .map((item) => item.pricePerLiter)
+      .sort((a, b) => a - b);
+    if (comparableLogs.length < 3) {
+      return false;
+    }
+
+    const median = comparableLogs[Math.floor(comparableLogs.length / 2)];
+    return log.pricePerLiter > median * 1.8 || log.pricePerLiter < median * 0.55;
+  }
+
+  private duplicatedStationAddress() {
+    const groups = new Map<string, Station[]>();
+    this.stations.forEach((station) => {
+      const key = normalizedStationAddress(station);
+      if (!key) {
+        return;
+      }
+
+      groups.set(key, [...(groups.get(key) ?? []), station]);
+    });
+
+    const duplicated = Array.from(groups.values()).find((group) => group.length > 1);
+    if (!duplicated) {
+      return null;
+    }
+
+    return `Há ${duplicated.length} postos cadastrados no mesmo endereço: ${duplicated.map((station) => station.name).join(", ")}. Vale unificar para o ranking ficar mais correto.`;
+  }
+
+  private carWithoutFuelLogs() {
+    return this.cars.find((car) => !this.allLogs.some((log) => log.carId === car.id));
+  }
+
+  private emptyPeriodInsight() {
+    if (this.allLogs.length === 0) {
+      return "Registre seu primeiro abastecimento para começar a ver gastos, litros, preço por litro e ranking de postos.";
+    }
+
+    return "Não há abastecimentos neste período. Se você esqueceu algum, registre com a data correta para manter o histórico completo.";
   }
 
   private firstPeriodInsight() {
@@ -814,6 +912,24 @@ class SummaryInsightBuilder {
 
     return this.totalSpent(logs) / liters;
   }
+}
+
+function normalizedStationAddress(station: Station) {
+  const value = [station.address, station.city, station.state]
+    .filter(Boolean)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  if (!value || value === "sem endereco" || value === "cadastrado manualmente") {
+    return "";
+  }
+
+  return value;
 }
 
 function costPerKmForMonth(logs: FuelLog[], referenceDate: Date) {
