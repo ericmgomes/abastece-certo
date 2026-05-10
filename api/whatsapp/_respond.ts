@@ -61,7 +61,7 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
       odometerKm: pending.odometerKm,
       createdAt: pending.createdAt
     });
-    const answer = `Abastecimento #${log.sequence ?? ""} registrado: R$ ${formatNumber(log.paid)} em ${formatNumber(log.liters)} L (${formatNumber(log.pricePerLiter)}/L).`;
+    const answer = `Pronto. Abastecimento #${log.sequence ?? ""} registrado: ${formatNumber(log.liters)} L por R$ ${formatNumber(log.paid)}, ou seja R$ ${formatNumber(log.pricePerLiter)}/L.`;
     await links.saveSession(link.phone_number, {
       conversation: nextConversation(normalizedConversation(link.conversation), text, answer),
       pendingFuelLog: null
@@ -161,7 +161,7 @@ function nonNegativeNumber(value: unknown) {
 
 function formatNumber(value: number) {
   return value.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
     maximumFractionDigits: 2
   });
 }
