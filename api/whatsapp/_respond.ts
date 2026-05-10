@@ -81,7 +81,7 @@ export async function answerConnectedWhatsAppMessage(link: WhatsAppLinkRow, text
     return response.answer;
   }
 
-  return `${response.answer}\n\nAinda não salvei pelo WhatsApp. Confira no app antes de registrar.`;
+  return `${response.answer}\n\nResponda confirmar para salvar.`;
 }
 
 function isConfirmation(text: string) {
