@@ -279,7 +279,7 @@ function withMediaSummary(answer: string, mediaSummary?: string) {
     return answer;
   }
 
-  if (/^Pela foto/i.test(answer)) {
+  if (/(^Pela foto|foto|op[cç][aã]o|op[cç][oõ]es|identifiquei|identificad[ao]s?)/i.test(answer)) {
     return answer;
   }
 
