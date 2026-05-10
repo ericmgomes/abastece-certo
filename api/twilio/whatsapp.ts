@@ -35,7 +35,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const links = new WhatsAppLinksRepository();
     const existing = await links.findByPhone(message.from);
     if (existing?.owner_id) {
-      sendTwiML(response, await answerConnectedWhatsAppMessage(existing, message.text, message.commandText));
+      const answer = await answerConnectedWhatsAppMessage(existing, message.text, message.commandText);
+      sendTwiML(response, withMediaSummary(answer, message.mediaSummary));
       return;
     }
 
@@ -53,13 +54,16 @@ export default async function handler(request: VercelRequest, response: VercelRe
 async function readTwilioMessage(request: VercelRequest) {
   const body = await readFormBody(request);
   const bodyText = String(body.Body ?? "").trim();
-  const mediaTexts = await Promise.all(readTwilioMedia(body).map((media) => textFromMedia(media)));
+  const mediaItems = await Promise.all(readTwilioMedia(body).map((media) => textFromMedia(media)));
+  const mediaTexts = mediaItems.map((item) => item.text);
   const text = [bodyText, ...mediaTexts].filter(Boolean).join("\n\n").trim();
+  const mediaSummary = mediaItems.find((item) => item.kind === "image")?.summary;
 
   return {
     from: normalizePhone(String(body.From ?? "")),
     text,
     commandText: bodyText,
+    mediaSummary,
     name: typeof body.ProfileName === "string" ? body.ProfileName : undefined
   };
 }
@@ -79,14 +83,25 @@ function readTwilioMedia(body: Record<string, string>): TwilioMediaItem[] {
 
 async function textFromMedia(media: TwilioMediaItem) {
   if (media.contentType.startsWith("audio/")) {
-    return transcribeAudio(media);
+    return {
+      kind: "audio" as const,
+      text: await transcribeAudio(media)
+    };
   }
 
   if (media.contentType.startsWith("image/")) {
-    return describeFuelPumpImage(media);
+    const summary = await describeFuelPumpImage(media);
+    return {
+      kind: "image" as const,
+      text: `Dados extraídos da foto: ${summary}`,
+      summary
+    };
   }
 
-  return `Recebi uma mídia do tipo ${media.contentType}, mas por enquanto só consigo interpretar áudio e foto.`;
+  return {
+    kind: "other" as const,
+    text: `Recebi uma mídia do tipo ${media.contentType}, mas por enquanto só consigo interpretar áudio e foto.`
+  };
 }
 
 async function transcribeAudio(media: TwilioMediaItem) {
@@ -134,6 +149,8 @@ async function describeFuelPumpImage(media: TwilioMediaItem) {
           content: [
             "Você lê fotos de bomba ou comprovante de abastecimento para o app LitroCerto.",
             "Extraia apenas dados visíveis: valor pago, litros, preço por litro, combustível, data/hora se aparecer.",
+            "Se a imagem mostrar mais de um abastecimento, display, bico ou conjunto de valores, não escolha sozinho.",
+            "Nesse caso, liste as opções visíveis de forma curta e pergunte qual delas foi o abastecimento do usuário.",
             "Se algum dado não estiver visível, diga que não foi identificado.",
             "Responda em português do Brasil, em uma frase curta, sem inventar dados."
           ].join(" ")
@@ -162,10 +179,10 @@ async function describeFuelPumpImage(media: TwilioMediaItem) {
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const description = payload.choices?.[0]?.message?.content?.trim();
   if (!description) {
-    return "Recebi uma foto, mas não consegui identificar dados de abastecimento.";
+    return "não consegui identificar dados de abastecimento com segurança.";
   }
 
-  return `Dados extraídos da foto: ${description}`;
+  return description;
 }
 
 async function downloadTwilioMedia(media: TwilioMediaItem) {
@@ -255,6 +272,18 @@ function sendTwiML(response: VercelResponse, message: string) {
   response.status(200);
   response.setHeader("content-type", "text/xml; charset=utf-8");
   response.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`);
+}
+
+function withMediaSummary(answer: string, mediaSummary?: string) {
+  if (!mediaSummary) {
+    return answer;
+  }
+
+  if (/^Pela foto/i.test(answer)) {
+    return answer;
+  }
+
+  return `Pela foto, identifiquei: ${mediaSummary}\n\n${answer}`;
 }
 
 function escapeXml(value: string) {

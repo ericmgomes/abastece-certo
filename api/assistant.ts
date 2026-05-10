@@ -160,6 +160,7 @@ export async function assistantResponse(
             "Nunca afirme que executou ações fora deste JSON. Você só pode responder e preparar draftFuelLog.",
             "Sempre retorne JSON válido no formato: {\"answer\":\"texto\", \"draftFuelLog\": opcional}.",
             "draftFuelLog só deve aparecer quando o usuário pedir para registrar/preencher um abastecimento.",
+            "Se o contexto da foto indicar mais de uma opção de abastecimento, não crie draftFuelLog ainda. Pergunte qual opção é a correta.",
             "Use IDs reais do contexto para carId e stationId. Se não tiver certeza, deixe ausente e liste em missingFields.",
             "Combustíveis aceitos no frontend agora: Gasolina comum, Gasolina aditivada, Etanol, Diesel.",
             "Números de draftFuelLog precisam ser positivos, finitos e plausíveis. Se faltar ou parecer absurdo, deixe ausente e explique o que falta.",
