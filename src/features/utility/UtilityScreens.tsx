@@ -20,22 +20,87 @@ export function HelpScreen({
   components: Pick<UtilityComponents, "Section">;
 }) {
   const { Section } = components;
+  const [openItem, setOpenItem] = useState<string | null>(null);
+
+  const faqItems = [
+    {
+      id: "what",
+      question: "O que é o LitroCerto?",
+      answers: [
+        "O LitroCerto ajuda você a registrar abastecimentos, calcular quanto pagou de verdade por litro e enxergar melhor para onde está indo seu dinheiro com combustível.",
+        "Com o histórico, o app mostra gasto, litros, preço por litro, postos mais baratos, evolução por período e dados separados por veículo e combustível."
+      ]
+    },
+    {
+      id: "how",
+      question: "Como usar?",
+      answers: [
+        "Comece cadastrando seus veículos e os postos que você costuma usar. Depois, sempre que abastecer, toque no botão +, informe data, hora, veículo, combustível, valor pago, litros e, se quiser, a km atual.",
+        "O app calcula automaticamente o preço por litro e atualiza os gráficos, rankings e médias. Você também pode editar um registro antigo se perceber que digitou algo errado."
+      ]
+    },
+    {
+      id: "when",
+      question: "Quando usar?",
+      answers: [
+        "Use logo depois de abastecer, enquanto o valor pago, os litros e o posto ainda estão fáceis de conferir. Se esquecer, registre depois escolhendo a data e a hora corretas.",
+        "Quanto mais abastecimentos você registra, melhores ficam os comparativos por mês, veículo, combustível e posto."
+      ]
+    },
+    {
+      id: "summary",
+      question: "Como interpretar o Resumo?",
+      answers: [
+        "No Resumo você escolhe período, veículos e combustíveis. Os cards mostram gasto, litros, preço por litro e outras métricas considerando exatamente os filtros selecionados.",
+        "Os gráficos ajudam a comparar períodos. Se um mês ficou mais caro, veja se foi por mais litros, por preço maior no litro ou por abastecer em postos mais caros."
+      ]
+    },
+    {
+      id: "stations-vehicles",
+      question: "Para que servem Postos e Veículos?",
+      answers: [
+        "Em Postos, você acompanha onde abasteceu e compara preços médios. Em Veículos, você vê quais veículos concentram mais gasto e pode manter os dados básicos de cada um.",
+        "Se aparecer mais de um posto igual ou algum abastecimento com valor estranho, corrija os cadastros para deixar os insights mais confiáveis."
+      ]
+    },
+    {
+      id: "ai-whatsapp",
+      question: "Como funcionam IA e WhatsApp?",
+      answers: [
+        "A IA pode consultar seus dados, responder perguntas como quanto você gastou em um período e ajudar a preparar um abastecimento para registro.",
+        "Quando disponível, você também pode conversar pelo WhatsApp e enviar informações do abastecimento em linguagem natural. Antes de salvar, confira se o app entendeu tudo corretamente."
+      ]
+    },
+    {
+      id: "demo",
+      question: "O que são dados de exemplo?",
+      answers: [
+        "Se você ainda não fez login, pode navegar com dados de exemplo para entender o app.",
+        "Para começar seu histórico real, faça login e registre seus próprios veículos, postos e abastecimentos."
+      ]
+    },
+    {
+      id: "privacy",
+      question: "E minha privacidade?",
+      answers: [
+        "O LitroCerto não foi feito para rastrear seus trajetos. A localização, quando usada, serve para ajudar a identificar o posto no momento do registro.",
+        "Seus abastecimentos ficam vinculados à sua conta e não aparecem para outros usuários."
+      ]
+    }
+  ];
 
   return (
     <View style={styles.stack}>
       <Section title="Ajuda" rightAction={<CloseButton onClose={onClose} styles={styles} />}>
-        <View style={styles.helpBlock}>
-          <Text style={styles.itemTitle}>O que é?</Text>
-          <Text style={styles.helpText}>Um app simples para registrar abastecimentos, descobrir o preço real por litro e entender quais postos valem mais a pena para você.</Text>
-        </View>
-        <View style={styles.helpBlock}>
-          <Text style={styles.itemTitle}>Como usar?</Text>
-          <Text style={styles.helpText}>Cadastre seus veículos, registre cada abastecimento e confirme o posto sugerido pelo app. O Litro Certo calcula preço por litro, gasto mensal, rankings e histórico.</Text>
-        </View>
-        <View style={styles.helpBlock}>
-          <Text style={styles.itemTitle}>Quando usar?</Text>
-          <Text style={styles.helpText}>Use sempre que abastecer para guardar valor, litros, posto e data. Se esquecer de registrar na hora, você pode lançar depois escolhendo a data correta.</Text>
-        </View>
+        {faqItems.map((item) => (
+          <FaqItem
+            key={item.id}
+            item={item}
+            open={openItem === item.id}
+            onToggle={() => setOpenItem((current) => current === item.id ? null : item.id)}
+            styles={styles}
+          />
+        ))}
       </Section>
     </View>
   );
@@ -162,6 +227,34 @@ export function DemoBanner({
       <Pressable style={styles.demoBannerButton} onPress={onOpenAuth}>
         <Text style={styles.demoBannerButtonText}>Login</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function FaqItem({
+  item,
+  open,
+  onToggle,
+  styles
+}: {
+  item: { question: string; answers: string[] };
+  open: boolean;
+  onToggle: () => void;
+  styles: UtilityStyles;
+}) {
+  return (
+    <View style={styles.faqItem}>
+      <Pressable style={[styles.faqHeader, styles.pressableNoOutline]} onPress={onToggle}>
+        <Text style={styles.faqQuestion}>{item.question}</Text>
+        <Text style={styles.faqArrow}>{open ? "−" : "+"}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.faqAnswer}>
+          {item.answers.map((answer) => (
+            <Text key={answer} style={styles.helpText}>{answer}</Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }

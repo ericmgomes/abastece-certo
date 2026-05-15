@@ -36,6 +36,8 @@ export function Cars({
   onUpdate,
   onDeleteCar,
   styles,
+  initialEditingCarId,
+  onRouteEditChange,
   components
 }: {
   cars: Car[];
@@ -47,6 +49,8 @@ export function Cars({
   onUpdate: (car: Car) => void;
   onDeleteCar: (carId: string) => void;
   styles: VehicleStyles;
+  initialEditingCarId?: string | null;
+  onRouteEditChange?: (carId: string | null) => void;
   components: VehicleComponents;
 }) {
   const { Section, Empty } = components;
@@ -56,9 +60,28 @@ export function Cars({
     .map((car) => carSummary(car, logs))
     .sort((a, b) => b.total - a.total);
 
+  useEffect(() => {
+    if (!initialEditingCarId) {
+      return;
+    }
+
+    if (initialEditingCarId === "new") {
+      setEditingCarId("new");
+      setSelectedDetailsCarId(null);
+      return;
+    }
+
+    if (cars.some((car) => car.id === initialEditingCarId)) {
+      setEditingCarId(initialEditingCarId);
+      setSelectedDetailsCarId(initialEditingCarId);
+      onSelect(initialEditingCarId);
+    }
+  }, [initialEditingCarId, cars.length]);
+
   function openNewForm() {
     trackEvent("vehicle_form_opened", { mode: "new" });
     setEditingCarId("new");
+    onRouteEditChange?.("new");
   }
 
   function selectCarDetails(car: Car) {
@@ -69,6 +92,7 @@ export function Cars({
     onSelect(car.id);
     setSelectedDetailsCarId((current) => (current === car.id ? null : car.id));
     setEditingCarId(null);
+    onRouteEditChange?.(null);
   }
 
   function closeForm() {
@@ -76,6 +100,7 @@ export function Cars({
       mode: editingCarId === "new" ? "new" : "edit"
     });
     setEditingCarId(null);
+    onRouteEditChange?.(null);
   }
 
   return (
@@ -142,7 +167,11 @@ export function Cars({
                       });
                       onSelect(car.id);
                       setSelectedDetailsCarId(car.id);
-                      setEditingCarId((current) => (current === car.id ? null : car.id));
+                      setEditingCarId((current) => {
+                        const next = current === car.id ? null : car.id;
+                        onRouteEditChange?.(next);
+                        return next;
+                      });
                     }}
                   >
                     <Text style={styles.inlineIconButtonText}>✎</Text>
@@ -319,8 +348,8 @@ function CarEditor({
         </Pressable>
       </View>
       <View style={styles.fieldToastAnchor}>
-        <View style={styles.inlineField}>
-          <Text style={styles.inlineLabel}>Tipo</Text>
+        <View style={styles.blockField}>
+          <Text style={styles.blockLabel}>Tipo</Text>
           <View style={styles.choiceFieldWrap}>
             {vehicleTypes.map((type) => (
               <Choice
@@ -343,6 +372,7 @@ function CarEditor({
       </View>
       <View style={styles.fieldToastAnchor}>
         <BrandSelect
+          block
           value={brand}
           onFocus={() => setActiveField("brand")}
           onChange={updateCarField("brand", setBrand)}
@@ -350,28 +380,42 @@ function CarEditor({
         <FieldToast notice={notice} anchor="brand" styles={styles} />
       </View>
       <View style={styles.fieldToastAnchor}>
-        <Field label="Modelo" value={model} onFocus={() => setActiveField("model")} onChangeText={updateCarField("model", setModel)} />
+        <Field block label="Modelo" value={model} onFocus={() => setActiveField("model")} onChangeText={updateCarField("model", setModel)} />
         <FieldToast notice={notice} anchor="model" styles={styles} />
       </View>
-      <View style={styles.fieldToastAnchor}>
-        <Field
-          label="Km inicial"
-          value={initialOdometerKm}
-          keyboardType="numeric"
-          onFocus={() => setActiveField("initialOdometerKm")}
-          onChangeText={updateCarField("initialOdometerKm", updateInitialOdometerKm)}
-        />
-        <FieldToast notice={notice} anchor="initialOdometerKm" styles={styles} />
-      </View>
-      <View style={styles.fieldToastAnchor}>
-        <Field
-          label="Km atual"
-          value={currentOdometerKm}
-          keyboardType="numeric"
-          onFocus={() => setActiveField("currentOdometerKm")}
-          onChangeText={updateCarField("currentOdometerKm", (value) => setCurrentOdometerKm(value.replace(/[^\d,.]/g, "")))}
-        />
-        <FieldToast notice={notice} anchor="currentOdometerKm" styles={styles} />
+      <View style={styles.compactFieldRow}>
+        <View style={[styles.fieldToastAnchor, styles.odometerFieldColumn]}>
+          <View style={styles.compactBlockField}>
+            <Text style={styles.blockLabel}>Km inicial</Text>
+            <Field
+              block
+              hideLabel
+              label=""
+              value={initialOdometerKm}
+              keyboardType="numeric"
+              onFocus={() => setActiveField("initialOdometerKm")}
+              onChangeText={updateCarField("initialOdometerKm", updateInitialOdometerKm)}
+              style={styles.compactBlockInput}
+            />
+          </View>
+          <FieldToast notice={notice} anchor="initialOdometerKm" styles={styles} />
+        </View>
+        <View style={[styles.fieldToastAnchor, styles.odometerFieldColumn]}>
+          <View style={styles.compactBlockField}>
+            <Text style={styles.blockLabel}>Km atual</Text>
+            <Field
+              block
+              hideLabel
+              label=""
+              value={currentOdometerKm}
+              keyboardType="numeric"
+              onFocus={() => setActiveField("currentOdometerKm")}
+              onChangeText={updateCarField("currentOdometerKm", (value) => setCurrentOdometerKm(value.replace(/[^\d,.]/g, "")))}
+              style={styles.compactBlockInput}
+            />
+          </View>
+          <FieldToast notice={notice} anchor="currentOdometerKm" styles={styles} />
+        </View>
       </View>
     </View>
   );

@@ -60,10 +60,11 @@ export function SummaryScreen({
   const [vehicleFilterOpen, setVehicleFilterOpen] = useState(false);
   const [fuelFilterOpen, setFuelFilterOpen] = useState(false);
   const [periodFilterOpen, setPeriodFilterOpen] = useState(false);
-  const [selectedFuel, setSelectedFuel] = useState<FuelLog["fuel"] | null>(null);
+  const [selectedFuels, setSelectedFuels] = useState<FuelLog["fuel"][]>([]);
   const availableFuels = fuelTypesForLogs(logs);
-  const effectiveFuel = selectedFuel && availableFuels.includes(selectedFuel) ? selectedFuel : null;
-  const summaryLogs = effectiveFuel ? logs.filter((log) => log.fuel === effectiveFuel) : logs;
+  const effectiveFuels = selectedFuels.filter((fuel) => availableFuels.includes(fuel));
+  const hasFuelFilter = effectiveFuels.length > 0;
+  const summaryLogs = hasFuelFilter ? logs.filter((log) => effectiveFuels.includes(log.fuel)) : logs;
   const periodRange = selectedPeriodRange(summaryLogs, visibleMonth, summaryPeriod);
   const previousPeriodRangeValue = previousPeriodRange(summaryLogs, visibleMonth, summaryPeriod);
   const periodLogs = logsForRange(summaryLogs, periodRange);
@@ -85,7 +86,7 @@ export function SummaryScreen({
     ? metricTrend(periodCostPerKm, previousPeriodCostPerKm, "lower")
     : undefined;
   const chartData = monthlyChartData(summaryLogs, visibleMonth, chartMetric);
-  const fuelAverages = fuelAveragesForLogs(periodLogs);
+  const fuelAverages = fuelAveragesForLogs(logsForRange(logs, periodRange));
   const averageFuelPrice = periodLiters > 0 ? periodTotal / periodLiters : null;
   const visibleCars = cars.filter((car) => activeCarIds.includes(car.id));
   const insight = new SummaryInsightBuilder(periodLogs, previousPeriodLogs, stations, visibleCars, summaryLogs).build();
@@ -146,32 +147,23 @@ export function SummaryScreen({
                 }}
               >
                 <Text style={styles.summaryFilterIcon}>⛽</Text>
-                <Text style={styles.summaryFilterText} numberOfLines={1}>{fuelFilterLabel(effectiveFuel)}</Text>
+                <Text style={styles.summaryFilterText} numberOfLines={1}>{fuelFilterLabel(effectiveFuels, availableFuels)}</Text>
                 <Text style={styles.summaryFilterArrow}>{fuelFilterOpen ? "⌃" : "⌄"}</Text>
               </Pressable>
               {fuelFilterOpen ? (
                 <View style={styles.summaryFilterMenu}>
-                  <Pressable
-                    style={[styles.summaryFilterOption, styles.pressableNoOutline, !effectiveFuel && styles.summaryFilterOptionActive]}
-                    onPress={() => {
-                      trackEvent("fuel_filter_changed_from_summary", { fuel_type: "all" });
-                      setSelectedFuel(null);
-                      setFuelFilterOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.summaryFilterOptionText, !effectiveFuel && styles.summaryFilterOptionTextActive]}>Todos os combustíveis</Text>
-                    <Text style={[styles.summaryFilterCheck, !effectiveFuel && styles.summaryFilterOptionTextActive]}>{!effectiveFuel ? "✓" : ""}</Text>
-                  </Pressable>
                   {availableFuels.map((fuel) => {
-                    const active = fuel === effectiveFuel;
+                    const active = effectiveFuels.includes(fuel);
                     return (
                       <Pressable
                         key={fuel}
                         style={[styles.summaryFilterOption, styles.pressableNoOutline, active && styles.summaryFilterOptionActive]}
                         onPress={() => {
-                          trackEvent("fuel_filter_changed_from_summary", { fuel_type: fuel });
-                          setSelectedFuel(fuel);
-                          setFuelFilterOpen(false);
+                          const nextFuels = active
+                            ? effectiveFuels.filter((selected) => selected !== fuel)
+                            : [...effectiveFuels, fuel];
+                          trackEvent("fuel_filter_changed_from_summary", { fuel_type: nextFuels.join(",") || "all" });
+                          setSelectedFuels(nextFuels);
                         }}
                       >
                         <Text style={[styles.summaryFilterOptionText, active && styles.summaryFilterOptionTextActive]}>{fuel}</Text>
@@ -269,6 +261,7 @@ export function SummaryScreen({
             small
             trend={costPerKmTrend}
             active={chartMetric === "costPerKm"}
+            compact
             onPress={() => {
               trackEvent("summary_chart_metric_changed", { metric: "costPerKm" });
               setChartMetric("costPerKm");
@@ -282,6 +275,7 @@ export function SummaryScreen({
             trend={undefined}
             muted
             active={chartMetric === "efficiency"}
+            compact
             onPress={() => {
               trackEvent("summary_chart_metric_changed", { metric: "efficiency" });
               setChartMetric("efficiency");
@@ -300,7 +294,7 @@ export function SummaryScreen({
               setChartMetric("pricePerLiter");
             }}
           />
-          {fuelAverages.slice(0, 4).map((fuel) => (
+          {fuelAverages.slice(0, 3).map((fuel) => (
             <MetricCard
               key={fuel.name}
               styles={styles}
@@ -308,14 +302,17 @@ export function SummaryScreen({
               value={`${formatCurrency(fuel.average)}/L`}
               small
               trend={undefined}
-              active={chartMetric === "pricePerLiter" && effectiveFuel === fuel.name}
+              active={effectiveFuels.includes(fuel.name)}
               compact
               onPress={() => {
+                const active = effectiveFuels.includes(fuel.name);
+                const nextFuels = active
+                  ? effectiveFuels.filter((selected) => selected !== fuel.name)
+                  : [...effectiveFuels, fuel.name];
                 trackEvent("fuel_average_clicked", {
-                  fuel_type: fuel.name
+                  fuel_type: nextFuels.join(",") || "all"
                 });
-                setSelectedFuel(fuel.name);
-                setChartMetric("pricePerLiter");
+                setSelectedFuels(nextFuels);
               }}
             />
           ))}
@@ -672,12 +669,16 @@ function fuelTypesForLogs(logs: FuelLog[]): FuelLog["fuel"][] {
   return Array.from(new Set(logs.map((log) => log.fuel))).sort();
 }
 
-function fuelFilterLabel(fuel: FuelLog["fuel"] | null) {
-  if (!fuel) {
+function fuelFilterLabel(fuels: FuelLog["fuel"][], availableFuels: FuelLog["fuel"][]) {
+  if (fuels.length === 0 || fuels.length === availableFuels.length) {
     return "Todos os combustíveis";
   }
 
-  return fuel;
+  if (fuels.length === 1) {
+    return fuels[0];
+  }
+
+  return `${fuels.length} combustíveis`;
 }
 
 function periodFilterLabel(period: SummaryPeriod) {

@@ -274,7 +274,7 @@ export function Tabs({
   };
   const icons: Record<AppTab, string> = {
     Resumo: "📊",
-    IA: "✨",
+    IA: "✦",
     Abastecimentos: "⛽",
     Postos: "📍",
     Veículos: "🚗"
@@ -294,7 +294,7 @@ export function Tabs({
             ]}
             onPress={() => onChange(tab)}
           >
-            <Text style={[styles.tabIcon, active === tab && styles.activeTabText]}>{icons[tab]}</Text>
+            <Text style={[styles.tabIcon, active === tab && styles.activeTabText, tab === "IA" && styles.aiTabIcon]}>{icons[tab]}</Text>
             <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{labels[tab]}</Text>
           </Pressable>
         ))}

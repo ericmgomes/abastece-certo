@@ -56,6 +56,19 @@ type UtilityScreen = "help" | "privacy" | "users" | null;
 const storageKey = "litro-certo:v1";
 const guestStorageKey = "litro-certo:guest:v1";
 const appRepository = new SupabaseAppRepository();
+const tabSlugs: Record<Tab, string> = {
+  Resumo: "resumo",
+  IA: "ia",
+  Abastecimentos: "abastecimentos",
+  Postos: "postos",
+  Veículos: "veiculos"
+};
+
+const tabsBySlug = Object.entries(tabSlugs).reduce<Record<string, Tab>>((acc, [tabName, slug]) => {
+  acc[slug] = tabName as Tab;
+  return acc;
+}, {});
+
 function getAuthUserName(metadata: Record<string, unknown> | null | undefined) {
   const possibleName = metadata?.full_name ?? metadata?.name;
   if (typeof possibleName !== "string") {
@@ -142,6 +155,30 @@ function clearHashRoute() {
   history.replaceState({}, "", `${location.pathname}${location.search}`);
 }
 
+function routeParams() {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  if (!location) {
+    return new URLSearchParams();
+  }
+
+  return new URLSearchParams(location.search);
+}
+
+function replaceRouteParams(params: URLSearchParams) {
+  const location = (globalThis as unknown as { location?: Location }).location;
+  const history = (globalThis as unknown as { history?: History }).history;
+  if (!location || !history || location.pathname === "/oauth/consent") {
+    return;
+  }
+
+  const query = params.toString();
+  history.replaceState({}, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+}
+
+function appTabFromRoute() {
+  return tabsBySlug[routeParams().get("tab") ?? ""] ?? null;
+}
+
 type ThemeContextValue = {
   mode: ThemeMode;
   palette: ThemePalette;
@@ -171,6 +208,7 @@ export default function App() {
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>(initialAssistantMessages);
   const [fuelFormMode, setFuelFormMode] = useState<"closed" | "new" | "edit">("closed");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [routeEntityEditId, setRouteEntityEditId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const scrollRef = useRef<ScrollView>(null);
@@ -189,8 +227,87 @@ export default function App() {
       document.title = "LitroCerto";
       initAnalytics();
       trackEvent("app_loaded");
+
+      const params = routeParams();
+      const routeTab = appTabFromRoute();
+      if (routeTab) {
+        setTab(routeTab);
+      }
+
+      const utility = params.get("utility");
+      if (utility === "privacy" || utility === "users") {
+        setUtilityScreen(utility);
+      }
+
+      const form = params.get("form");
+      if (form === "fuel-new") {
+        setFuelFormMode("new");
+        setEditingLogId(null);
+        setUtilityScreen(null);
+      }
+
+      if (form === "fuel-edit" && params.get("log")) {
+        setFuelFormMode("edit");
+        setEditingLogId(params.get("log"));
+        setUtilityScreen(null);
+        setTab("Abastecimentos");
+      }
+
+      setRouteEntityEditId(params.has("new") ? "new" : params.get("edit"));
     }
   }, []);
+
+  useEffect(() => {
+    if (!ready || Platform.OS !== "web" || oauthConsentRoute || hasWhatsappTokenRoute()) {
+      return;
+    }
+
+    const params = routeParams();
+    params.set("tab", tabSlugs[tab]);
+
+    if (fuelFormMode === "new") {
+      params.set("form", "fuel-new");
+      params.delete("log");
+      params.delete("edit");
+      params.delete("new");
+      params.delete("utility");
+    } else if (fuelFormMode === "edit" && editingLogId) {
+      params.set("tab", tabSlugs.Abastecimentos);
+      params.set("form", "fuel-edit");
+      params.set("log", editingLogId);
+      params.delete("edit");
+      params.delete("new");
+      params.delete("utility");
+    } else {
+      params.delete("form");
+      params.delete("log");
+    }
+
+    if (utilityScreen) {
+      params.set("utility", utilityScreen);
+      params.delete("form");
+      params.delete("log");
+      params.delete("edit");
+      params.delete("new");
+    } else {
+      params.delete("utility");
+    }
+
+    if ((tab === "Postos" || tab === "Veículos") && routeEntityEditId && fuelFormMode === "closed" && !utilityScreen) {
+      if (routeEntityEditId === "new") {
+        params.set("new", "");
+        params.delete("edit");
+      } else {
+        params.set("edit", routeEntityEditId);
+        params.delete("new");
+      }
+    } else if (!["postos", "veiculos"].includes(params.get("tab") ?? "") || !routeEntityEditId) {
+      params.delete("edit");
+      params.delete("new");
+    }
+
+    replaceRouteParams(params);
+  }, [editingLogId, fuelFormMode, oauthConsentRoute, ready, routeEntityEditId, tab, utilityScreen]);
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -640,6 +757,46 @@ export default function App() {
     setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
   }
 
+  function openNewStationForm() {
+    trackEvent("station_form_opened", {
+      mode: "new",
+      source: "floating_button",
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
+    closeFuelForm();
+    setUtilityScreen(null);
+    setTab("Postos");
+    setRouteEntityEditId("new");
+    setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
+  }
+
+  function openNewVehicleForm() {
+    trackEvent("vehicle_form_opened", {
+      mode: "new",
+      source: "floating_button",
+      auth_state: ownerId ? "authenticated" : "guest"
+    });
+    closeFuelForm();
+    setUtilityScreen(null);
+    setTab("Veículos");
+    setRouteEntityEditId("new");
+    setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
+  }
+
+  function openContextualNewForm() {
+    if (tab === "Postos") {
+      openNewStationForm();
+      return;
+    }
+
+    if (tab === "Veículos") {
+      openNewVehicleForm();
+      return;
+    }
+
+    openNewFuelForm();
+  }
+
   function openEditFuelForm(logId: string) {
     if (editingLogId === logId) {
       closeFuelForm();
@@ -664,6 +821,18 @@ export default function App() {
     }
     setEditingLogId(null);
     setFuelFormMode("closed");
+  }
+
+  function shouldShowFloatingAddButton() {
+    if (fuelFormMode === "new") {
+      return false;
+    }
+
+    if ((tab === "Postos" || tab === "Veículos") && routeEntityEditId === "new") {
+      return false;
+    }
+
+    return true;
   }
 
   function changeTab(nextTab: Tab) {
@@ -776,6 +945,11 @@ export default function App() {
               trackEvent("vehicle_deleted", {
                 auth_state: ownerId ? "authenticated" : "guest"
               });
+              if (ownerId) {
+                appRepository.deleteVehicle(ownerId, carId).catch((error) => {
+                  console.warn("Não foi possível apagar o veículo no Supabase.", error);
+                });
+              }
               setState((current) => {
                 const cars = current.cars.filter((car) => car.id !== carId);
                 const logs = current.logs.filter((log) => log.carId !== carId);
@@ -791,6 +965,8 @@ export default function App() {
             }
           }
           styles={styles}
+          initialEditingCarId={routeEntityEditId}
+          onRouteEditChange={setRouteEntityEditId}
           components={{
             Section,
             Empty
@@ -855,6 +1031,11 @@ export default function App() {
               trackEvent("station_deleted", {
                 auth_state: ownerId ? "authenticated" : "guest"
               });
+              if (ownerId) {
+                appRepository.deleteStation(ownerId, stationId).catch((error) => {
+                  console.warn("Não foi possível apagar o posto no Supabase.", error);
+                });
+              }
               setState((current) => ({
                 ...current,
                 stations: current.stations.filter((station) => station.id !== stationId),
@@ -863,6 +1044,8 @@ export default function App() {
             }
           }
           styles={styles}
+          initialEditingStationId={routeEntityEditId}
+          onRouteEditChange={setRouteEntityEditId}
           theme={theme}
           components={{
             Section,
@@ -1051,11 +1234,18 @@ export default function App() {
                   styles={styles}
                   theme={theme}
                 />
-                <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+                <ScrollView
+                  ref={scrollRef}
+                  contentContainerStyle={[
+                    styles.content,
+                    fuelFormMode === "closed" && tab === "Resumo" && !utilityScreen ? styles.contentCompactBottom : null
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                >
                   {renderContent()}
                 </ScrollView>
-                {fuelFormMode !== "new" ? (
-                  <Pressable style={styles.floatingFuelButton} onPress={openNewFuelForm}>
+                {shouldShowFloatingAddButton() ? (
+                  <Pressable style={styles.floatingFuelButton} onPress={openContextualNewForm}>
                     <Text style={styles.floatingFuelButtonText}>+</Text>
                   </Pressable>
                 ) : null}

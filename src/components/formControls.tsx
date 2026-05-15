@@ -31,12 +31,14 @@ export function FormControlsProvider({
   );
 }
 
-export function Field(props: React.ComponentProps<typeof TextInput> & { label: string; compact?: boolean }) {
+export function Field(props: React.ComponentProps<typeof TextInput> & { label: string; compact?: boolean; block?: boolean; hideLabel?: boolean }) {
   const { styles, theme } = useFormControls();
-  const { label, compact, style, ...inputProps } = props;
+  const { label, compact, block, hideLabel, style, ...inputProps } = props;
   return (
-    <View style={[styles.inlineField, compact && styles.compactInlineField]}>
-      <Text style={[styles.inlineLabel, compact && styles.compactInlineLabel]}>{label}</Text>
+    <View style={[block ? styles.blockField : styles.inlineField, compact && styles.compactInlineField]}>
+      {hideLabel ? null : (
+        <Text style={[block ? styles.blockLabel : styles.inlineLabel, compact && styles.compactInlineLabel]}>{label}</Text>
+      )}
       <TextInput placeholderTextColor={theme.muted} style={[styles.input, style]} {...inputProps} />
     </View>
   );
@@ -45,11 +47,13 @@ export function Field(props: React.ComponentProps<typeof TextInput> & { label: s
 export function BrandSelect({
   value,
   onChange,
-  onFocus
+  onFocus,
+  block
 }: {
   value: string;
   onChange: (value: string) => void;
   onFocus?: () => void;
+  block?: boolean;
 }) {
   const { styles, theme } = useFormControls();
   const normalizedValue = value.trim();
@@ -62,8 +66,8 @@ export function BrandSelect({
 
   if (Platform.OS === "web") {
     return (
-      <View style={styles.inlineField}>
-        <Text style={styles.inlineLabel}>Marca</Text>
+      <View style={block ? styles.blockField : styles.inlineField}>
+        <Text style={block ? styles.blockLabel : styles.inlineLabel}>Marca</Text>
         {React.createElement(
           "select",
           {
@@ -86,6 +90,7 @@ export function BrandSelect({
   return (
     <Field
       label="Marca"
+      block={block}
       value={value}
       onFocus={onFocus}
       onChangeText={selectValue}
@@ -122,8 +127,8 @@ export function DateSelector({
   }
 
   return (
-    <View style={styles.inlineField}>
-      <Text style={styles.inlineLabel}>{label}</Text>
+    <View style={styles.dateField}>
+      <Text style={styles.dateFieldLabel}>{label}</Text>
       <View style={styles.dateSelector}>
         <NumberSelect
           value={parsedDay}
@@ -177,8 +182,8 @@ export function TimeSelector({
   }
 
   return (
-    <View style={styles.inlineField}>
-      <Text style={styles.inlineLabel}>{label}</Text>
+    <View style={styles.dateField}>
+      <Text style={styles.dateFieldLabel}>{label}</Text>
       <View style={styles.timeSelector}>
         <NumberSelect
           value={parsedHour}
@@ -217,38 +222,21 @@ export function DateTimeSelector({
   onFocus?: () => void;
 }) {
   const { styles } = useFormControls();
-  const [day = "", month = "", year = ""] = date.split("-");
-  const [hour = "", minute = "", second = ""] = time.split(":");
-  const now = new Date();
-  const parsedDay = clampNumber(day, 1, 31, now.getDate());
-  const parsedMonth = clampNumber(month, 1, 12, now.getMonth() + 1);
-  const parsedYear = clampNumber(year, 1970, 2100, now.getFullYear());
-  const parsedHour = clampNumber(hour, 0, 23, now.getHours());
-  const parsedMinute = clampNumber(minute, 0, 59, now.getMinutes());
-  const parsedSecond = clampNumber(second, 0, 59, 0);
-  const maxDay = new Date(parsedYear, parsedMonth, 0).getDate();
-
-  function updateDate(nextDay: number, nextMonth: number, nextYear: number) {
-    const safeMonth = clamp(nextMonth, 1, 12);
-    const safeYear = clamp(nextYear, 1970, 2100);
-    const safeDay = clamp(nextDay, 1, new Date(safeYear, safeMonth, 0).getDate());
-    onDateChange(`${pad2(safeDay)}-${pad2(safeMonth)}-${safeYear}`);
-  }
-
-  function updateTime(nextHour: number, nextMinute: number) {
-    onTimeChange(`${pad2(clamp(nextHour, 0, 23))}:${pad2(clamp(nextMinute, 0, 59))}:${pad2(parsedSecond)}`);
-  }
 
   return (
-    <View style={styles.inlineField}>
-      <Text style={styles.inlineLabel}>{label}</Text>
-      <View style={styles.dateTimeSelector}>
-        <NumberSelect value={parsedDay} min={1} max={maxDay} digits={2} onFocus={onFocus} onChange={(nextDay) => updateDate(nextDay, parsedMonth, parsedYear)} />
-        <NumberSelect value={parsedMonth} min={1} max={12} digits={1} onFocus={onFocus} onChange={(nextMonth) => updateDate(parsedDay, nextMonth, parsedYear)} />
-        <NumberSelect value={parsedYear} min={1970} max={2100} digits={4} wide onFocus={onFocus} onChange={(nextYear) => updateDate(parsedDay, parsedMonth, nextYear)} />
-        <NumberSelect value={parsedHour} min={0} max={23} digits={2} onFocus={onFocus} onChange={(nextHour) => updateTime(nextHour, parsedMinute)} />
-        <NumberSelect value={parsedMinute} min={0} max={59} digits={2} onFocus={onFocus} onChange={(nextMinute) => updateTime(parsedHour, nextMinute)} />
-      </View>
+    <View style={styles.dateTimeSplit}>
+      <DateSelector
+        label="Data"
+        value={date}
+        onChange={onDateChange}
+        onFocus={onFocus}
+      />
+      <TimeSelector
+        label="Hora"
+        value={time}
+        onChange={onTimeChange}
+        onFocus={onFocus}
+      />
     </View>
   );
 }
@@ -321,11 +309,13 @@ function NumberSelect({
 export function StateSelect({
   value,
   onChange,
-  onFocus
+  onFocus,
+  block
 }: {
   value: string;
   onChange: (value: string) => void;
   onFocus?: () => void;
+  block?: boolean;
 }) {
   const { styles, theme } = useFormControls();
   const normalizedValue = value.trim().toUpperCase();
@@ -342,7 +332,7 @@ export function StateSelect({
         value: brazilStates.includes(normalizedValue) ? normalizedValue : "",
         onFocus,
         onChange: (event: { target: { value: string } }) => selectValue(event.target.value),
-        style: StyleSheet.flatten(styles.stateSelect) as never
+        style: StyleSheet.flatten([styles.stateSelect, block && styles.stateSelectCompact]) as never
       },
       [
         React.createElement("option", { key: "empty", value: "" }, "UF"),
@@ -362,7 +352,7 @@ export function StateSelect({
       placeholderTextColor={theme.muted}
       autoCapitalize="characters"
       maxLength={2}
-      style={styles.stateSelect}
+      style={[styles.stateSelect, block && styles.stateSelectCompact]}
     />
   );
 }

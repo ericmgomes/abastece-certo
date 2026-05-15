@@ -51,10 +51,6 @@ type FuelLogRow = {
   longitude: number | null;
 };
 
-type PersistedRow = {
-  id: string;
-};
-
 export class SupabaseAppRepository {
   async load(ownerId: string): Promise<Partial<AppState> | null> {
     if (!ownerId) {
@@ -128,8 +124,24 @@ export class SupabaseAppRepository {
     await this.upsertRows("cars", state.cars.map((car) => this.carToRow(ownerId, car)));
     await this.upsertRows("stations", state.stations.map((station) => this.stationToRow(ownerId, station)));
     await this.upsertRows("fuel_logs", state.logs.map((log) => this.logToRow(ownerId, log)));
-    await this.deleteMissingRows("cars", ownerId, state.cars.map((car) => car.id));
-    await this.deleteMissingRows("stations", ownerId, state.stations.map((station) => station.id));
+  }
+
+  async deleteVehicle(ownerId: string, carId: string) {
+    if (!ownerId || !carId) {
+      return;
+    }
+
+    await this.deleteRows("fuel_logs", ownerId, "car_id", carId);
+    await this.deleteRows("cars", ownerId, "id", carId);
+  }
+
+  async deleteStation(ownerId: string, stationId: string) {
+    if (!ownerId || !stationId) {
+      return;
+    }
+
+    await this.deleteRows("fuel_logs", ownerId, "station_id", stationId);
+    await this.deleteRows("stations", ownerId, "id", stationId);
   }
 
   async listUserSummaries(): Promise<UserSummary[]> {
@@ -185,24 +197,16 @@ export class SupabaseAppRepository {
     }
   }
 
-  private async deleteMissingRows(table: "cars" | "stations" | "fuel_logs", ownerId: string, keptIds: string[]) {
-    if (keptIds.length === 0) {
-      return;
+  private async deleteRows(
+    table: "cars" | "stations" | "fuel_logs",
+    ownerId: string,
+    column: "id" | "car_id" | "station_id",
+    value: string
+  ) {
+    const deleteResult = await supabase.from(table).delete().eq("owner_id", ownerId).eq(column, value);
+    if (deleteResult.error) {
+      throw deleteResult.error;
     }
-
-    const existingResult = await supabase.from(table).select("id").eq("owner_id", ownerId);
-    if (existingResult.error) {
-      throw existingResult.error;
-    }
-
-    const kept = new Set(keptIds);
-    const rowsToDelete = ((existingResult.data ?? []) as PersistedRow[]).filter((row) => !kept.has(row.id));
-    await Promise.all(rowsToDelete.map(async (row) => {
-      const deleteResult = await supabase.from(table).delete().eq("owner_id", ownerId).eq("id", row.id);
-      if (deleteResult.error) {
-        throw deleteResult.error;
-      }
-    }));
   }
 
   private countByOwner(rows: Array<{ owner_id?: string }>) {

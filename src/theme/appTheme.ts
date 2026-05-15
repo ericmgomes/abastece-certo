@@ -779,6 +779,42 @@ export function createStyles(theme: Theme) {
   helpBlock: {
     gap: 5
   },
+  faqItem: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: glassBorder,
+    backgroundColor: glassSurface,
+    overflow: "hidden"
+  },
+  faqHeader: {
+    minHeight: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  faqQuestion: {
+    flex: 1,
+    color: theme.text,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
+  },
+  faqArrow: {
+    color: theme.primary,
+    fontSize: 24,
+    lineHeight: 26,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  faqAnswer: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 7
+  },
   helpText: {
     color: theme.text,
     fontSize: 16,
@@ -788,6 +824,9 @@ export function createStyles(theme: Theme) {
   content: {
     padding: 8,
     paddingBottom: 138
+  },
+  contentCompactBottom: {
+    paddingBottom: 148
   },
   stack: {
     gap: 10
@@ -1241,7 +1280,7 @@ export function createStyles(theme: Theme) {
   input: {
     flex: 1,
     minWidth: 0,
-    minHeight: 44,
+    minHeight: 46,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 8,
@@ -1263,7 +1302,7 @@ export function createStyles(theme: Theme) {
   },
   formStack: {
     position: "relative",
-    gap: 8
+    gap: 12
   },
   fieldToastAnchor: {
     position: "relative"
@@ -1271,23 +1310,57 @@ export function createStyles(theme: Theme) {
   compactFieldRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 6
+    gap: 4
   },
   compactFieldToastAnchor: {
     position: "relative",
     flex: 1,
     minWidth: 0
   },
+  cityFieldColumn: {
+    flex: 1,
+    minWidth: 0
+  },
+  stateFieldColumn: {
+    width: 86
+  },
+  odometerFieldColumn: {
+    width: 140,
+    maxWidth: "48%"
+  },
+  blockField: {
+    gap: 7,
+    alignItems: "stretch"
+  },
+  blockLabel: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily,
+    lineHeight: 18
+  },
+  compactBlockField: {
+    gap: 7,
+    alignItems: "stretch"
+  },
+  compactBlockInput: {
+    flex: 1,
+    width: "100%"
+  },
+  fuelOdometerField: {
+    width: 150,
+    maxWidth: "52%"
+  },
   inlineField: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    minHeight: 44
+    gap: 6,
+    minHeight: 38
   },
   inlineLabel: {
-    width: 88,
+    width: 74,
     color: theme.text,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -1300,38 +1373,51 @@ export function createStyles(theme: Theme) {
     minWidth: 0
   },
   dateSelector: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     minWidth: 0
   },
   timeSelector: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     minWidth: 0,
     justifyContent: "flex-start"
+  },
+  dateTimeSplit: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start"
+  },
+  dateField: {
+    gap: 4
+  },
+  dateFieldLabel: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "800",
+    fontFamily: theme.fontFamily
   },
   dateTimeSelector: {
     flex: 1,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 4,
+    justifyContent: "flex-start",
+    gap: 3,
     minWidth: 0
   },
   numberSelect: {
-    width: 49,
-    minHeight: 36,
+    width: 43,
+    minHeight: 34,
     borderWidth: 1,
     borderColor: glassBorder,
     borderRadius: 8,
     backgroundColor: theme.input,
     color: theme.text,
     textAlign: "center",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
     fontFamily: theme.fontFamily
   },
@@ -1343,13 +1429,12 @@ export function createStyles(theme: Theme) {
   },
   compactInlineLabel: {
     width: "auto",
-    fontSize: 13
+    fontSize: 12
   },
   numberSelectWide: {
-    width: 68
+    width: 58
   },
   stateSelect: {
-    flex: 1,
     minWidth: 0,
     minHeight: 40,
     borderWidth: 1,
@@ -1361,6 +1446,10 @@ export function createStyles(theme: Theme) {
     fontSize: 17,
     fontWeight: "800",
     fontFamily: theme.fontFamily
+  },
+  stateSelectCompact: {
+    width: 82,
+    flex: 0
   },
   dateInput: {
     flex: 1,
@@ -1501,7 +1590,7 @@ export function createStyles(theme: Theme) {
     minWidth: 0,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 7
   },
   choice: {
     borderRadius: 8,
@@ -1518,7 +1607,7 @@ export function createStyles(theme: Theme) {
   choiceText: {
     color: theme.text,
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: theme.fontFamily
   },
   choiceTextActive: {
@@ -1572,6 +1661,30 @@ export function createStyles(theme: Theme) {
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 10
+  },
+  resultValue: {
+    color: theme.text,
+    fontSize: 22,
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
+  },
+  priceInlineBox: {
+    minHeight: 46,
+    borderRadius: 8,
+    backgroundColor: theme.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8
+  },
+  priceInlineLabel: {
+    color: theme.text,
+    opacity: 0.9
+  },
+  priceInlineValue: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
   },
   assistantDemoNotice: {
     borderRadius: 8,
@@ -2189,6 +2302,9 @@ export function createStyles(theme: Theme) {
     fontWeight: "900",
     textAlign: "center",
     fontFamily: theme.fontFamily
+  },
+  aiTabIcon: {
+    color: "#E53935"
   },
   activeTabText: {
     color: "#FFFFFF"

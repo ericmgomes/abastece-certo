@@ -36,6 +36,8 @@ export function Stations({
   onUpdate,
   onDeleteStation,
   styles,
+  initialEditingStationId,
+  onRouteEditChange,
   theme,
   components
 }: {
@@ -49,6 +51,8 @@ export function Stations({
   onUpdate: (station: Station) => void;
   onDeleteStation: (stationId: string) => void;
   styles: StationStyles;
+  initialEditingStationId?: string | null;
+  onRouteEditChange?: (stationId: string | null) => void;
   theme: StationTheme;
   components: StationComponents;
 }) {
@@ -64,11 +68,29 @@ export function Stations({
     }))
     .sort((a, b) => (a.ranking?.average ?? Number.POSITIVE_INFINITY) - (b.ranking?.average ?? Number.POSITIVE_INFINITY));
 
+  useEffect(() => {
+    if (!initialEditingStationId) {
+      return;
+    }
+
+    if (initialEditingStationId === "new") {
+      setEditingStationId("new");
+      setSelectedStationId(null);
+      return;
+    }
+
+    if (stations.some((station) => station.id === initialEditingStationId)) {
+      setEditingStationId(initialEditingStationId);
+      setSelectedStationId(initialEditingStationId);
+    }
+  }, [initialEditingStationId, stations.length]);
+
   function openNewForm() {
     trackEvent("station_form_opened", {
       mode: "new"
     });
     setEditingStationId("new");
+    onRouteEditChange?.("new");
   }
 
   return (
@@ -85,7 +107,10 @@ export function Stations({
           <View style={styles.inlineEditGroup}>
             <View style={styles.sectionTitleRow}>
               <Text style={styles.sectionTitle}>Adicionar posto</Text>
-              <Pressable style={styles.closeButton} onPress={() => setEditingStationId(null)}>
+              <Pressable style={styles.closeButton} onPress={() => {
+                setEditingStationId(null);
+                onRouteEditChange?.(null);
+              }}>
                 <Text style={styles.closeButtonText}>×</Text>
               </Pressable>
             </View>
@@ -94,7 +119,10 @@ export function Stations({
                 onSave={onSave}
                 onUpdate={onUpdate}
                 onDelete={onDeleteStation}
-                onCancel={() => setEditingStationId(null)}
+                onCancel={() => {
+                  setEditingStationId(null);
+                  onRouteEditChange?.(null);
+                }}
                 styles={styles}
                 components={components}
               />
@@ -121,6 +149,7 @@ export function Stations({
                   });
                   setSelectedStationId((current) => (current === station.id ? null : station.id));
                   setEditingStationId(null);
+                  onRouteEditChange?.(null);
                 }}
               >
                 <View style={styles.rankingInfo}>
@@ -138,7 +167,11 @@ export function Stations({
                         mode: editingStationId === station.id ? "close_edit" : "edit"
                       });
                       setSelectedStationId(station.id);
-                      setEditingStationId((current) => (current === station.id ? null : station.id));
+                      setEditingStationId((current) => {
+                        const next = current === station.id ? null : station.id;
+                        onRouteEditChange?.(next);
+                        return next;
+                      });
                     }}
                   >
                     <Text style={styles.inlineIconButtonText}>✎</Text>
@@ -157,7 +190,10 @@ export function Stations({
                         onSave={onSave}
                         onUpdate={onUpdate}
                         onDelete={onDeleteStation}
-                        onCancel={() => setEditingStationId(null)}
+                        onCancel={() => {
+                          setEditingStationId(null);
+                          onRouteEditChange?.(null);
+                        }}
                         styles={styles}
                         components={components}
                       />
@@ -343,34 +379,37 @@ function StationEditor({
         </Pressable>
       </View>
       <View style={styles.fieldToastAnchor}>
-        <Field label="Nome" value={name} onFocus={() => setActiveField("name")} onChangeText={updateStationField("name", setName)} />
+        <Field block label="Nome" value={name} onFocus={() => setActiveField("name")} onChangeText={updateStationField("name", setName)} />
         <FieldToast notice={notice} anchor="name" styles={styles} />
       </View>
       <View style={styles.fieldToastAnchor}>
-        <Field label="Endereço" value={address} onFocus={() => setActiveField("address")} onChangeText={updateStationField("address", setAddress)} />
+        <Field block label="Endereço" value={address} onFocus={() => setActiveField("address")} onChangeText={updateStationField("address", setAddress)} />
         <FieldToast notice={notice} anchor="address" styles={styles} />
       </View>
-      <View style={styles.fieldToastAnchor}>
-        <Field label="Cidade" value={city} onFocus={() => setActiveField("city")} onChangeText={updateStationField("city", setCity)} />
-        <FieldToast notice={notice} anchor="city" styles={styles} />
-      </View>
-      <View style={styles.fieldToastAnchor}>
-        <View style={styles.inlineField}>
-          <Text style={styles.inlineLabel}>Estado</Text>
-          <StateSelect
-            value={stateName}
-            onFocus={() => setActiveField("state")}
-            onChange={(value: string) => {
-              setActiveField("state");
-              trackEvent("station_field_changed", {
-                field: "state",
-                mode: station ? "edit" : draftStation ? "draft" : "new"
-              });
-              setStateName(value);
-            }}
-          />
+      <View style={styles.compactFieldRow}>
+        <View style={[styles.fieldToastAnchor, styles.cityFieldColumn]}>
+          <Field block label="Cidade" value={city} onFocus={() => setActiveField("city")} onChangeText={updateStationField("city", setCity)} />
+          <FieldToast notice={notice} anchor="city" styles={styles} />
         </View>
-        <FieldToast notice={notice} anchor="state" styles={styles} />
+        <View style={[styles.fieldToastAnchor, styles.stateFieldColumn]}>
+          <View style={styles.blockField}>
+            <Text style={styles.blockLabel}>Estado</Text>
+            <StateSelect
+              block
+              value={stateName}
+              onFocus={() => setActiveField("state")}
+              onChange={(value: string) => {
+                setActiveField("state");
+                trackEvent("station_field_changed", {
+                  field: "state",
+                  mode: station ? "edit" : draftStation ? "draft" : "new"
+                });
+                setStateName(value);
+              }}
+            />
+          </View>
+          <FieldToast notice={notice} anchor="state" styles={styles} />
+        </View>
       </View>
     </View>
   );

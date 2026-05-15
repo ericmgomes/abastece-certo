@@ -246,8 +246,8 @@ export function RegisterFuel({
             </View>
 
             <View style={styles.fieldToastAnchor}>
-              <View style={styles.inlineField}>
-                <Text style={styles.inlineLabel}>Veículo</Text>
+              <View style={styles.blockField}>
+                <Text style={styles.blockLabel}>Veículo</Text>
                 <View style={styles.choiceFieldWrap}>
                   {cars.map((car) => (
                     <Choice
@@ -268,8 +268,29 @@ export function RegisterFuel({
             </View>
 
             <View style={styles.fieldToastAnchor}>
-              <View style={styles.inlineField}>
-                <Text style={styles.inlineLabel}>Combustível</Text>
+              <View style={[styles.compactBlockField, styles.fuelOdometerField]}>
+                <Text style={styles.blockLabel}>Km</Text>
+                <Field
+                  block
+                  hideLabel
+                  label=""
+                  value={odometerKm}
+                  onFocus={() => setActiveField("odometerKm")}
+                  onChangeText={(value: string) => {
+                    setActiveField("odometerKm");
+                    setDirty(true);
+                    setOdometerKm(value);
+                  }}
+                  keyboardType="decimal-pad"
+                  style={styles.compactBlockInput}
+                />
+              </View>
+              <FieldToast notice={notice} anchor="odometerKm" styles={styles} />
+            </View>
+
+            <View style={styles.fieldToastAnchor}>
+              <View style={styles.blockField}>
+                <Text style={styles.blockLabel}>Combustível</Text>
                 <View style={styles.choiceFieldWrap}>
                   {fuelOptions.map((item) => (
                     <Choice
@@ -320,32 +341,18 @@ export function RegisterFuel({
                 <FieldToast notice={notice} anchor="liters" styles={styles} />
               </View>
               <View style={styles.compactFieldToastAnchor}>
-                <Field
-                  label="Km"
-                  value={odometerKm}
-                  onFocus={() => setActiveField("odometerKm")}
-                  onChangeText={(value: string) => {
-                    setActiveField("odometerKm");
-                    setDirty(true);
-                    setOdometerKm(value);
-                  }}
-                  keyboardType="decimal-pad"
-                  compact
-                />
-                <FieldToast notice={notice} anchor="odometerKm" styles={styles} />
+                <View style={styles.compactInlineField}>
+                  <Text style={[styles.compactInlineLabel, styles.priceInlineLabel]}>Preço/L</Text>
+                  <View style={styles.priceInlineBox}>
+                    <Text style={styles.priceInlineValue}>{Number.isFinite(price) ? formatCurrency(price) : "R$ 0"}</Text>
+                  </View>
+                </View>
               </View>
-            </View>
-            <View style={styles.result}>
-              <Text style={styles.label}>Preço real por litro</Text>
-              <Text style={styles.bigValue}>{Number.isFinite(price) ? formatCurrency(price) : "R$ 0"}</Text>
-              {parsedOdometerKm ? (
-                <Text style={styles.muted}>Km atual: {parsedOdometerKm.toLocaleString("pt-BR")} km</Text>
-              ) : null}
             </View>
 
             <View style={styles.fieldToastAnchor}>
-              <View style={styles.inlineField}>
-                <Text style={styles.inlineLabel}>Posto</Text>
+              <View style={styles.blockField}>
+                <Text style={styles.blockLabel}>Posto</Text>
                 <View style={styles.choiceFieldWrap}>
                   {stations.map((station) => (
                     <Choice
