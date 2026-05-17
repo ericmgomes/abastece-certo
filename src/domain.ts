@@ -60,7 +60,7 @@ export type AppState = {
 };
 
 export type ThemeMode = "light" | "dark";
-export type ThemePalette = "green" | "pink" | "blue" | "orange";
+export type ThemePalette = "green" | "pink" | "blue" | "orange" | "clean";
 
 export type UserSummary = {
   ownerId: string;

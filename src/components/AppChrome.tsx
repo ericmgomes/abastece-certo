@@ -231,6 +231,7 @@ export function ThemePalettePicker({
 }) {
   const options: Array<{ value: ThemePalette; color: string; label: string }> = [
     { value: "blue", color: "#1D6FD6", label: "Azul" },
+    { value: "clean", color: "#17C6C3", label: "Clean" },
     { value: "green", color: "#178A4A", label: "Verde" },
     { value: "pink", color: "#D63384", label: "Rosa" },
     { value: "orange", color: "#D66A1D", label: "Laranja" }

@@ -323,7 +323,7 @@ function StationEditor({
 
       setDraftStation(payload);
       onSave(payload);
-      showFieldNotice(setNotice, "Posto criado.", activeField);
+      showFieldNotice(setNotice, "Novo posto criado.", activeField);
     }, 800);
 
     return () => {

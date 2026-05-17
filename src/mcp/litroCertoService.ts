@@ -91,7 +91,7 @@ export class LitroCertoMcpService {
     });
     await this.ensureProfile();
     await this.upsertVehicle(vehicle);
-    return vehicle;
+    return withUserMessage(vehicle, `Pronto. Veículo ${vehicle.nickname} criado.`);
   }
 
   async updateVehicle(input: {
@@ -111,7 +111,7 @@ export class LitroCertoMcpService {
       model
     });
     await this.upsertVehicle(updated);
-    return updated;
+    return withUserMessage(updated, `Pronto. Veículo ${updated.nickname} atualizado.`);
   }
 
   async listStations() {
@@ -142,7 +142,7 @@ export class LitroCertoMcpService {
     };
     await this.ensureProfile();
     await this.upsertStation(station);
-    return station;
+    return withUserMessage(station, `Pronto. Posto ${station.name} criado.`);
   }
 
   async updateStation(input: {
@@ -168,7 +168,7 @@ export class LitroCertoMcpService {
       longitude: coordinates.longitude
     };
     await this.upsertStation(updated);
-    return updated;
+    return withUserMessage(updated, `Pronto. Posto ${updated.name} atualizado.`);
   }
 
   async listFuelLogs(limit = 30) {
@@ -193,7 +193,7 @@ export class LitroCertoMcpService {
     latitude?: number;
     longitude?: number;
   }) {
-    await this.assertVehicleExists(input.carId);
+    const car = await this.getVehicle(input.carId);
     const station = await this.getStation(input.stationId);
     const sequence = await this.nextFuelLogSequence();
     const log = {
@@ -213,7 +213,7 @@ export class LitroCertoMcpService {
 
     await this.ensureProfile();
     await this.upsertFuelLog(log);
-    return log;
+    return withUserMessage(log, fuelLogUserMessage("registrado", log, car, station));
   }
 
   async updateFuelLog(input: {
@@ -255,7 +255,9 @@ export class LitroCertoMcpService {
       longitude: input.longitude ?? current.longitude
     };
     await this.upsertFuelLog(updated);
-    return updated;
+    const car = await this.getVehicle(updated.carId);
+    const station = await this.getStation(updated.stationId);
+    return withUserMessage(updated, fuelLogUserMessage("atualizado", updated, car, station));
   }
 
   async metrics(month?: string) {
@@ -536,4 +538,36 @@ function parseMonth(month?: string) {
   }
 
   return new Date(Number(match[1]), Number(match[2]) - 1, 1);
+}
+
+function withUserMessage<T extends object>(data: T, userMessage: string): T & { userMessage: string } {
+  return {
+    ...data,
+    userMessage
+  };
+}
+
+function fuelLogUserMessage(action: "registrado" | "atualizado", log: FuelLog, car: Car, station: Station) {
+  const sequence = log.sequence ? ` #${log.sequence}` : "";
+  const liters = formatNumber(log.liters);
+  const paid = formatCurrency(log.paid);
+  const price = formatCurrency(log.pricePerLiter);
+  const odometer = typeof log.odometerKm === "number" ? `, km ${formatNumber(log.odometerKm)}` : "";
+  return `Pronto. Abastecimento${sequence} ${action}: ${liters} L por ${paid} no ${car.nickname}, ${station.name}, ${log.fuel}${odometer}. Preço por litro: ${price}/L.`;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(value);
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: LitroCerto Actions API
-  description: Consulta e altera veículos, postos, abastecimentos e métricas da conta logada no LitroCerto.
+  description: Consulta e altera veículos, postos, abastecimentos e métricas da conta logada no LitroCerto. Para respostas ao usuário final, nunca mostre JSON bruto, IDs técnicos ou objetos de dados. Sempre transforme os resultados em texto natural em português. Quando a resposta incluir userMessage, use essa frase como base.
   version: 0.1.0
 servers:
   - url: https://app.litrocerto.com.br/api
@@ -253,6 +253,9 @@ components:
     Vehicle:
       type: object
       properties:
+        userMessage:
+          type: string
+          description: Mensagem pronta para mostrar ao usuário final em vez de JSON bruto.
         id:
           type: string
         vehicleType:
@@ -287,6 +290,9 @@ components:
     Station:
       type: object
       properties:
+        userMessage:
+          type: string
+          description: Mensagem pronta para mostrar ao usuário final em vez de JSON bruto.
         id:
           type: string
         name:
@@ -331,7 +337,11 @@ components:
           maxLength: 2
     FuelLog:
       type: object
+      description: Dados estruturados de abastecimento para uso da Action. Não mostre este objeto como JSON ao usuário final; resuma em português ou use userMessage.
       properties:
+        userMessage:
+          type: string
+          description: Mensagem pronta para mostrar ao usuário final em vez de JSON bruto.
         id:
           type: string
         sequence:

@@ -97,6 +97,15 @@ export function SummaryScreen({
   return (
     <View style={styles.summaryStack}>
       <Section title="">
+        {insight ? (
+          <View style={styles.aiInsightCard}>
+            <View style={styles.aiInsightHeader}>
+              <Text style={styles.aiInsightIcon}>✦</Text>
+              <Text style={styles.aiInsightBadge}>IA</Text>
+            </View>
+            <Text style={styles.aiInsightText}>{insight}</Text>
+          </View>
+        ) : null}
         {cars.length > 1 ? (
           <View style={[styles.summaryFilterBox, { zIndex: 30 }]}>
             <Pressable
@@ -324,15 +333,6 @@ export function SummaryScreen({
           <Bars data={chartData} styles={styles} Empty={Empty} />
         )}
 
-        {insight ? (
-          <View style={styles.aiInsightCard}>
-            <View style={styles.aiInsightHeader}>
-              <Text style={styles.aiInsightIcon}>✦</Text>
-              <Text style={styles.aiInsightBadge}>IA · Insight</Text>
-            </View>
-            <Text style={styles.aiInsightText}>{insight}</Text>
-          </View>
-        ) : null}
       </Section>
     </View>
   );

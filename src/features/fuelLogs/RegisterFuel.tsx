@@ -190,7 +190,7 @@ export function RegisterFuel({
     setDraftLog(newLog);
     onSave(newLog);
     setDirty(false);
-    showFieldNotice(setNotice, "Abastecimento criado.", feedbackField);
+    showFieldNotice(setNotice, "Novo abastecimento criado.", feedbackField);
     return true;
   }
 

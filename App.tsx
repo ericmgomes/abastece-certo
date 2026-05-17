@@ -1234,6 +1234,16 @@ export default function App() {
                   styles={styles}
                   theme={theme}
                 />
+                {!ownerId ? (
+                  <View style={styles.topDemoBannerWrap}>
+                    <DemoBanner onOpenAuth={() => {
+                      trackEvent("login_opened", {
+                        source: "demo_banner"
+                      });
+                      setAuthScreenOpen(true);
+                    }} styles={styles} />
+                  </View>
+                ) : null}
                 <ScrollView
                   ref={scrollRef}
                   contentContainerStyle={[
@@ -1248,14 +1258,6 @@ export default function App() {
                   <Pressable style={styles.floatingFuelButton} onPress={openContextualNewForm}>
                     <Text style={styles.floatingFuelButtonText}>+</Text>
                   </Pressable>
-                ) : null}
-                {!ownerId ? (
-                  <DemoBanner onOpenAuth={() => {
-                    trackEvent("login_opened", {
-                      source: "demo_banner"
-                    });
-                    setAuthScreenOpen(true);
-                  }} styles={styles} />
                 ) : null}
                 <Tabs active={utilityScreen || fuelFormMode === "new" ? null : tab} onChange={changeTab} styles={styles} />
               </KeyboardAvoidingView>

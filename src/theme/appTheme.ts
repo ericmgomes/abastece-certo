@@ -140,13 +140,52 @@ export function buildTheme(mode: ThemeMode, palette: ThemePalette) {
         fontFamily: blueFont,
         headingFontFamily: blueFont
       }
+    },
+    clean: {
+      light: {
+        background: "#FBFCFD",
+        surface: "#FFFFFF",
+        surfaceAlt: "#F7FAFB",
+        border: "#E6EDF1",
+        text: "#303344",
+        muted: "#8A94A3",
+        primary: "#17C6C3",
+        primaryDark: "#0F8F8D",
+        primarySoft: "#E8FAF9",
+        accent: "#7FE0DC",
+        danger: "#E05252",
+        success: "#16A085",
+        input: "#FFFFFF",
+        map: "#EEF7F7",
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
+      },
+      dark: {
+        background: "#0B1216",
+        surface: "#121C22",
+        surfaceAlt: "#18252C",
+        border: "#2B3A42",
+        text: "#F7FBFC",
+        muted: "#A9B6BE",
+        primary: "#4FD9D4",
+        primaryDark: "#1BA5A0",
+        primarySoft: "#163B3D",
+        accent: "#9DEAE7",
+        danger: "#FF7777",
+        success: "#5FE0B9",
+        input: "#0E171C",
+        map: "#142B30",
+        fontFamily: blueFont,
+        headingFontFamily: blueFont
+      }
     }
   };
 
-  const selected = palettes[palette][mode];
+  const selectedPalette = palettes[palette] ?? palettes.blue;
+  const selected = selectedPalette[mode] ?? selectedPalette.light;
   return {
       mode,
-      palette,
+      palette: palettes[palette] ? palette : "blue",
       ...selected
   };
 }
@@ -429,10 +468,6 @@ export function createStyles(theme: Theme) {
     fontFamily: theme.fontFamily
   },
   demoBanner: {
-    position: "absolute",
-    left: 12,
-    right: 82,
-    bottom: 70,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.border,
@@ -827,6 +862,11 @@ export function createStyles(theme: Theme) {
   },
   contentCompactBottom: {
     paddingBottom: 148
+  },
+  topDemoBannerWrap: {
+    paddingHorizontal: 8,
+    paddingBottom: 6,
+    zIndex: 12
   },
   stack: {
     gap: 10
@@ -2290,7 +2330,7 @@ export function createStyles(theme: Theme) {
   },
   tabText: {
     color: theme.muted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
     textAlign: "center",
     fontFamily: theme.fontFamily
