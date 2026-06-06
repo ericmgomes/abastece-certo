@@ -79,8 +79,9 @@ export function HelpScreen({
       id: "claude",
       question: "Como conversar com o LitroCerto pelo Claude?",
       answers: [
-        "No Claude, você pode adicionar o conector MCP remoto do LitroCerto para consultar métricas e interagir com seus dados.",
-        "Com o conector, você pode pedir ao Claude para consultar gastos e preparar registros. Quando estiver usando recursos de voz ou imagem no Claude, isso facilita transformar uma fala ou foto da bomba em um abastecimento para revisar e salvar.",
+        "Com o Claude, você pode registrar abastecimentos por texto, voz ou foto da bomba, além de consultar seus gastos e métricas.",
+        "Para isso, adicione o conector MCP remoto do LitroCerto. Com ele, o Claude consegue preparar registros de abastecimento a partir do que você escrever, falar ou mostrar em uma imagem.",
+        "Por exemplo: você pode enviar uma foto da bomba ou dizer por voz quanto pagou, o preço por litro, o combustível, o veículo e o posto. O Claude prepara o abastecimento para você revisar e salvar.",
         "Depois de conectar, o Claude também pedirá autorização para acessar apenas os dados da sua conta.",
         "1. Abra o Claude e entre em Configurações.",
         "2. Vá em Conectores e escolha adicionar um conector personalizado.",
