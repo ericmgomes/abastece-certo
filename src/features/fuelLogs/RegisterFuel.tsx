@@ -371,7 +371,7 @@ export function RegisterFuel({
             <View style={styles.compactFieldRow}>
               <View style={styles.compactFieldToastAnchor}>
                 <Field
-                  label="Valor"
+                  label="Valor (R$)"
                   value={paid}
                   onFocus={() => setActiveField("paid")}
                   onBlur={() => savePendingFuelLog("paid")}
@@ -384,6 +384,22 @@ export function RegisterFuel({
                   compact
                 />
                 <FieldToast notice={notice} anchor="paid" styles={styles} />
+              </View>
+              <View style={styles.compactFieldToastAnchor}>
+                <Field
+                  label="Preço/L (R$)"
+                  value={pricePerLiter}
+                  onFocus={() => setActiveField("pricePerLiter")}
+                  onBlur={() => savePendingFuelLog("pricePerLiter")}
+                  onChangeText={(value: string) => {
+                    setActiveField("pricePerLiter");
+                    markDirty();
+                    updatePricePerLiter(value);
+                  }}
+                  keyboardType="decimal-pad"
+                  compact
+                />
+                <FieldToast notice={notice} anchor="pricePerLiter" styles={styles} />
               </View>
               <View style={styles.compactFieldToastAnchor}>
                 <Field
@@ -400,22 +416,6 @@ export function RegisterFuel({
                   compact
                 />
                 <FieldToast notice={notice} anchor="liters" styles={styles} />
-              </View>
-              <View style={styles.compactFieldToastAnchor}>
-                <Field
-                  label="Preço/L"
-                  value={pricePerLiter}
-                  onFocus={() => setActiveField("pricePerLiter")}
-                  onBlur={() => savePendingFuelLog("pricePerLiter")}
-                  onChangeText={(value: string) => {
-                    setActiveField("pricePerLiter");
-                    markDirty();
-                    updatePricePerLiter(value);
-                  }}
-                  keyboardType="decimal-pad"
-                  compact
-                />
-                <FieldToast notice={notice} anchor="pricePerLiter" styles={styles} />
               </View>
             </View>
 

@@ -66,7 +66,7 @@ export function SummaryScreen({
   const hasFuelFilter = effectiveFuels.length > 0;
   const summaryLogs = hasFuelFilter ? logs.filter((log) => effectiveFuels.includes(log.fuel)) : logs;
   const periodRange = selectedPeriodRange(summaryLogs, visibleMonth, summaryPeriod);
-  const previousPeriodRangeValue = previousPeriodRange(summaryLogs, visibleMonth, summaryPeriod);
+  const previousPeriodRangeValue = previousPeriodRange(summaryLogs, visibleMonth, summaryPeriod, periodRange);
   const periodLogs = logsForRange(summaryLogs, periodRange);
   const previousPeriodLogs = previousPeriodRangeValue ? logsForRange(summaryLogs, previousPeriodRangeValue) : [];
   const periodTotal = periodLogs.reduce((sum, log) => sum + log.paid, 0);
@@ -572,12 +572,25 @@ function selectedPeriodRange(logs: FuelLog[], visibleMonth: Date, period: Summar
   };
 }
 
-function previousPeriodRange(logs: FuelLog[], visibleMonth: Date, period: SummaryPeriod) {
+function previousPeriodRange(logs: FuelLog[], visibleMonth: Date, period: SummaryPeriod, currentRange: DateRange) {
   if (period === "all") {
     return null;
   }
 
-  return selectedPeriodRange(logs, addMonths(visibleMonth, -periodStepMonths(period)), period);
+  const previousRange = selectedPeriodRange(logs, addMonths(visibleMonth, -periodStepMonths(period)), period);
+  const now = new Date();
+
+  if (now <= currentRange.start || now >= currentRange.end) {
+    return previousRange;
+  }
+
+  const elapsedMs = now.getTime() - currentRange.start.getTime();
+  const comparableEnd = new Date(previousRange.start.getTime() + elapsedMs);
+
+  return {
+    ...previousRange,
+    end: comparableEnd < previousRange.end ? comparableEnd : previousRange.end
+  };
 }
 
 function allPeriodRange(logs: FuelLog[], visibleMonth: Date): DateRange {

@@ -43,6 +43,22 @@ export function HelpScreen({
       ]
     },
     {
+      id: "whatsapp",
+      question: "Como conversar com o LitroCerto pelo WhatsApp?",
+      answers: [
+        "A integração com WhatsApp está em testes. Ela permite enviar mensagens, fotos da bomba e dados do abastecimento para preparar um registro.",
+        "Antes de salvar qualquer abastecimento criado por IA, confira se veículo, posto, combustível, valor, litros e km estão corretos."
+      ]
+    },
+    {
+      id: "app-ai",
+      question: "Como usar a IA dentro do app?",
+      answers: [
+        "A IA dentro do app ajuda a consultar gastos, comparar postos e preparar registros de abastecimento.",
+        "Você pode fazer perguntas como quanto gastou no mês, qual posto está mais barato ou pedir ajuda para registrar um abastecimento."
+      ]
+    },
+    {
       id: "chatgpt",
       question: "Como conversar com o LitroCerto pelo ChatGPT?",
       answers: [
@@ -100,14 +116,6 @@ export function HelpScreen({
       answers: [
         "Em Postos, você acompanha onde abasteceu e compara preços médios. Em Veículos, você vê quais veículos concentram mais gasto e pode manter os dados básicos de cada um.",
         "Se aparecer mais de um posto igual ou algum abastecimento com valor estranho, corrija os cadastros para deixar os insights mais confiáveis."
-      ]
-    },
-    {
-      id: "ai-whatsapp",
-      question: "E a IA dentro do app e no WhatsApp?",
-      answers: [
-        "A IA dentro do app ajuda a consultar gastos, comparar postos e preparar registros de abastecimento.",
-        "Também há integração via WhatsApp em testes. Antes de salvar qualquer abastecimento criado por IA, confira se veículo, posto, combustível, valor, litros e km estão corretos."
       ]
     },
     {
