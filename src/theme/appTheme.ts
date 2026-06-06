@@ -363,7 +363,48 @@ export function createStyles(theme: Theme) {
   },
   headerLogo: {
     width: 178,
-    height: 40
+    height: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  headerLogoMark: {
+    width: 34,
+    height: 34,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    transform: [{ rotate: "45deg" }],
+    marginLeft: 3
+  },
+  headerLogoCheck: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: "900",
+    transform: [{ rotate: "-45deg" }],
+    fontFamily: theme.headingFontFamily
+  },
+  headerLogoTextRow: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  headerLogoText: {
+    color: theme.text,
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: "900",
+    fontFamily: theme.headingFontFamily
+  },
+  headerLogoTextDark: {
+    color: "#FFFFFF"
+  },
+  headerLogoTextAccent: {
+    color: theme.primary
   },
   headerSecondaryActions: {
     position: "relative",
@@ -854,6 +895,29 @@ export function createStyles(theme: Theme) {
     color: theme.text,
     fontSize: 16,
     lineHeight: 22,
+    fontFamily: theme.fontFamily
+  },
+  helpLinkRow: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.primarySoft,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 2
+  },
+  helpLinkText: {
+    color: theme.primaryDark,
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  helpLinkUrl: {
+    color: theme.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
     fontFamily: theme.fontFamily
   },
   content: {
@@ -1806,33 +1870,96 @@ export function createStyles(theme: Theme) {
   assistantComposer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
-  },
-  assistantIconButton: {
-    width: 38,
-    minHeight: 42,
-    borderRadius: 8,
+    gap: 8,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: theme.border,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: theme.input,
+    paddingHorizontal: 8,
+    paddingVertical: 6
+  },
+  assistantAttachButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center"
   },
-  assistantIconText: {
+  assistantAttachBox: {
+    position: "relative"
+  },
+  assistantAttachMenu: {
+    position: "absolute",
+    left: 0,
+    bottom: 42,
+    minWidth: 148,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    paddingVertical: 6,
+    shadowColor: "#000000",
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+    zIndex: 80
+  },
+  assistantAttachMenuItem: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12
+  },
+  assistantAttachMenuIcon: {
     color: theme.primary,
     fontSize: 18,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  assistantAttachMenuText: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  assistantAttachIcon: {
+    color: theme.mode === "dark" ? "#E8F0F6" : "#202A34",
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: "500",
+    fontFamily: theme.fontFamily
+  },
+  assistantVoiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent"
+  },
+  assistantVoiceButtonHover: {
+    backgroundColor: theme.primary
+  },
+  assistantVoiceButtonActive: {
+    backgroundColor: theme.primaryDark,
+    borderColor: theme.primaryDark
+  },
+  assistantVoiceIcon: {
+    color: theme.mode === "dark" ? "#E8F0F6" : "#202A34",
+    fontSize: 21,
+    lineHeight: 23,
     fontWeight: "900",
     fontFamily: theme.fontFamily
   },
   assistantInput: {
     flex: 1,
     minWidth: 0,
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    backgroundColor: theme.input,
+    minHeight: 34,
+    borderWidth: 0,
+    paddingHorizontal: 2,
+    backgroundColor: "transparent",
     color: theme.text,
     fontSize: 16,
     fontFamily: theme.fontFamily
@@ -2298,29 +2425,73 @@ export function createStyles(theme: Theme) {
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 68,
-    paddingTop: 6,
+    minHeight: 82,
+    paddingTop: 14,
     paddingBottom: 6,
     backgroundColor: theme.surface,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    alignItems: "center"
+    alignItems: "center",
+    overflow: "visible"
   },
   tabs: {
     width: "100%",
     maxWidth: 470,
     paddingHorizontal: 7,
     flexDirection: "row",
-    gap: 5
+    alignItems: "flex-end",
+    gap: 5,
+    overflow: "visible"
   },
   tab: {
+    position: "relative",
     minWidth: 58,
     minHeight: 56,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
-    gap: 2
+    gap: 2,
+    overflow: "visible"
+  },
+  tabWithRaisedAction: {
+    paddingTop: 20
+  },
+  tabRaisedAction: {
+    position: "absolute",
+    top: -38,
+    alignSelf: "center",
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: actionFill,
+    borderWidth: 5,
+    borderColor: theme.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 45,
+    elevation: 18,
+    shadowColor: actionFill,
+    shadowOpacity: theme.mode === "dark" ? 0.34 : 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  tabRaisedActionHover: {
+    backgroundColor: theme.primaryDark
+  },
+  tabRaisedActionText: {
+    color: "#FFFFFF",
+    fontSize: 42,
+    lineHeight: 44,
+    fontWeight: "900",
+    fontFamily: theme.fontFamily
+  },
+  tabRaisedSpacer: {
+    width: 22,
+    height: 21
+  },
+  tabRaisedActiveText: {
+    color: theme.primary
   },
   tabHover: {
     backgroundColor: theme.primarySoft
@@ -2329,22 +2500,124 @@ export function createStyles(theme: Theme) {
     backgroundColor: theme.primaryDark
   },
   tabText: {
-    color: theme.muted,
+    color: theme.mode === "dark" ? "#D8E1EA" : "#2D3640",
     fontSize: 13,
     fontWeight: "800",
     textAlign: "center",
     fontFamily: theme.fontFamily
   },
   tabIcon: {
-    color: theme.muted,
+    color: theme.mode === "dark" ? "#E8F0F6" : "#202A34",
     fontSize: 19,
     lineHeight: 21,
     fontWeight: "900",
     textAlign: "center",
     fontFamily: theme.fontFamily
   },
-  aiTabIcon: {
-    color: "#E53935"
+  tabMiniIcon: {
+    width: 22,
+    height: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative"
+  },
+  tabIconShape: {
+    backgroundColor: theme.mode === "dark" ? "#E8F0F6" : "#202A34",
+    borderColor: theme.mode === "dark" ? "#E8F0F6" : "#202A34"
+  },
+  tabIconShapeActive: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#FFFFFF"
+  },
+  tabBarColumn: {
+    position: "absolute",
+    bottom: 2,
+    width: 4,
+    borderRadius: 2
+  },
+  tabBarColumnShort: {
+    left: 4,
+    height: 8
+  },
+  tabBarColumnTall: {
+    left: 9,
+    height: 15
+  },
+  tabBarColumnMid: {
+    left: 14,
+    height: 11
+  },
+  tabPumpBody: {
+    position: "absolute",
+    left: 5,
+    top: 3,
+    width: 10,
+    height: 16,
+    borderRadius: 2
+  },
+  tabPumpWindow: {
+    position: "absolute",
+    left: 2,
+    right: 2,
+    top: 2,
+    height: 4,
+    borderRadius: 1,
+    backgroundColor: theme.surface
+  },
+  tabPumpHose: {
+    position: "absolute",
+    right: 3,
+    top: 6,
+    width: 5,
+    height: 9,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderStyle: "solid",
+    backgroundColor: "transparent",
+    borderRadius: 2
+  },
+  tabPinHead: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 3,
+    backgroundColor: "transparent"
+  },
+  tabPinPoint: {
+    width: 8,
+    height: 8,
+    transform: [{ rotate: "45deg" }],
+    marginTop: -5,
+    borderBottomRightRadius: 2
+  },
+  tabCarBody: {
+    position: "absolute",
+    left: 3,
+    bottom: 5,
+    width: 16,
+    height: 7,
+    borderRadius: 3
+  },
+  tabCarRoof: {
+    position: "absolute",
+    left: 7,
+    bottom: 10,
+    width: 8,
+    height: 6,
+    borderRadius: 3
+  },
+  tabCarWheel: {
+    position: "absolute",
+    bottom: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2
+  },
+  tabCarWheelLeft: {
+    left: 5
+  },
+  tabCarWheelRight: {
+    right: 5
   },
   activeTabText: {
     color: "#FFFFFF"

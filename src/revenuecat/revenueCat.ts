@@ -1,11 +1,5 @@
 import { Platform } from "react-native";
-import type {
-  CustomerInfo,
-  CustomerInfoUpdateListener,
-  PurchasesOffering,
-  PurchasesPackage
-} from "react-native-purchases";
-import type RevenueCatUIType from "react-native-purchases-ui";
+import Constants from "expo-constants";
 
 export const REVENUECAT_ENTITLEMENTS = {
   premium: "premium"
@@ -29,11 +23,39 @@ const REVENUECAT_API_KEYS = {
 let configured = false;
 let configuredUserId: string | null | undefined;
 
-type PurchasesModule = typeof import("react-native-purchases").default;
-type PurchasesUiModule = typeof RevenueCatUIType;
+export type CustomerInfoLike = {
+  entitlements?: {
+    active?: Record<string, unknown>;
+  };
+};
+type PurchasesPackageLike = unknown;
+type PurchasesOfferingLike = {
+  monthly?: unknown;
+  annual?: unknown;
+  lifetime?: unknown;
+  availablePackages?: unknown[];
+};
+type CustomerInfoUpdateListener = (customerInfo: CustomerInfoLike) => void;
+type PurchasesModule = {
+  setLogLevel: (level: unknown) => Promise<void> | void;
+  configure: (options: { apiKey: string; appUserID?: string }) => void;
+  logIn: (appUserId: string) => Promise<{ customerInfo: CustomerInfoLike }>;
+  logOut: () => Promise<CustomerInfoLike>;
+  getCustomerInfo: () => Promise<CustomerInfoLike>;
+  getOfferings: () => Promise<{ current?: PurchasesOfferingLike | null; all: Record<string, PurchasesOfferingLike> }>;
+  purchasePackage: (packageToBuy: PurchasesPackageLike) => Promise<{ customerInfo: CustomerInfoLike }>;
+  restorePurchases: () => Promise<CustomerInfoLike>;
+  addCustomerInfoUpdateListener: (listener: CustomerInfoUpdateListener) => void;
+  removeCustomerInfoUpdateListener: (listener: CustomerInfoUpdateListener) => void;
+};
+type PurchasesUiModule = {
+  presentPaywallIfNeeded: (options: { requiredEntitlementIdentifier: string; displayCloseButton: boolean }) => Promise<string>;
+  presentPaywall: (options: { displayCloseButton: boolean }) => Promise<string>;
+  presentCustomerCenter: () => Promise<void>;
+};
 
 export function isRevenueCatSupported() {
-  return Platform.OS === "ios" || Platform.OS === "android";
+  return (Platform.OS === "ios" || Platform.OS === "android") && Constants.appOwnership !== "expo";
 }
 
 export async function configureRevenueCat(appUserId?: string | null) {
@@ -42,7 +64,7 @@ export async function configureRevenueCat(appUserId?: string | null) {
   }
 
   const Purchases = purchasesModule();
-  const { LOG_LEVEL } = require("react-native-purchases") as typeof import("react-native-purchases");
+  const { LOG_LEVEL } = purchasesPackage();
   const apiKey = Platform.OS === "ios" ? REVENUECAT_API_KEYS.ios : REVENUECAT_API_KEYS.android;
 
   if (!configured) {
@@ -91,11 +113,11 @@ export async function logoutRevenueCatCustomer() {
   return purchasesModule().logOut();
 }
 
-export function hasPremiumEntitlement(customerInfo: CustomerInfo | null | undefined) {
-  return Boolean(customerInfo?.entitlements.active[REVENUECAT_ENTITLEMENTS.premium]);
+export function hasPremiumEntitlement(customerInfo: CustomerInfoLike | null | undefined) {
+  return Boolean(customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENTS.premium]);
 }
 
-export async function getCurrentOffering(appUserId?: string | null): Promise<PurchasesOffering | null> {
+export async function getCurrentOffering(appUserId?: string | null): Promise<PurchasesOfferingLike | null> {
   if (!isRevenueCatSupported()) {
     return null;
   }
@@ -117,7 +139,7 @@ export async function getRevenueCatPackages(appUserId?: string | null) {
   };
 }
 
-export async function purchaseRevenueCatPackage(packageToBuy: PurchasesPackage, appUserId?: string | null) {
+export async function purchaseRevenueCatPackage(packageToBuy: PurchasesPackageLike, appUserId?: string | null) {
   if (!isRevenueCatSupported()) {
     return { customerInfo: null, isPremium: false };
   }
@@ -150,7 +172,7 @@ export async function presentPremiumPaywallIfNeeded(appUserId?: string | null) {
 
   await configureRevenueCat(appUserId);
   const RevenueCatUI = purchasesUiModule();
-  const { PAYWALL_RESULT } = require("react-native-purchases-ui") as typeof import("react-native-purchases-ui");
+  const { PAYWALL_RESULT } = purchasesUiPackage();
   const result = await RevenueCatUI.presentPaywallIfNeeded({
     requiredEntitlementIdentifier: REVENUECAT_ENTITLEMENTS.premium,
     displayCloseButton: true
@@ -166,7 +188,7 @@ export async function presentPremiumPaywall(appUserId?: string | null) {
 
   await configureRevenueCat(appUserId);
   const RevenueCatUI = purchasesUiModule();
-  const { PAYWALL_RESULT } = require("react-native-purchases-ui") as typeof import("react-native-purchases-ui");
+  const { PAYWALL_RESULT } = purchasesUiPackage();
   const result = await RevenueCatUI.presentPaywall({
     displayCloseButton: true
   });
@@ -196,9 +218,23 @@ export function addCustomerInfoListener(listener: CustomerInfoUpdateListener) {
 }
 
 function purchasesModule(): PurchasesModule {
-  return require("react-native-purchases").default as PurchasesModule;
+  return purchasesPackage().default as PurchasesModule;
 }
 
 function purchasesUiModule(): PurchasesUiModule {
-  return require("react-native-purchases-ui").default as PurchasesUiModule;
+  return purchasesUiPackage().default as PurchasesUiModule;
+}
+
+function purchasesPackage() {
+  return require("react-native-purchases") as {
+    default: PurchasesModule;
+    LOG_LEVEL: Record<string, unknown>;
+  };
+}
+
+function purchasesUiPackage() {
+  return require("react-native-purchases-ui") as {
+    default: PurchasesUiModule;
+    PAYWALL_RESULT: Record<string, string>;
+  };
 }

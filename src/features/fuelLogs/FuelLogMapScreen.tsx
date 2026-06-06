@@ -1,4 +1,3 @@
-import L from "leaflet";
 import React, { useEffect, useRef, useState } from "react";
 import { Image, Platform, Pressable, Text, View } from "react-native";
 import {
@@ -180,8 +179,9 @@ export function FuelMap({
   theme: FeatureTheme;
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const leafletMapRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<L.Marker[]>([]);
+  const leafletModuleRef = useRef<typeof import("leaflet") | null>(null);
+  const leafletMapRef = useRef<import("leaflet").Map | null>(null);
+  const markersRef = useRef<import("leaflet").Marker[]>([]);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const points = numberedLogs.map(({ log, number }, index) => {
@@ -200,6 +200,7 @@ export function FuelMap({
       return;
     }
 
+    let disposed = false;
     const cssId = "leaflet-css";
     const documentRef = globalThis.document;
     if (documentRef && !documentRef.getElementById(cssId)) {
@@ -235,27 +236,36 @@ export function FuelMap({
       documentRef.head.appendChild(style);
     }
 
-    const map = L.map(mapRef.current, { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
-    leafletMapRef.current = map;
-    resizeObserverRef.current = new ResizeObserver(() => {
-      window.setTimeout(() => map.invalidateSize(), 0);
+    void import("leaflet").then((Leaflet) => {
+      if (disposed || !mapRef.current) {
+        return;
+      }
+
+      leafletModuleRef.current = Leaflet;
+      const map = Leaflet.map(mapRef.current, { zoomControl: true, attributionControl: true });
+      Leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap"
+      }).addTo(map);
+      leafletMapRef.current = map;
+      resizeObserverRef.current = new ResizeObserver(() => {
+        window.setTimeout(() => map.invalidateSize(), 0);
+      });
+      resizeObserverRef.current.observe(mapRef.current);
     });
-    resizeObserverRef.current.observe(mapRef.current);
 
     return () => {
+      disposed = true;
       resizeObserverRef.current?.disconnect();
       resizeObserverRef.current = null;
-      map.remove();
+      leafletMapRef.current?.remove();
       leafletMapRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     const map = leafletMapRef.current;
-    if (!map) {
+    const Leaflet = leafletModuleRef.current;
+    if (!map || !Leaflet) {
       return;
     }
 
@@ -268,12 +278,12 @@ export function FuelMap({
       return;
     }
 
-    const bounds = L.latLngBounds([]);
+    const bounds = Leaflet.latLngBounds([]);
     points.forEach((point) => {
       const latitude = point.latitude + point.offset * 0.00008;
       const longitude = point.longitude + point.offset * 0.00008;
-      const marker = L.marker([latitude, longitude], {
-        icon: L.divIcon({
+      const marker = Leaflet.marker([latitude, longitude], {
+        icon: Leaflet.divIcon({
           className: "fuel-map-pin",
           html: `<span>${point.number}</span>`,
           iconSize: [34, 34],

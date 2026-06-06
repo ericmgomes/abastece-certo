@@ -1254,12 +1254,13 @@ export default function App() {
                 >
                   {renderContent()}
                 </ScrollView>
-                {shouldShowFloatingAddButton() ? (
-                  <Pressable style={styles.floatingFuelButton} onPress={openContextualNewForm}>
-                    <Text style={styles.floatingFuelButtonText}>+</Text>
-                  </Pressable>
-                ) : null}
-                <Tabs active={utilityScreen || fuelFormMode === "new" ? null : tab} onChange={changeTab} styles={styles} />
+                <Tabs
+                  active={utilityScreen || fuelFormMode === "new" ? null : tab}
+                  onChange={changeTab}
+                  onNewFuel={openNewFuelForm}
+                  showNewFuelButton={shouldShowFloatingAddButton()}
+                  styles={styles}
+                />
               </KeyboardAvoidingView>
             </SafeAreaView>
           </FormControlsProvider>

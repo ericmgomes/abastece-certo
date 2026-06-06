@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import type { CustomerInfo } from "react-native-purchases";
 import {
   addCustomerInfoListener,
   configureRevenueCat,
+  CustomerInfoLike,
   getRevenueCatCustomerInfo,
   hasPremiumEntitlement,
   identifyRevenueCatCustomer,
@@ -17,7 +17,7 @@ import { trackEvent } from "../analytics";
 export function useRevenueCat(appUserId?: string | null) {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfoLike | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const isSupported = isRevenueCatSupported();
   const isPremium = hasPremiumEntitlement(customerInfo);

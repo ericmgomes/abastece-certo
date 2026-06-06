@@ -47,8 +47,16 @@ export function AuthScreen({
   const isSignIn = authMode === "signIn";
 
   function authRedirectUrl() {
-    const location = (globalThis as unknown as { location?: { origin?: string } }).location;
-    return authRedirectTo ?? location?.origin ?? "http://localhost:8086";
+    const location = (globalThis as unknown as { location?: Location }).location;
+    if (authRedirectTo) {
+      return authRedirectTo;
+    }
+
+    if (Platform.OS === "web" && location?.href) {
+      return location.href;
+    }
+
+    return "https://app.litrocerto.com.br/";
   }
 
   async function submit(modeToSubmit: "signIn" | "signUp") {

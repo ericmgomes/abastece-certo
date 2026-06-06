@@ -21,6 +21,19 @@ type AssistantRequestBody = {
   message?: string;
   conversation?: Array<{ role?: "assistant" | "user"; text?: string }>;
   state?: Partial<AppState>;
+  media?: AssistantMediaInput;
+};
+
+type AssistantMediaInput = {
+  kind?: "image" | "audio";
+  dataUrl?: string;
+  contentType?: string;
+};
+
+type AssistantPreparedMessage = {
+  message: string;
+  mediaText?: string;
+  mediaKind?: AssistantMediaInput["kind"];
 };
 
 type AssistantDraftFuelLog = {
@@ -29,6 +42,7 @@ type AssistantDraftFuelLog = {
   fuel?: FuelType;
   paid?: number;
   liters?: number;
+  pricePerLiter?: number;
   odometerKm?: number;
   createdAt?: string;
   missingFields?: string[];
@@ -45,9 +59,10 @@ const allowedOrigins = [
   "https://litrocerto.com.br",
   "https://abastece-certo.vercel.app",
   "http://localhost:8086",
-  "http://localhost:8087"
+  "http://localhost:8087",
+  "http://localhost:8081"
 ];
-const visibleFuels = fuels.filter((fuel) => fuel !== "Gás Natural" && fuel !== "Eletricidade");
+const visibleFuels: readonly FuelType[] = fuels.filter((fuel) => fuel !== "Gás Natural" && fuel !== "Eletricidade");
 
 function loadLocalEnv() {
   if (process.env.VERCEL === "1") {
@@ -106,19 +121,22 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
 
     const body = await readBody(request) as AssistantRequestBody;
-    const message = body.message?.trim();
-    if (!message) {
-      response.status(400).json({ error: "bad_request", message: "Digite uma mensagem para o assistente." });
+    const prepared = await messageFromRequestBody(body);
+    if (!prepared.message) {
+      response.status(400).json({ error: "bad_request", message: "Digite uma mensagem ou envie uma foto/áudio para o assistente." });
       return;
     }
 
-    if (message.length > 800) {
+    if (prepared.message.length > 1800) {
       response.status(400).json({ error: "bad_request", message: "Mensagem muito longa." });
       return;
     }
 
     const appState = await stateFromRequest(request, body);
-    const result = await assistantResponse(message, appState, body.conversation ?? []);
+    const result = await assistantResponse(prepared.message, appState, body.conversation ?? [], {
+      mediaText: prepared.mediaText,
+      mediaKind: prepared.mediaKind
+    });
     response.status(200).json(result);
   } catch (error) {
     response.status(400).json({
@@ -128,10 +146,160 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
 }
 
+async function messageFromRequestBody(body: AssistantRequestBody): Promise<AssistantPreparedMessage> {
+  const typedMessage = body.message?.trim() ?? "";
+  if (!body.media?.kind) {
+    return { message: typedMessage };
+  }
+
+  const mediaText = await textFromAssistantMedia(body.media);
+  return {
+    message: [typedMessage, mediaText].filter(Boolean).join("\n\n").trim(),
+    mediaText,
+    mediaKind: body.media.kind
+  };
+}
+
+async function textFromAssistantMedia(media: AssistantMediaInput) {
+  if (media.kind === "image") {
+    return `Dados extraídos da foto: ${await describeAssistantImage(media)}`;
+  }
+
+  if (media.kind === "audio") {
+    return await transcribeAssistantAudio(media);
+  }
+
+  return "";
+}
+
+async function describeAssistantImage(media: AssistantMediaInput) {
+  const dataUrl = safeDataUrl(media, "image");
+  const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      Authorization: `Bearer ${openAiApiKey()}`
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_VISION_MODEL ?? process.env.OPENAI_ASSISTANT_MODEL ?? "gpt-4o-mini",
+      temperature: 0,
+      max_tokens: 260,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "Você lê fotos de bomba ou comprovante de abastecimento para o app LitroCerto.",
+            "Extraia apenas dados visíveis: valor pago, litros, preço por litro, combustível, data/hora se aparecer.",
+            "Se a imagem mostrar mais de um abastecimento, display, bico ou conjunto de valores, não escolha sozinho.",
+            "Nesse caso, liste as opções visíveis de forma curta e pergunte qual delas foi o abastecimento do usuário.",
+            "Se algum dado não estiver visível, diga que não foi identificado.",
+            "Responda em português do Brasil, em texto curto, sem inventar dados."
+          ].join(" ")
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Leia esta imagem de abastecimento e extraia os dados para preparar um registro."
+            },
+            {
+              type: "image_url",
+              image_url: { url: dataUrl }
+            }
+          ]
+        }
+      ]
+    })
+  });
+
+  if (!openAiResponse.ok) {
+    throw new Error(await openAiErrorMessage(openAiResponse));
+  }
+
+  const data = await openAiResponse.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const description = data.choices?.[0]?.message?.content?.trim();
+  if (!description) {
+    return "não consegui identificar dados de abastecimento com segurança.";
+  }
+
+  return sanitizeText(description, 900) ?? "não consegui identificar dados de abastecimento com segurança.";
+}
+
+async function transcribeAssistantAudio(media: AssistantMediaInput) {
+  const file = bytesFromDataUrl(safeDataUrl(media, "audio"));
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_TRANSCRIPTION_MODEL ?? "whisper-1");
+  form.append("language", "pt");
+  form.append("file", new Blob([file.bytes], { type: file.contentType }), filenameFor(file.contentType, "audio"));
+
+  const openAiResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openAiApiKey()}`
+    },
+    body: form
+  });
+
+  if (!openAiResponse.ok) {
+    throw new Error(await openAiErrorMessage(openAiResponse));
+  }
+
+  const data = await openAiResponse.json() as { text?: string };
+  const transcription = data.text?.trim();
+  if (!transcription) {
+    return "Recebi um áudio, mas não consegui entender o conteúdo.";
+  }
+
+  return `Transcrição do áudio: ${sanitizeText(transcription, 900) ?? transcription}`;
+}
+
+function safeDataUrl(media: AssistantMediaInput, expectedKind: "image" | "audio") {
+  const dataUrl = media.dataUrl?.trim();
+  if (!dataUrl || !dataUrl.startsWith(`data:${expectedKind}/`)) {
+    throw new Error(expectedKind === "image" ? "Envie uma imagem válida." : "Envie um áudio válido.");
+  }
+
+  const file = bytesFromDataUrl(dataUrl);
+  const maxSize = expectedKind === "image" ? 8 * 1024 * 1024 : 20 * 1024 * 1024;
+  if (file.bytes.byteLength > maxSize) {
+    throw new Error(expectedKind === "image" ? "A imagem é muito grande. Envie uma menor." : "O áudio é muito grande. Grave um trecho menor.");
+  }
+
+  return dataUrl;
+}
+
+function bytesFromDataUrl(dataUrl: string) {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    throw new Error("Mídia inválida.");
+  }
+
+  return {
+    contentType: match[1],
+    bytes: Buffer.from(match[2], "base64")
+  };
+}
+
+function filenameFor(contentType: string, fallback: string) {
+  const extension = contentType.split("/")[1]?.split(";")[0] || "bin";
+  return `${fallback}.${extension}`;
+}
+
+function openAiApiKey() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY não configurada. A IA real não pode responder.");
+  }
+
+  return apiKey;
+}
+
 export async function assistantResponse(
   message: string,
   state: AppState,
-  conversation: Array<{ role?: "assistant" | "user"; text?: string }>
+  conversation: Array<{ role?: "assistant" | "user"; text?: string }>,
+  options: { mediaText?: string; mediaKind?: AssistantMediaInput["kind"] } = {}
 ): Promise<AssistantPayload> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -160,8 +328,15 @@ export async function assistantResponse(
             "Nunca afirme que executou ações fora deste JSON. Você só pode responder e preparar draftFuelLog.",
             "Sempre retorne JSON válido no formato: {\"answer\":\"texto\", \"draftFuelLog\": opcional}.",
             "draftFuelLog só deve aparecer quando o usuário pedir para registrar/preencher um abastecimento.",
+            "Só peça confirmação para salvar quando carId, stationId, fuel, paid e liters estiverem preenchidos e plausíveis.",
+            "Se faltar campo obrigatório, não diga 'confirme' nem 'posso salvar'. Diga claramente quais campos faltam e peça apenas esses dados.",
+            "Se o usuário responder 'confirmar', 'salvar', 'ok' ou similar enquanto ainda faltarem campos obrigatórios, explique que ainda não dá para salvar e liste os campos faltantes.",
+            "Se houver valor pago e preço por litro, calcule litros como valor pago dividido pelo preço por litro. Não pergunte litros nesse caso. Arredonde para no máximo 3 casas decimais.",
+            "Se informar preço por litro em draftFuelLog, use pricePerLiter.",
             "Se o contexto da foto indicar mais de uma opção de abastecimento, não crie draftFuelLog ainda. Pergunte qual opção é a correta.",
             "Use IDs reais do contexto para carId e stationId. Se não tiver certeza, deixe ausente e liste em missingFields.",
+            "Quando a conversa recente trouxer 'Rascunho pendente', preserve os campos já preenchidos e use a nova mensagem apenas para completar ou corrigir o rascunho.",
+            "Não peça novamente valor, litros, preço por litro ou combustível se esses dados já estiverem no rascunho pendente ou no contexto da foto.",
             "Combustíveis aceitos no frontend agora: Gasolina comum, Gasolina aditivada, Etanol, Diesel.",
             "Números de draftFuelLog precisam ser positivos, finitos e plausíveis. Se faltar ou parecer absurdo, deixe ausente e explique o que falta.",
             "Use o histórico recente da conversa para interpretar perguntas curtas como 'e mês passado?', 'e no Fastback?' ou 'e naquele posto?'.",
@@ -195,7 +370,7 @@ export async function assistantResponse(
     throw new Error("A OpenAI não retornou conteúdo.");
   }
 
-  return normalizeAssistantPayload(JSON.parse(content), state);
+  return normalizeAssistantPayload(JSON.parse(content), state, options);
 }
 
 async function openAiErrorMessage(response: Response) {
@@ -327,16 +502,34 @@ function snapshotToState(snapshot?: Partial<AppState>): AppState {
   };
 }
 
-function normalizeAssistantPayload(value: unknown, state: AppState): AssistantPayload {
+function normalizeAssistantPayload(
+  value: unknown,
+  state: AppState,
+  options: { mediaText?: string; mediaKind?: AssistantMediaInput["kind"] } = {}
+): AssistantPayload {
   const payload = value as AssistantPayload;
   const answer = typeof payload.answer === "string" && payload.answer.trim()
     ? sanitizeText(payload.answer, 700) ?? "Pronto."
-    : "Pronto.";
+    : mediaFallbackAnswer(options) ?? "Pronto.";
 
   return {
     answer,
     draftFuelLog: normalizeDraftFuelLog(payload.draftFuelLog, state)
   };
+}
+
+function mediaFallbackAnswer(options: { mediaText?: string; mediaKind?: AssistantMediaInput["kind"] }) {
+  if (!options.mediaText) {
+    return undefined;
+  }
+
+  const text = options.mediaText.replace(/^Dados extraídos da foto:\s*/i, "").replace(/^Transcrição do áudio:\s*/i, "").trim();
+  if (!text) {
+    return undefined;
+  }
+
+  const prefix = options.mediaKind === "audio" ? "Entendi no áudio:" : "Pela foto, identifiquei:";
+  return sanitizeText(`${prefix} ${text}`, 700);
 }
 
 function normalizeDraftFuelLog(draft: AssistantDraftFuelLog | undefined, state: AppState): AssistantDraftFuelLog | undefined {
@@ -359,6 +552,10 @@ function normalizeDraftFuelLog(draft: AssistantDraftFuelLog | undefined, state: 
 
   normalized.paid = boundedNumber(draft.paid, 0.01, 10000);
   normalized.liters = boundedNumber(draft.liters, 0.01, 1000);
+  const pricePerLiter = boundedNumber(draft.pricePerLiter, 0.01, 1000);
+  if (!normalized.liters && normalized.paid && pricePerLiter) {
+    normalized.liters = roundTo(normalized.paid / pricePerLiter, 3);
+  }
   normalized.odometerKm = boundedNumber(draft.odometerKm, 0, 2000000);
 
   if (typeof draft.createdAt === "string" && isValidDate(draft.createdAt)) {
@@ -386,6 +583,11 @@ function boundedNumber(value: unknown, min: number, max: number) {
   }
 
   return value;
+}
+
+function roundTo(value: number, digits: number) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
 }
 
 function isValidDate(value: string) {

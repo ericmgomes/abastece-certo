@@ -27,16 +27,23 @@ type AssistantDraftFuelLog = {
   fuel?: FuelType;
   paid?: number;
   liters?: number;
+  pricePerLiter?: number;
   odometerKm?: number;
   createdAt?: string;
   missingFields?: string[];
+};
+
+type AssistantMediaPayload = {
+  kind: "image" | "audio";
+  dataUrl: string;
+  contentType: string;
 };
 
 type SectionComponent = React.ComponentType<{ title: string; children: React.ReactNode }>;
 type AssistantStyles = Record<string, any>;
 type AssistantTheme = { muted: string };
 
-const visibleFuels = fuels.filter((fuel) => fuel !== "Gás Natural" && fuel !== "Eletricidade");
+const visibleFuels: readonly FuelType[] = fuels.filter((fuel) => fuel !== "Gás Natural" && fuel !== "Eletricidade");
 const fakeCurrentLocation = {
   latitude: -23.5614,
   longitude: -46.6559
@@ -70,8 +77,13 @@ export function AssistantScreen({
   theme: AssistantTheme;
 }) {
   const inputRef = useRef<TextInput>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const quickPrompts = [
     "Quanto gastei este mês?",
     "Qual posto está mais barato?",
@@ -79,20 +91,25 @@ export function AssistantScreen({
     "Registrar abastecimento"
   ];
 
-  async function sendMessage(text = input, source: "manual" | "quick_prompt" = "manual") {
+  async function sendMessage(
+    text = input,
+    source: "manual" | "quick_prompt" | "image" | "audio" = "manual",
+    media?: AssistantMediaPayload
+  ) {
     const trimmed = text.trim();
-    if (!trimmed || loading) {
+    if ((!trimmed && !media) || loading) {
       return;
     }
 
     const userMessage: AssistantMessage = {
       id: IdFactory.create("msg-user"),
       role: "user",
-      text: trimmed
+      text: trimmed || mediaUserText(media)
     };
     setMessages((current) => [...current, userMessage]);
     setInput("");
     inputRef.current?.focus();
+    setAttachmentMenuOpen(false);
     setLoading(true);
     trackEvent("ai_message_sent", {
       source,
@@ -112,6 +129,7 @@ export function AssistantScreen({
         },
         body: JSON.stringify({
           message: trimmed,
+          media,
           conversation: assistantConversationSnapshot([...messages, userMessage]),
           state: assistantStateSnapshot(state)
         })
@@ -120,6 +138,9 @@ export function AssistantScreen({
       const payload = parseAssistantResponse(rawPayload);
       if (!response.ok) {
         throw new Error(payload.message ?? "Não foi possível falar com o assistente.");
+      }
+      if (!payload.answer && !payload.draftFuelLog) {
+        throw new Error(payload.message ?? "A IA respondeu em um formato inesperado.");
       }
 
       trackEvent("ai_response_received", {
@@ -150,8 +171,143 @@ export function AssistantScreen({
       ]);
     } finally {
       setLoading(false);
-      window.setTimeout(() => inputRef.current?.focus(), 0);
+      if (Platform.OS === "web") {
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+      }
     }
+  }
+
+  async function pickImage() {
+    if (loading) {
+      return;
+    }
+    setAttachmentMenuOpen(false);
+
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      appendAssistantError("Envio de foto ainda está disponível só na versão web.");
+      return;
+    }
+
+    const inputElement = document.createElement("input");
+    inputElement.type = "file";
+    inputElement.accept = "image/*";
+    inputElement.onchange = async () => {
+      const file = inputElement.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        trackEvent("ai_image_selected", {
+          auth_state: state.user?.email ? "authenticated" : "guest",
+          file_type: file.type
+        });
+        await sendMessage("Enviei uma foto.", "image", {
+          kind: "image",
+          dataUrl,
+          contentType: file.type || "image/jpeg"
+        });
+      } catch (error) {
+        appendAssistantError(error instanceof Error ? error.message : "Não consegui ler a imagem.");
+      }
+    };
+    inputElement.click();
+  }
+
+  async function toggleRecording() {
+    if (loading) {
+      return;
+    }
+
+    if (recording) {
+      stopRecording();
+      return;
+    }
+
+    await startRecording();
+  }
+
+  async function startRecording() {
+    if (Platform.OS !== "web" || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      appendAssistantError("Gravação de áudio ainda está disponível só em navegadores com microfone.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      audioStreamRef.current = stream;
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event: { data?: Blob }) => {
+        if (event.data?.size) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        void sendRecordedAudio();
+      };
+      recorder.start();
+      setRecording(true);
+      trackEvent("ai_audio_recording_started", {
+        auth_state: state.user?.email ? "authenticated" : "guest"
+      });
+    } catch {
+      appendAssistantError("Não consegui acessar o microfone.");
+    }
+  }
+
+  function stopRecording() {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      setRecording(false);
+      return;
+    }
+
+    recorder.stop();
+    setRecording(false);
+  }
+
+  async function sendRecordedAudio() {
+    audioStreamRef.current?.getTracks?.().forEach((track: { stop: () => void }) => track.stop());
+    audioStreamRef.current = null;
+    const contentType = recorderRef.current?.mimeType || "audio/webm";
+    recorderRef.current = null;
+    const blob = new Blob(audioChunksRef.current, { type: contentType });
+    audioChunksRef.current = [];
+
+    if (!blob.size) {
+      appendAssistantError("Não consegui capturar o áudio.");
+      return;
+    }
+
+    try {
+      const dataUrl = await blobToDataUrl(blob);
+      trackEvent("ai_audio_recording_sent", {
+        auth_state: state.user?.email ? "authenticated" : "guest",
+        file_type: contentType
+      });
+      await sendMessage("Enviei um áudio.", "audio", {
+        kind: "audio",
+        dataUrl,
+        contentType
+      });
+    } catch (error) {
+      appendAssistantError(error instanceof Error ? error.message : "Não consegui enviar o áudio.");
+    }
+  }
+
+  function appendAssistantError(text: string) {
+    setMessages((current) => [
+      ...current,
+      {
+        id: IdFactory.create("msg-error"),
+        role: "assistant",
+        text,
+        isError: true
+      }
+    ]);
   }
 
   function confirmDraft(draft: AssistantDraftFuelLog) {
@@ -246,6 +402,30 @@ export function AssistantScreen({
           {loading ? <Text style={styles.muted}>Pensando...</Text> : null}
         </View>
         <View style={styles.assistantComposer}>
+          <View style={styles.assistantAttachBox}>
+            {attachmentMenuOpen ? (
+              <>
+                <View style={styles.assistantAttachMenu}>
+                  <Pressable
+                    style={[styles.assistantAttachMenuItem, styles.pressableNoOutline]}
+                    onPress={() => void pickImage()}
+                    disabled={loading || recording}
+                  >
+                    <Text style={styles.assistantAttachMenuIcon}>▧</Text>
+                    <Text style={styles.assistantAttachMenuText}>Imagem</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+            <Pressable
+              style={[styles.assistantAttachButton, styles.pressableNoOutline]}
+              onPress={() => setAttachmentMenuOpen((current) => !current)}
+              disabled={loading || recording}
+              accessibilityLabel="Adicionar anexo"
+            >
+              <Text style={styles.assistantAttachIcon}>+</Text>
+            </Pressable>
+          </View>
           <TextInput
             ref={inputRef}
             value={input}
@@ -257,10 +437,64 @@ export function AssistantScreen({
             blurOnSubmit={false}
             onSubmitEditing={() => void sendMessage()}
           />
+          <Pressable
+            style={(pressState) => [
+              styles.assistantVoiceButton,
+              styles.pressableNoOutline,
+              isPressedOrHovered(pressState) && !recording ? styles.assistantVoiceButtonHover : null,
+              recording ? styles.assistantVoiceButtonActive : null
+            ]}
+            onPress={() => void toggleRecording()}
+            disabled={loading}
+            accessibilityLabel={recording ? "Parar gravação" : "Gravar áudio"}
+          >
+            <Text style={styles.assistantVoiceIcon}>{recording ? "■" : "🎙"}</Text>
+          </Pressable>
         </View>
       </Section>
     </View>
   );
+}
+
+function isPressedOrHovered(state: unknown) {
+  const maybeState = state as { hovered?: boolean; pressed?: boolean };
+  return Boolean(maybeState.hovered || maybeState.pressed);
+}
+
+function mediaUserText(media?: AssistantMediaPayload) {
+  if (media?.kind === "image") {
+    return "Enviei uma foto.";
+  }
+
+  if (media?.kind === "audio") {
+    return "Enviei um áudio.";
+  }
+
+  return "";
+}
+
+function fileToDataUrl(file: File) {
+  if (file.size > 8 * 1024 * 1024) {
+    return Promise.reject(new Error("A imagem é muito grande. Envie uma menor."));
+  }
+
+  return blobToDataUrl(file);
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Não consegui ler a mídia."));
+    };
+    reader.onerror = () => reject(new Error("Não consegui ler a mídia."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function assistantApiUrl() {
@@ -269,7 +503,10 @@ function assistantApiUrl() {
   }
 
   const location = (globalThis as unknown as { location?: Location }).location;
-  if ((location?.hostname === "localhost" || location?.hostname === "127.0.0.1") && location.port === "8086") {
+  if (
+    (location?.hostname === "localhost" || location?.hostname === "127.0.0.1") &&
+    (location.port === "8081" || location.port === "8086")
+  ) {
     return "http://localhost:8087/api/assistant";
   }
 
@@ -281,7 +518,9 @@ function parseAssistantResponse(rawPayload: string) {
     return JSON.parse(rawPayload) as { answer?: string; draftFuelLog?: AssistantDraftFuelLog; message?: string };
   } catch {
     return {
-      message: "A resposta da IA não veio no formato esperado."
+      message: rawPayload.trim().startsWith("<")
+        ? "A API da IA não está rodando neste endereço."
+        : "A resposta da IA não veio no formato esperado."
     };
   }
 }
@@ -393,8 +632,24 @@ function assistantStateSnapshot(state: AppState) {
 function assistantConversationSnapshot(messages: AssistantMessage[]) {
   return messages.slice(-8).map((message) => ({
     role: message.role,
-    text: message.text
+    text: message.draftFuelLog
+      ? `${message.text}\nRascunho pendente: ${assistantDraftSnapshotText(message.draftFuelLog)}`
+      : message.text
   }));
+}
+
+function assistantDraftSnapshotText(draft: AssistantDraftFuelLog) {
+  return [
+    draft.carId ? `carId=${draft.carId}` : null,
+    draft.stationId ? `stationId=${draft.stationId}` : null,
+    draft.fuel ? `fuel=${draft.fuel}` : null,
+    draft.paid ? `paid=${draft.paid}` : null,
+    draft.liters ? `liters=${draft.liters}` : null,
+    draft.pricePerLiter ? `pricePerLiter=${draft.pricePerLiter}` : null,
+    draft.odometerKm ? `odometerKm=${draft.odometerKm}` : null,
+    draft.createdAt ? `createdAt=${draft.createdAt}` : null,
+    draft.missingFields?.length ? `missingFields=${draft.missingFields.join(",")}` : null
+  ].filter(Boolean).join("; ");
 }
 
 function formatCurrency(value: number) {

@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Image,
-  Platform,
   Pressable,
   Text,
   TextInput,
@@ -12,7 +10,7 @@ import { Car, ThemeMode, ThemePalette, User, VehicleType } from "../domain";
 export type AppTab = "Resumo" | "Abastecimentos" | "Postos" | "Veículos" | "IA";
 
 type ChromeStyles = Record<string, any>;
-type ChromeTheme = { muted: string };
+type ChromeTheme = { muted: string; primary: string; primaryDark: string; text: string };
 
 export function Header({
   user,
@@ -121,24 +119,7 @@ export function Header({
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <Pressable style={styles.brandBlock} onPress={onOpenSummary}>
-          <Image
-            source={
-              mode === "dark"
-                ? (
-                    Platform.OS === "web"
-                      ? { uri: "/assets/litrocerto-logo-header-dark-mode.png" }
-                      : require("../../assets/litrocerto-logo-header-dark-mode.png")
-                  )
-                : (
-                    Platform.OS === "web"
-                      ? { uri: "/assets/litrocerto-header.svg" }
-                      : require("../../assets/litrocerto-logo-header.png")
-                  )
-            }
-            style={styles.headerLogo}
-            resizeMode="contain"
-            accessibilityLabel="LitroCerto"
-          />
+          <HeaderLogo mode={mode} styles={styles} />
         </Pressable>
         <View style={styles.headerTools}>
           <Pressable style={styles.themeButton} onPress={onToggleTheme}>
@@ -220,6 +201,20 @@ export function Header({
   );
 }
 
+function HeaderLogo({ mode, styles }: { mode: ThemeMode; styles: ChromeStyles }) {
+  return (
+    <View style={styles.headerLogo}>
+      <View style={styles.headerLogoMark}>
+        <Text style={styles.headerLogoCheck}>✓</Text>
+      </View>
+      <View style={styles.headerLogoTextRow}>
+        <Text style={[styles.headerLogoText, mode === "dark" ? styles.headerLogoTextDark : null]}>Litro</Text>
+        <Text style={[styles.headerLogoText, styles.headerLogoTextAccent]}>Certo</Text>
+      </View>
+    </View>
+  );
+}
+
 export function ThemePalettePicker({
   palette,
   styles,
@@ -259,10 +254,14 @@ export function ThemePalettePicker({
 export function Tabs({
   active,
   onChange,
+  onNewFuel,
+  showNewFuelButton,
   styles
 }: {
   active: AppTab | null;
   onChange: (tab: AppTab) => void;
+  onNewFuel: () => void;
+  showNewFuelButton: boolean;
   styles: ChromeStyles;
 }) {
   const tabs: AppTab[] = ["Resumo", "IA", "Abastecimentos", "Postos", "Veículos"];
@@ -273,33 +272,104 @@ export function Tabs({
     Veículos: "Veículos",
     IA: "IA"
   };
-  const icons: Record<AppTab, string> = {
-    Resumo: "📊",
-    IA: "✦",
-    Abastecimentos: "⛽",
-    Postos: "📍",
-    Veículos: "🚗"
-  };
-
   return (
     <View style={styles.tabsBar}>
       <View style={styles.tabs}>
-        {tabs.map((tab) => (
-          <Pressable
-            key={tab}
-            style={(state) => [
-              styles.tab,
-              { flexGrow: labels[tab].length, flexBasis: 0 },
-              isHovered(state) && active !== tab && styles.tabHover,
-              active === tab && styles.activeTab
-            ]}
-            onPress={() => onChange(tab)}
-          >
-            <Text style={[styles.tabIcon, active === tab && styles.activeTabText, tab === "IA" && styles.aiTabIcon]}>{icons[tab]}</Text>
-            <Text style={[styles.tabText, active === tab && styles.activeTabText]}>{labels[tab]}</Text>
-          </Pressable>
-        ))}
+        {tabs.map((tab) => {
+          const isFuelTab = tab === "Abastecimentos";
+          const raisedFuelAction = isFuelTab && showNewFuelButton;
+
+          return (
+            <Pressable
+              key={tab}
+              style={(state) => [
+                styles.tab,
+                raisedFuelAction && styles.tabWithRaisedAction,
+                { flexGrow: labels[tab].length, flexBasis: 0 },
+                isHovered(state) && active !== tab && !raisedFuelAction && styles.tabHover,
+                active === tab && !raisedFuelAction && styles.activeTab
+              ]}
+              onPress={() => onChange(tab)}
+            >
+              {raisedFuelAction ? (
+                <Pressable
+                  accessibilityLabel="Novo abastecimento"
+                  style={(state) => [
+                    styles.tabRaisedAction,
+                    isHovered(state) && styles.tabRaisedActionHover
+                  ]}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    onNewFuel();
+                  }}
+                >
+                  <Text style={styles.tabRaisedActionText}>+</Text>
+                </Pressable>
+              ) : null}
+              {raisedFuelAction ? (
+                <View style={styles.tabRaisedSpacer} />
+              ) : (
+                <TabIcon tab={tab} active={active === tab} styles={styles} />
+              )}
+              <Text
+                style={[
+                  styles.tabText,
+                  active === tab && !raisedFuelAction && styles.activeTabText,
+                  active === tab && raisedFuelAction && styles.tabRaisedActiveText
+                ]}
+              >
+                {labels[tab]}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
+    </View>
+  );
+}
+
+function TabIcon({ tab, active, styles }: { tab: AppTab; active: boolean; styles: ChromeStyles }) {
+  const colorStyle = active ? styles.tabIconShapeActive : styles.tabIconShape;
+  if (tab === "Resumo") {
+    return (
+      <View style={styles.tabMiniIcon}>
+        <View style={[styles.tabBarColumn, styles.tabBarColumnShort, colorStyle]} />
+        <View style={[styles.tabBarColumn, styles.tabBarColumnTall, colorStyle]} />
+        <View style={[styles.tabBarColumn, styles.tabBarColumnMid, colorStyle]} />
+      </View>
+    );
+  }
+
+  if (tab === "IA") {
+    return <Text style={[styles.tabIcon, active && styles.activeTabText]}>✦</Text>;
+  }
+
+  if (tab === "Abastecimentos") {
+    return (
+      <View style={styles.tabMiniIcon}>
+        <View style={[styles.tabPumpBody, colorStyle]}>
+          <View style={styles.tabPumpWindow} />
+        </View>
+        <View style={[styles.tabPumpHose, colorStyle]} />
+      </View>
+    );
+  }
+
+  if (tab === "Postos") {
+    return (
+      <View style={styles.tabMiniIcon}>
+        <View style={[styles.tabPinHead, colorStyle]} />
+        <View style={[styles.tabPinPoint, colorStyle]} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.tabMiniIcon}>
+      <View style={[styles.tabCarBody, colorStyle]} />
+      <View style={[styles.tabCarRoof, colorStyle]} />
+      <View style={[styles.tabCarWheel, styles.tabCarWheelLeft, colorStyle]} />
+      <View style={[styles.tabCarWheel, styles.tabCarWheelRight, colorStyle]} />
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 import { DateFormatter, UserSummary } from "../../domain";
 
 type SharedComponent = React.ComponentType<any>;
@@ -8,6 +8,11 @@ type UtilityStyles = Record<string, any>;
 type UtilityComponents = {
   Section: SharedComponent;
   Empty: SharedComponent;
+};
+
+type FaqLink = {
+  label: string;
+  url: string;
 };
 
 export function HelpScreen({
@@ -65,10 +70,21 @@ export function HelpScreen({
     },
     {
       id: "ai-whatsapp",
-      question: "Como funcionam IA e WhatsApp?",
+      question: "Como conversar com o LitroCerto fora do app?",
       answers: [
-        "A IA pode consultar seus dados, responder perguntas como quanto você gastou em um período e ajudar a preparar um abastecimento para registro.",
-        "Quando disponível, você também pode conversar pelo WhatsApp e enviar informações do abastecimento em linguagem natural. Antes de salvar, confira se o app entendeu tudo corretamente."
+        "Além da IA dentro do app, você pode conversar com o LitroCerto pelo ChatGPT e pelo Claude. Eles conseguem consultar seus dados e ajudar a registrar veículos, postos e abastecimentos quando você autoriza o acesso.",
+        "No ChatGPT, use o GPT do LitroCerto. No Claude, adicione o conector MCP remoto do LitroCerto usando a URL abaixo.",
+        "Também há integração via WhatsApp em testes. Antes de salvar qualquer abastecimento criado por IA, confira se veículo, posto, combustível, valor, litros e km estão corretos."
+      ],
+      links: [
+        {
+          label: "Abrir LitroCerto no ChatGPT",
+          url: "https://chatgpt.com/g/g-69f8c4254da081919da115f90af3656d-litrocerto"
+        },
+        {
+          label: "URL do conector Claude MCP",
+          url: "https://app.litrocerto.com.br/mcp"
+        }
       ]
     },
     {
@@ -237,7 +253,7 @@ function FaqItem({
   onToggle,
   styles
 }: {
-  item: { question: string; answers: string[] };
+  item: { question: string; answers: string[]; links?: FaqLink[] };
   open: boolean;
   onToggle: () => void;
   styles: UtilityStyles;
@@ -252,6 +268,16 @@ function FaqItem({
         <View style={styles.faqAnswer}>
           {item.answers.map((answer) => (
             <Text key={answer} style={styles.helpText}>{answer}</Text>
+          ))}
+          {item.links?.map((link) => (
+            <Pressable
+              key={link.url}
+              style={[styles.helpLinkRow, styles.pressableNoOutline]}
+              onPress={() => void Linking.openURL(link.url)}
+            >
+              <Text style={styles.helpLinkText}>{link.label}</Text>
+              <Text style={styles.helpLinkUrl}>{link.url}</Text>
+            </Pressable>
           ))}
         </View>
       ) : null}
