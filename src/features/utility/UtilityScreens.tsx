@@ -34,6 +34,40 @@ export function HelpScreen({
       answers: [
         "O LitroCerto ajuda você a registrar abastecimentos, calcular quanto pagou de verdade por litro e enxergar melhor para onde está indo seu dinheiro com combustível.",
         "Com o histórico, o app mostra gasto, litros, preço por litro, postos mais baratos, evolução por período e dados separados por veículo e combustível."
+      ],
+      links: [
+        {
+          label: "Abrir site do LitroCerto",
+          url: "https://litrocerto.com.br"
+        }
+      ]
+    },
+    {
+      id: "chatgpt",
+      question: "Como conversar com o LitroCerto pelo ChatGPT?",
+      answers: [
+        "Você pode usar o GPT do LitroCerto no ChatGPT para consultar seus dados e pedir ajuda para registrar veículos, postos e abastecimentos.",
+        "Ao usar pela primeira vez, o ChatGPT vai pedir autorização. Essa autorização vale apenas para a sua conta."
+      ],
+      links: [
+        {
+          label: "Abrir LitroCerto no ChatGPT",
+          url: "https://chatgpt.com/g/g-69f8c4254da081919da115f90af3656d-litrocerto"
+        }
+      ]
+    },
+    {
+      id: "claude",
+      question: "Como conversar com o LitroCerto pelo Claude?",
+      answers: [
+        "No Claude, você pode adicionar o conector MCP remoto do LitroCerto para consultar métricas e interagir com seus dados.",
+        "Depois de conectar, o Claude também pedirá autorização para acessar apenas os dados da sua conta."
+      ],
+      links: [
+        {
+          label: "URL do conector Claude MCP",
+          url: "https://app.litrocerto.com.br/mcp"
+        }
       ]
     },
     {
@@ -70,21 +104,10 @@ export function HelpScreen({
     },
     {
       id: "ai-whatsapp",
-      question: "Como conversar com o LitroCerto fora do app?",
+      question: "E a IA dentro do app e no WhatsApp?",
       answers: [
-        "Além da IA dentro do app, você pode conversar com o LitroCerto pelo ChatGPT e pelo Claude. Eles conseguem consultar seus dados e ajudar a registrar veículos, postos e abastecimentos quando você autoriza o acesso.",
-        "No ChatGPT, use o GPT do LitroCerto. No Claude, adicione o conector MCP remoto do LitroCerto usando a URL abaixo.",
+        "A IA dentro do app ajuda a consultar gastos, comparar postos e preparar registros de abastecimento.",
         "Também há integração via WhatsApp em testes. Antes de salvar qualquer abastecimento criado por IA, confira se veículo, posto, combustível, valor, litros e km estão corretos."
-      ],
-      links: [
-        {
-          label: "Abrir LitroCerto no ChatGPT",
-          url: "https://chatgpt.com/g/g-69f8c4254da081919da115f90af3656d-litrocerto"
-        },
-        {
-          label: "URL do conector Claude MCP",
-          url: "https://app.litrocerto.com.br/mcp"
-        }
       ]
     },
     {

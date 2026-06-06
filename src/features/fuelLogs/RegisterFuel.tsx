@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   AppState,
@@ -58,6 +58,7 @@ export function RegisterFuel({
   const [fuel, setFuel] = useState<FuelType>("Gasolina comum");
   const [paid, setPaid] = useState("");
   const [liters, setLiters] = useState("");
+  const [pricePerLiter, setPricePerLiter] = useState("");
   const [odometerKm, setOdometerKm] = useState("");
   const [date, setDate] = useState(DateFormatter.inputDate(new Date().toISOString()));
   const [time, setTime] = useState(DateFormatter.inputTime(new Date().toISOString()));
@@ -68,6 +69,7 @@ export function RegisterFuel({
   const [notice, setNotice] = useState<ToastNotice | null>(null);
   const [activeField, setActiveField] = useState("paid");
   const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
   const currentCar = cars.find((car) => car.id === carId) ?? selectedCar;
   const fuelOptions = visibleFuels;
 
@@ -91,13 +93,14 @@ export function RegisterFuel({
     setFuel(editingLog.fuel);
     setPaid(String(editingLog.paid).replace(".", ","));
     setLiters(String(editingLog.liters).replace(".", ","));
+    setPricePerLiter(String(editingLog.pricePerLiter).replace(".", ","));
     setOdometerKm(editingLog.odometerKm ? String(editingLog.odometerKm).replace(".", ",") : "");
     setDate(DateFormatter.inputDate(editingLog.createdAt));
     setTime(DateFormatter.inputTime(editingLog.createdAt));
     setStationId(editingLog.stationId);
     setDraftLog(null);
     setSaveStatus(null);
-    setDirty(false);
+    markSaved();
   }, [editingLog?.id]);
 
   useEffect(() => {
@@ -118,10 +121,69 @@ export function RegisterFuel({
     setLocation(fakeCurrentLocation);
   }, [editingLog, stations]);
 
-  const parsedPaid = MoneyParser.toNumber(paid);
-  const parsedLiters = MoneyParser.toNumber(liters);
-  const price = new FuelPrice(parsedPaid, parsedLiters).valuePerLiter();
-  const parsedOdometerKm = odometerKm.trim() ? MoneyParser.toNumber(odometerKm) : undefined;
+  function updatePaid(value: string) {
+    setPaid(value);
+    const nextPaid = MoneyParser.toNumber(value);
+    const currentPrice = MoneyParser.toNumber(pricePerLiter);
+    const currentLiters = MoneyParser.toNumber(liters);
+
+    if (Number.isFinite(nextPaid) && nextPaid > 0 && Number.isFinite(currentPrice) && currentPrice > 0) {
+      setLiters(formatInputNumber(nextPaid / currentPrice));
+      return;
+    }
+
+    if (Number.isFinite(nextPaid) && nextPaid > 0 && Number.isFinite(currentLiters) && currentLiters > 0) {
+      setPricePerLiter(formatInputNumber(nextPaid / currentLiters));
+    }
+  }
+
+  function updateLiters(value: string) {
+    setLiters(value);
+    const nextLiters = MoneyParser.toNumber(value);
+    const currentPaid = MoneyParser.toNumber(paid);
+
+    if (!Number.isFinite(currentPaid) || currentPaid <= 0 || !Number.isFinite(nextLiters) || nextLiters <= 0) {
+      return;
+    }
+
+    setPricePerLiter(formatInputNumber(currentPaid / nextLiters));
+  }
+
+  function updatePricePerLiter(value: string) {
+    setPricePerLiter(value);
+    const nextPrice = MoneyParser.toNumber(value);
+    const currentPaid = MoneyParser.toNumber(paid);
+
+    if (!Number.isFinite(currentPaid) || currentPaid <= 0 || !Number.isFinite(nextPrice) || nextPrice <= 0) {
+      return;
+    }
+
+    setLiters(formatInputNumber(currentPaid / nextPrice));
+  }
+
+  function markDirty() {
+    dirtyRef.current = true;
+    setDirty(true);
+  }
+
+  function markSaved() {
+    dirtyRef.current = false;
+    setDirty(false);
+  }
+
+  function savePendingFuelLog(feedbackField = activeField) {
+    if (!dirtyRef.current) {
+      return;
+    }
+
+    setTimeout(() => {
+      if (!dirtyRef.current) {
+        return;
+      }
+
+      saveCurrentFuelLog(feedbackField);
+    }, 0);
+  }
 
   function buildPayload() {
     if (!currentCar) {
@@ -131,11 +193,15 @@ export function RegisterFuel({
 
     const paidNumber = MoneyParser.toNumber(paid);
     const litersNumber = MoneyParser.toNumber(liters);
+    const pricePerLiterNumber = MoneyParser.toNumber(pricePerLiter);
+    const effectiveLiters = Number.isFinite(litersNumber) && litersNumber > 0
+      ? litersNumber
+      : paidNumber / pricePerLiterNumber;
     const odometerNumber = odometerKm.trim() ? MoneyParser.toNumber(odometerKm) : undefined;
-    const fuelPrice = new FuelPrice(paidNumber, litersNumber);
+    const fuelPrice = new FuelPrice(paidNumber, effectiveLiters);
 
     if (!fuelPrice.isValid()) {
-      setSaveStatus("Preencha valor e litros para registrar.");
+      setSaveStatus("Preencha valor e litros ou preço por litro para registrar.");
       return undefined;
     }
 
@@ -155,7 +221,7 @@ export function RegisterFuel({
       stationId,
       fuel,
       paid: paidNumber,
-      liters: litersNumber,
+      liters: effectiveLiters,
       odometerKm: odometerNumber,
       createdAt,
       latitude: location.latitude,
@@ -172,7 +238,7 @@ export function RegisterFuel({
 
     if (editingLog) {
       onUpdate(FuelLogFactory.update(editingLog, payload));
-      setDirty(false);
+      markSaved();
       showFieldNotice(setNotice, "Abastecimento atualizado.", feedbackField);
       return true;
     }
@@ -181,7 +247,7 @@ export function RegisterFuel({
       const updatedDraft = FuelLogFactory.update(draftLog, payload);
       setDraftLog(updatedDraft);
       onUpdate(updatedDraft);
-      setDirty(false);
+      markSaved();
       showFieldNotice(setNotice, "Abastecimento atualizado.", feedbackField);
       return true;
     }
@@ -189,7 +255,7 @@ export function RegisterFuel({
     const newLog = FuelLogFactory.create(payload);
     setDraftLog(newLog);
     onSave(newLog);
-    setDirty(false);
+    markSaved();
     showFieldNotice(setNotice, "Novo abastecimento criado.", feedbackField);
     return true;
   }
@@ -197,18 +263,6 @@ export function RegisterFuel({
   function submitFuelLog() {
     saveCurrentFuelLog("submit");
   }
-
-  useEffect(() => {
-    if (!dirty) {
-      return undefined;
-    }
-
-    const timeout = setTimeout(() => {
-      saveCurrentFuelLog();
-    }, 550);
-
-    return () => clearTimeout(timeout);
-  }, [dirty, carId, fuel, paid, liters, odometerKm, date, time, stationId, location.latitude, location.longitude, editingLog?.id, draftLog?.id]);
 
   return (
     <View style={styles.stack}>
@@ -233,13 +287,15 @@ export function RegisterFuel({
                 onFocus={() => setActiveField("dateTime")}
                 onDateChange={(value: string) => {
                   setActiveField("dateTime");
-                  setDirty(true);
+                  markDirty();
                   setDate(value);
+                  savePendingFuelLog("dateTime");
                 }}
                 onTimeChange={(value: string) => {
                   setActiveField("dateTime");
-                  setDirty(true);
+                  markDirty();
                   setTime(value);
+                  savePendingFuelLog("dateTime");
                 }}
               />
               <FieldToast notice={notice} anchor="dateTime" styles={styles} />
@@ -256,9 +312,10 @@ export function RegisterFuel({
                       active={car.id === currentCar?.id}
                       onPress={() => {
                         setActiveField("car");
-                        setDirty(true);
+                        markDirty();
                         setCarId(car.id);
                         onCarSelect(car.id);
+                        savePendingFuelLog("car");
                       }}
                     />
                   ))}
@@ -276,9 +333,10 @@ export function RegisterFuel({
                   label=""
                   value={odometerKm}
                   onFocus={() => setActiveField("odometerKm")}
+                  onBlur={() => savePendingFuelLog("odometerKm")}
                   onChangeText={(value: string) => {
                     setActiveField("odometerKm");
-                    setDirty(true);
+                    markDirty();
                     setOdometerKm(value);
                   }}
                   keyboardType="decimal-pad"
@@ -299,8 +357,9 @@ export function RegisterFuel({
                       active={item === fuel}
                       onPress={() => {
                         setActiveField("fuel");
-                        setDirty(true);
+                        markDirty();
                         setFuel(item);
+                        savePendingFuelLog("fuel");
                       }}
                     />
                   ))}
@@ -315,10 +374,11 @@ export function RegisterFuel({
                   label="Valor"
                   value={paid}
                   onFocus={() => setActiveField("paid")}
+                  onBlur={() => savePendingFuelLog("paid")}
                   onChangeText={(value: string) => {
                     setActiveField("paid");
-                    setDirty(true);
-                    setPaid(value);
+                    markDirty();
+                    updatePaid(value);
                   }}
                   keyboardType="decimal-pad"
                   compact
@@ -330,10 +390,11 @@ export function RegisterFuel({
                   label="Litros"
                   value={liters}
                   onFocus={() => setActiveField("liters")}
+                  onBlur={() => savePendingFuelLog("liters")}
                   onChangeText={(value: string) => {
                     setActiveField("liters");
-                    setDirty(true);
-                    setLiters(value);
+                    markDirty();
+                    updateLiters(value);
                   }}
                   keyboardType="decimal-pad"
                   compact
@@ -341,12 +402,20 @@ export function RegisterFuel({
                 <FieldToast notice={notice} anchor="liters" styles={styles} />
               </View>
               <View style={styles.compactFieldToastAnchor}>
-                <View style={styles.compactInlineField}>
-                  <Text style={[styles.compactInlineLabel, styles.priceInlineLabel]}>Preço/L</Text>
-                  <View style={styles.priceInlineBox}>
-                    <Text style={styles.priceInlineValue}>{Number.isFinite(price) ? formatCurrency(price) : "R$ 0"}</Text>
-                  </View>
-                </View>
+                <Field
+                  label="Preço/L"
+                  value={pricePerLiter}
+                  onFocus={() => setActiveField("pricePerLiter")}
+                  onBlur={() => savePendingFuelLog("pricePerLiter")}
+                  onChangeText={(value: string) => {
+                    setActiveField("pricePerLiter");
+                    markDirty();
+                    updatePricePerLiter(value);
+                  }}
+                  keyboardType="decimal-pad"
+                  compact
+                />
+                <FieldToast notice={notice} anchor="pricePerLiter" styles={styles} />
               </View>
             </View>
 
@@ -361,8 +430,9 @@ export function RegisterFuel({
                       active={station.id === stationId}
                       onPress={() => {
                         setActiveField("station");
-                        setDirty(true);
+                        markDirty();
                         setStationId(station.id);
+                        savePendingFuelLog("station");
                       }}
                     />
                   ))}
@@ -383,11 +453,13 @@ export function RegisterFuel({
   );
 }
 
-function formatCurrency(value: number) {
+function formatInputNumber(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "";
+  }
+
   return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3
   }).format(value);
 }
