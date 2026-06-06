@@ -46,7 +46,8 @@ export function HelpScreen({
       id: "whatsapp",
       question: "Como conversar com o LitroCerto pelo WhatsApp?",
       answers: [
-        "A integração com WhatsApp está em testes. Ela permite enviar mensagens, fotos da bomba e dados do abastecimento para preparar um registro.",
+        "A integração com WhatsApp está em testes. O mais útil é poder registrar abastecimentos mandando áudio ou foto da bomba, em vez de digitar tudo.",
+        "Você pode enviar uma foto com valor, litros e preço por litro, ou mandar uma mensagem de voz dizendo o que abasteceu. A IA prepara o registro e pede só o que faltar, como veículo, posto ou km.",
         "Antes de salvar qualquer abastecimento criado por IA, confira se veículo, posto, combustível, valor, litros e km estão corretos."
       ]
     },
@@ -55,6 +56,7 @@ export function HelpScreen({
       question: "Como usar a IA dentro do app?",
       answers: [
         "A IA dentro do app ajuda a consultar gastos, comparar postos e preparar registros de abastecimento.",
+        "O principal ganho é registrar abastecimentos por conversa: você pode escrever, falar ou enviar foto da bomba para a IA extrair valor, litros, preço por litro e combustível quando conseguir identificar.",
         "Você pode fazer perguntas como quanto gastou no mês, qual posto está mais barato ou pedir ajuda para registrar um abastecimento."
       ]
     },
@@ -63,6 +65,7 @@ export function HelpScreen({
       question: "Como conversar com o LitroCerto pelo ChatGPT?",
       answers: [
         "Você pode usar o GPT do LitroCerto no ChatGPT para consultar seus dados e pedir ajuda para registrar veículos, postos e abastecimentos.",
+        "A parte mais prática é usar voz ou foto: mande uma imagem da bomba ou descreva o abastecimento por voz, e o ChatGPT pode preparar o registro no LitroCerto quando você autorizar.",
         "Ao usar pela primeira vez, o ChatGPT vai pedir autorização. Essa autorização vale apenas para a sua conta."
       ],
       links: [
@@ -77,7 +80,16 @@ export function HelpScreen({
       question: "Como conversar com o LitroCerto pelo Claude?",
       answers: [
         "No Claude, você pode adicionar o conector MCP remoto do LitroCerto para consultar métricas e interagir com seus dados.",
-        "Depois de conectar, o Claude também pedirá autorização para acessar apenas os dados da sua conta."
+        "Com o conector, você pode pedir ao Claude para consultar gastos e preparar registros. Quando estiver usando recursos de voz ou imagem no Claude, isso facilita transformar uma fala ou foto da bomba em um abastecimento para revisar e salvar.",
+        "Depois de conectar, o Claude também pedirá autorização para acessar apenas os dados da sua conta.",
+        "1. Abra o Claude e entre em Configurações.",
+        "2. Vá em Conectores e escolha adicionar um conector personalizado.",
+        "3. No nome, use LitroCerto.",
+        "4. Em URL do servidor MCP remoto, cole a URL abaixo.",
+        "5. Se o Claude pedir Client ID e Client Secret, use os dados do app LitroCerto que você configurou para o conector.",
+        "6. Salve o conector e clique para iniciar a autenticação.",
+        "7. Faça login no LitroCerto e autorize o acesso.",
+        "Depois disso, o Claude poderá consultar seus veículos, postos, abastecimentos e métricas da sua conta."
       ],
       links: [
         {
